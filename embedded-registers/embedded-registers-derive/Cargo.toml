@@ -1,0 +1,20 @@
+[package]
+name = "embedded-registers-derive"
+edition = "2021"
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+license.workspace = true
+version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+proc-macro2 = "1.0"
+darling = "0.20.3"
+
+[dev-dependencies]
+embedded-registers = { path = "../embedded-registers", features = ["derive"] }

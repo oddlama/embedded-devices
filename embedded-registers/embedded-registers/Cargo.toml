@@ -1,0 +1,15 @@
+[package]
+name = "embedded-registers"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+
+[dependencies]
+embedded-registers-derive = { path = "../embedded-registers-derive", optional = true }
+
+[features]
+default = ["derive"]
+derive = ["embedded-registers-derive"]
+std = []

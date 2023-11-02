@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+	"embedded-registers",
+	"embedded-registers-derive",
+]
+
+[workspace.package]
+version = "1.0.0"
+authors = ["oddlama <oddlama@oddlama.org>"]
+description = ""
+documentation = "https://example.com/bar"
+license = "MIT OR Apache-2.0"
