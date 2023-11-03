@@ -1,13 +1,14 @@
-use embedded_registers::register;
-use embedded_registers::Register;
+#![feature(generic_arg_infer)]
 
-//#[derive(Bitfields, Clone, PartialEq, Eq, Debug, Format)]
-//#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-#[derive(Clone, PartialEq, Eq, Debug)]
+use embedded_registers::register;
+
 #[register(address = 0x04, read)]
-struct ConfigBitfield {
+#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+pub struct Configuration {
     //#[bondrewd(bit_length = 5)]
-    something: u8,
+    something1: u8,
+    //#[bondrewd(bit_length = 5)]
+    something2: u8,
 }
 
 #[test]

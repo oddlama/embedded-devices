@@ -1,8 +1,8 @@
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro as pc;
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use proc_macro2::{Ident, TokenStream};
+use quote::{quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
 
 #[derive(Debug, FromMeta)]
@@ -28,102 +28,97 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     if args.read.is_none() && args.write.is_none() {
         return Err(syn::Error::new(
             args_span,
-            "A register definition must include read, write, or both!",
+            "A register definition must include read, write, or both",
         ));
     }
 
     let input = syn::parse2::<syn::ItemStruct>(input)?;
-    let ident = input.ident.clone();
-    let output = quote! {
-        #input
+    if !input.attrs.iter().any(|x| x.path().is_ident("bondrewd")) {
+        return Err(syn::Error::new(
+            args_span,
+            "A register definition must also include a #[bondrewd()] bitfield spec",
+        ));
+    }
 
-        impl Register for #ident {
+    let ident = input.ident;
+    let vis = input.vis;
+    let fields = input.fields;
+    let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();
+    let register_ident = Ident::from_string(&format!("Register{}", ident))?;
+
+    let mut output = quote! {
+        #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
+        #attrs
+        #vis struct #ident
+        #fields
+
+        #[derive(Clone, Default, PartialEq, Eq)]
+        pub struct #register_ident {
+            data: [u8; <#ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
+        }
+
+        impl core::fmt::Debug for #register_ident {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                #ident::from(self).fmt(f)
+            }
+        }
+
+        impl defmt::Format for #register_ident {
+            fn format(&self, f: defmt::Formatter) {
+                defmt::write!(
+                    f,
+                    "#register_ident {{ data: {}, bitfield: {} }}",
+                    self.data,
+                    #ident::from(self)
+                )
+            }
+        }
+
+        impl embedded_registers::Register for #register_ident {
+            type Data = [u8; Self::REGISTER_SIZE];
+            type Bitfield = #ident;
+
+            const REGISTER_SIZE: usize = <#ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
+            const ADDRESS: u8 = 0b001;
+
+            fn data(&self) -> &[u8] {
+                &self.data
+            }
+
+            fn data_mut(&mut self) -> &mut [u8] {
+                &mut self.data
+            }
+        }
+
+        impl From<&#register_ident> for #ident {
+            fn from(val: &#register_ident) -> Self {
+                use bondrewd::Bitfields;
+                #ident::from_bytes(val.data)
+            }
+        }
+
+        impl From<#ident> for #register_ident {
+            fn from(value: #ident) -> Self {
+                use bondrewd::Bitfields;
+                Self {
+                    data: value.into_bytes(),
+                }
+            }
         }
     };
+
+    if args.read.is_some() {
+        output.append_all(quote! {
+            impl embedded_registers::RegisterRead for #register_ident {}
+        });
+    }
+
+    if args.write.is_some() {
+        output.append_all(quote! {
+            impl embedded_registers::RegisterWrite for #register_ident {}
+        });
+    }
 
     println!("{}", output.to_token_stream());
     Ok(output)
 }
-
-//#[derive(FromDeriveInput, Default)]
-//#[darling(default, attributes(register))]
-//struct Opts {
-//    address: Option<u8>,
-//}
-//
-//#[proc_macro_derive(Register, attributes(register))]
-//pub fn derive(input: TokenStream) -> TokenStream {
-//    let input = parse_macro_input!(input);
-//    let opts = Opts::from_derive_input(&input).expect("Invalid options");
-//    let DeriveInput { ident, .. } = input;
-//
-//    let answer = match opts.address {
-//        Some(x) => quote! {
-//            fn answer() -> i32 {
-//                #x
-//            }
-//        },
-//        None => quote! {},
-//    };
-//
-//    //#[derive(Clone, Default, PartialEq, Eq)]
-//    //pub struct Config {
-//    //    data: [u8; ConfigBitfield::BYTE_SIZE],
-//    //}
-//
-//    //impl Debug for Config {
-//    //    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-//    //        ConfigBitfield::from(self).fmt(f)
-//    //    }
-//    //}
-//
-//    //impl Format for Config {
-//    //    fn format(&self, f: defmt::Formatter) {
-//    //        defmt::write!(
-//    //            f,
-//    //            "Config {{ data: {}, bitfield: {} }}",
-//    //            self.data,
-//    //            ConfigBitfield::from(self)
-//    //        )
-//    //    }
-//    //}
-//
-//    //impl Register for Config {
-//    //    type Data = [u8; Self::REGISTER_SIZE];
-//    //    type Bitfield = ConfigBitfield;
-//
-//    //    const REGISTER_SIZE: usize = ConfigBitfield::BYTE_SIZE;
-//    //    const ADDRESS: u8 = 0b001;
-//
-//    //    fn data(&self) -> &[u8] {
-//    //        &self.data
-//    //    }
-//
-//    //    fn data_mut(&mut self) -> &mut [u8] {
-//    //        &mut self.data
-//    //    }
-//    //}
-//
-//    //impl From<&Config> for ConfigBitfield {
-//    //    fn from(val: &Config) -> Self {
-//    //        ConfigBitfield::from_bytes(val.data)
-//    //    }
-//    //}
-//
-//    //impl From<ConfigBitfield> for Config {
-//    //    fn from(value: ConfigBitfield) -> Self {
-//    //        Self {
-//    //            data: value.into_bytes(),
-//    //        }
-//    //    }
-//    //}
-//
-//    //impl RegisterRead for Config {}
-//    //impl RegisterWrite for Config {}
-//    let output = quote! {
-//        impl Register for #ident {
-//            #answer
-//        }
-//    };
-//    output.into()
-//}
