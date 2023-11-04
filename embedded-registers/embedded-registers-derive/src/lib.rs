@@ -30,7 +30,7 @@
 //! - `Foo` will become the register, essentially a byte array with the correct size that provides
 //!   getter and setter functions for the individual fields.
 //! - `FooBitfield` will become the underlying bondrewd bitfield, which may be used to construct
-//!   a register from scratch, or can be obtained via [Foo::read_all] if you want to unpack all values.
+//!   a register from scratch, or can be obtained via `Foo::read_all` if you want to unpack all values.
 //!
 //! This has the advantage that reading a register incurs no additional memory and CPU cost to unpack all
 //! values of the bitfield. You only pay for the members you actually access.
@@ -43,20 +43,26 @@
 //! and is read-only:
 //!
 //! ```
+//! #![feature(generic_arg_infer)]
+//! use embedded_registers::{register, RegisterRead};
+//!
 //! #[register(address = 0b111, read)]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct DeviceId {
 //!     device_id: u8,
 //!     revision: u8,
 //! }
-//! ```
 //!
-//! The register may now be read from an I2C bus using sync or async operations:
-//!
-//! ```
+//! // The register may now be read from an I2C bus using sync or async operations:
+//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! # {
 //! let address = 0x24; // I2C device address
 //! let reg = DeviceId::read_i2c(&mut i2c, address).await?;
 //! // sync: let reg = DeviceId::read_i2c_blocking(&mut i2c, address);
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Complex Example
@@ -65,7 +71,12 @@
 //! Have a look at this excerpt of the Configuration register from the MCP9808:
 //!
 //! ```
-//! #[allow(non_camel_case_types)]
+//! #![feature(generic_arg_infer)]
+//! # use defmt::{info, Format};
+//! use embedded_registers::{register, RegisterRead, RegisterWrite};
+//! use bondrewd::BitfieldEnum;
+//!
+//! # #[allow(non_camel_case_types)]
 //! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
 //! #[bondrewd_enum(u8)]
 //! pub enum Hysteresis {
@@ -95,29 +106,33 @@
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
 //!     pub shutdown_mode: ShutdownMode,
 //!     // ... all 16 bits must be filled
+//!     # #[bondrewd(bit_length = 8, reserve)]
+//!     # #[allow(dead_code)]
+//!     # reserved2: u8,
 //! }
-//! ```
 //!
-//! This now allows us to read and write the register, while only
-//! unpacking the fields we require:
-//!
-//! ```
-//! let reg = Config::read_i2c(&mut i2c, address).await?;
+//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! # {
+//! # let address = 0x24; // I2C device address
+//! // This now allows us to read and write the register, while only
+//! // unpacking the fields we require:
+//! let mut reg = Config::read_i2c(&mut i2c, address).await?;
 //! info!("previous shutdown mode: {}", reg.read_shutdown_mode());
 //! reg.write_shutdown_mode(ShutdownMode::Shutdown);
 //! reg.write_i2c(&mut i2c, address).await?;
-//! ```
 //!
-//! If you want to get the full decoded bitfield, you can use either `read_all`
-//! or `.into()`. If you need to unpack all fields anyway, this might be
-//! more convenient as it allows you to access the bitfield members more ergonomically.
-//!
-//! ```
+//! // If you want to get the full decoded bitfield, you can use either `read_all`
+//! // or `.into()`. If you need to unpack all fields anyway, this might be
+//! // more convenient as it allows you to access the bitfield members more ergonomically.
 //! //let bf: ConfigBitfield = reg.into();
 //! let mut bf = reg.read_all();
-//! info!("previous shutdown mode: {}", reg.shutdown_mode);
+//! info!("previous shutdown mode: {}", bf.shutdown_mode);
 //! bf.shutdown_mode = ShutdownMode::Shutdown;
 //! reg.write_all(bf);
+//! # Ok(())
+//! # }
 //! ```
 
 use darling::ast::NestedMeta;

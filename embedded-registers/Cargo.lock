@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "embedded-hal",
  "embedded-hal-async",
@@ -121,11 +121,13 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "bondrewd",
  "darling",
  "defmt",
+ "embedded-hal",
+ "embedded-hal-async",
  "embedded-registers",
  "proc-macro2",
  "quote",
