@@ -12,6 +12,8 @@ categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+defmt = "0.3.5"
 embedded-hal = "1.0.0-rc.1"
 embedded-hal-async = "1.0.0-rc.1"
 embedded-registers = "0.9.0"

@@ -99,6 +99,8 @@ dependencies = [
 name = "embedded-devices"
 version = "0.9.0"
 dependencies = [
+ "bondrewd",
+ "defmt",
  "embedded-hal",
  "embedded-hal-async",
  "embedded-registers",
