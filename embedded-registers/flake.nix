@@ -56,6 +56,7 @@
       craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       commonArgs = {
+        pname = "embedded-registers";
         src = craneLib.cleanCargoSource (craneLib.path ./.);
         buildInputs =
           [
