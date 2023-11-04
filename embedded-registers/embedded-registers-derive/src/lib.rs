@@ -41,6 +41,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     }
 
     let ident = input.ident;
+    let debug_format_str = format!("{} ({{:?}}) => {{:?}}", ident.to_string());
     let vis = input.vis;
     let fields = input.fields.clone();
     let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();
@@ -54,9 +55,11 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         })?;
 
         let read_field_name = format_ident!("read_{field_name}");
-        let read_comment = format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
+        let read_comment =
+            format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
         let write_field_name = format_ident!("write_{field_name}");
-        let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
+        let write_comment =
+            format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
 
         forward_fns = quote! {
             #forward_fns
@@ -76,7 +79,9 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     }
 
     let read_all_comment = format!("Calls [`{bitfield_ident}::from_bytes`] on the stored data.");
-    let write_all_comment = format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
+    let write_all_comment =
+        format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
+    let address = args.address;
 
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
@@ -109,7 +114,12 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
         impl core::fmt::Debug for #ident {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                #bitfield_ident::from(self).fmt(f)
+                write!(
+                    f,
+                    #debug_format_str,
+                    self.data,
+                    #bitfield_ident::from(self)
+                )
             }
         }
 
@@ -117,8 +127,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             fn format(&self, f: defmt::Formatter) {
                 defmt::write!(
                     f,
-                    "{} {{ data: {}, bitfield: {} }}",
-                    stringify!(#ident),
+                    #debug_format_str,
                     self.data,
                     #bitfield_ident::from(self)
                 )
@@ -130,7 +139,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             type Bitfield = #bitfield_ident;
 
             const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
-            const ADDRESS: u8 = 0b001;
+            const ADDRESS: u8 = #address;
 
             #[inline]
             fn data(&self) -> &[u8] {
@@ -151,12 +160,12 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             }
         }
 
-        impl From<#bitfield_ident> for #ident {
+        impl From<&#bitfield_ident> for #ident {
             #[inline]
-            fn from(value: #bitfield_ident) -> Self {
+            fn from(value: &#bitfield_ident) -> Self {
                 use bondrewd::Bitfields;
                 Self {
-                    data: value.into_bytes(),
+                    data: value.clone().into_bytes(),
                 }
             }
         }

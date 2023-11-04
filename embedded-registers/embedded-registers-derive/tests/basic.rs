@@ -25,13 +25,16 @@ pub struct Configuration {
 
 #[test]
 fn example_register() {
-    let mut a: Configuration = Default::default();
-    a.write_status(StatusMagnetometer {
+    let mut reg: Configuration = Default::default();
+    reg.write_status(StatusMagnetometer {
         mtm1: true,
         mtm2: true,
         mtm3: true,
         reserved: 0,
     });
-    let b = a.read_all();
-    a.write_all(b);
+
+    let bitfield = reg.read_all();
+    let mut reg2 = reg.clone();
+    reg2.write_all(bitfield);
+    assert_eq!(reg, reg2);
 }

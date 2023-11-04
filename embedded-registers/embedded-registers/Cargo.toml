@@ -8,7 +8,9 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
-embedded-registers-derive = { path = "../embedded-registers-derive", optional = true }
+embedded-hal = "1.0.0-rc.1"
+embedded-hal-async = "1.0.0-rc.1"
+embedded-registers-derive = { version = "1.0.0", path = "../embedded-registers-derive", optional = true }
 
 [features]
 default = ["derive"]
