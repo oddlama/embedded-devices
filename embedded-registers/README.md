@@ -35,6 +35,8 @@ For a simple register definition example, take a look at this `DeviceId` registe
 from the MCP9808 temperature sensor:
 
 ```rust
+#![feature(generic_arg_infer)]
+
 use embedded_registers::register;
 
 #[register(address = 0b111, read)]

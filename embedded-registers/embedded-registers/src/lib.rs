@@ -1,3 +1,6 @@
+//! Defined Traits for embedded-registers-derive.
+//! For Derive Docs see [embedded-registers-derive](https://docs.rs/embedded-registers-derive/latest/embedded_registers_derive/)
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use embedded_hal::i2c::Operation;

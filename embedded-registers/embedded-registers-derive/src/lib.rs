@@ -1,7 +1,124 @@
+//! This crate provides a procedural macro for effortless definitions of registers
+//! in embedded device drivers.
 //!
+//! Currently, embedded-registers requires you to use `#![feature(generic_arg_infer)]`.
 //!
+//! # Attribute macro
 //!
+//! Registers are defined by adding `#[register(...)]` to the definition of a bondrewd bitfield.
+//! As a short reminder, bondrewd is another proc macro that allows you to define a bitfield structure,
+//! which is very handy when dealing with registers, where multiple values are often tightly packed bit-on-bit.
 //!
+//! The register attribute macro supports the following arguments:
+//!
+//! <table>
+//!   <tr>
+//!     <td>address</td>
+//!     <td>The virtual address associated to the register.</td>
+//!   </tr>
+//!   <tr>
+//!     <td>read</td>
+//!     <td>Add this if the register should be readable</td>
+//!   </tr>
+//!   <tr>
+//!     <td>write</td>
+//!     <td>Add this if the register should be writeable</td>
+//!   </tr>
+//! </table>
+//!
+//! Adding this attribute to a bondrewd struct `Foo` will result in two types being defined:
+//! - `Foo` will become the register, essentially a byte array with the correct size that provides
+//!   getter and setter functions for the individual fields.
+//! - `FooBitfield` will become the underlying bondrewd bitfield, which may be used to construct
+//!   a register from scratch, or can be obtained via [Foo::read_all] if you want to unpack all values.
+//!
+//! This has the advantage that reading a register incurs no additional memory and CPU cost to unpack all
+//! values of the bitfield. You only pay for the members you actually access.
+//!
+//! # Simple Example
+//!
+//! This simple example defines the `DeviceId` register of an MCP9808. It has
+//! the virtual address `0b111 (0x7)`, uses big endian byte order with the first
+//! member of the struct positioned at the most significant bit, is 2 bytes in size
+//! and is read-only:
+//!
+//! ```
+//! #[register(address = 0b111, read)]
+//! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+//! pub struct DeviceId {
+//!     device_id: u8,
+//!     revision: u8,
+//! }
+//! ```
+//!
+//! The register may now be read from an I2C bus using sync or async operations:
+//!
+//! ```
+//! let address = 0x24; // I2C device address
+//! let reg = DeviceId::read_i2c(&mut i2c, address).await?;
+//! // sync: let reg = DeviceId::read_i2c_blocking(&mut i2c, address);
+//! ```
+//!
+//! # Complex Example
+//!
+//! A more complex example may involve adding your own Bondrewd-capable enums.
+//! Have a look at this excerpt of the Configuration register from the MCP9808:
+//!
+//! ```
+//! #[allow(non_camel_case_types)]
+//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
+//! #[bondrewd_enum(u8)]
+//! pub enum Hysteresis {
+//!     Deg_0_0C = 0b00,
+//!     Deg_1_5C = 0b01,
+//!     Deg_3_0C = 0b10,
+//!     Deg_6_0C = 0b11,
+//! }
+//!
+//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
+//! #[bondrewd_enum(u8)]
+//! pub enum ShutdownMode {
+//!     Continuous = 0,
+//!     Shutdown = 1,
+//! }
+//!
+//! #[register(address = 0b001, read, write)]
+//! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+//! pub struct Config {
+//!     // padding
+//!     #[bondrewd(bit_length = 5, reserve)]
+//!     #[allow(dead_code)]
+//!     reserved: u8,
+//!
+//!     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+//!     pub hysteresis: Hysteresis,
+//!     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+//!     pub shutdown_mode: ShutdownMode,
+//!     // ... all 16 bits must be filled
+//! }
+//! ```
+//!
+//! This now allows us to read and write the register, while only
+//! unpacking the fields we require:
+//!
+//! ```
+//! let reg = Config::read_i2c(&mut i2c, address).await?;
+//! info!("previous shutdown mode: {}", reg.read_shutdown_mode());
+//! reg.write_shutdown_mode(ShutdownMode::Shutdown);
+//! reg.write_i2c(&mut i2c, address).await?;
+//! ```
+//!
+//! If you want to get the full decoded bitfield, you can use either `read_all`
+//! or `.into()`. If you need to unpack all fields anyway, this might be
+//! more convenient as it allows you to access the bitfield members more ergonomically.
+//!
+//! ```
+//! //let bf: ConfigBitfield = reg.into();
+//! let mut bf = reg.read_all();
+//! info!("previous shutdown mode: {}", reg.shutdown_mode);
+//! bf.shutdown_mode = ShutdownMode::Shutdown;
+//! reg.write_all(bf);
+//! ```
 
 use darling::ast::NestedMeta;
 use darling::FromMeta;
