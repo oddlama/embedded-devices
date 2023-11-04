@@ -11,6 +11,7 @@ authors = ["oddlama <oddlama@oddlama.org>"]
 description = "Procedural macro for effortless definitions of registers in embedded device drivers"
 documentation = "https://github.com/oddlama/embedded-registers"
 homepage = "https://github.com/oddlama/embedded-registers"
+readme = "README.md"
 repository = "https://github.com/oddlama/embedded-registers"
 keywords = ["register", "registers", "bitfield", "derive", "sensor"]
 categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]

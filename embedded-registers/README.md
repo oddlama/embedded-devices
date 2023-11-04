@@ -16,9 +16,8 @@ resulting struct may trivially be extended to work with any other similar commun
 - Only the accessed bitfield members are decoded, conserving memory and saving on CPU time.
 - Supports both async and blocking operation modes
 
-This crate was designed for the [embedded-drivers](https://github.com/oddlama/embedded-drivers) crate,
-which aims to provide modern async-capable and coherent definitions
-of many embedded device drivers.
+This crate was designed for the [embedded-devices](https://github.com/oddlama/embedded-devices) crate,
+which aims to provide modern async-capable and coherent definitions for many embedded devices.
 
 ## Usage
 
