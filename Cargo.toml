@@ -1,7 +1,7 @@
 [package]
 name = "embedded-devices"
 edition = "2021"
-version = "0.9.0"
+version = "0.0.1"
 authors = ["oddlama <oddlama@oddlama.org>"]
 description = "Device driver implementations for many embedded sensors and devices"
 documentation = "https://github.com/oddlama/embedded-devices"
