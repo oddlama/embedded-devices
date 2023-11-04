@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-devices"
-version = "0.9.0"
+version = "0.0.1"
 dependencies = [
  "bondrewd",
  "defmt",
@@ -123,9 +123,9 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad33907c08855ee0cf65e534b7c8536ef06d5baa32cd6acda83e48dcf664884d"
+checksum = "b9a7dad9d8fb9615e4de5f42364886d4a15a4a7c1e049677c66bcf396f3486b3"
 dependencies = [
  "embedded-hal",
  "embedded-hal-async",
@@ -134,9 +134,9 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eba788518a578cc5a019644e74870696a9c5565b340c8e255eca21af8c1aeead"
+checksum = "2f134814daccc945cfaa492604c7b55ca43fdd3d4a4ea8ed2aa2bc89e71496c0"
 dependencies = [
  "bondrewd",
  "darling",
