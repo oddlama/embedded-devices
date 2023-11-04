@@ -18,5 +18,8 @@ darling = "0.20.3"
 bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
 defmt = "0.3.5"
 
+[dependencies.bondrewd-derive]
+features = ["setters"]
+
 [dev-dependencies]
 embedded-registers = { path = "../embedded-registers", features = ["derive"] }

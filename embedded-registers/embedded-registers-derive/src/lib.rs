@@ -1,8 +1,8 @@
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro as pc;
-use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
 
 #[derive(Debug, FromMeta)]
@@ -42,63 +42,118 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
     let ident = input.ident;
     let vis = input.vis;
-    let fields = input.fields;
+    let fields = input.fields.clone();
     let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();
-    let register_ident = Ident::from_string(&format!("Register{}", ident))?;
+    let bitfield_ident = format_ident!("{}Bitfield", ident);
+
+    let mut forward_fns = quote! {};
+    for field in input.fields {
+        let type_ident = field.ty;
+        let field_name = field.ident.ok_or_else(|| {
+            syn::Error::new(args_span, "A field contains a field without an identifier")
+        })?;
+
+        let read_field_name = format_ident!("read_{field_name}");
+        let read_comment = format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
+        let write_field_name = format_ident!("write_{field_name}");
+        let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
+
+        forward_fns = quote! {
+            #forward_fns
+
+            #[inline]
+            #[doc = #read_comment]
+            pub fn #read_field_name(&self) -> #type_ident {
+                #bitfield_ident::#read_field_name(&self.data)
+            }
+
+            #[inline]
+            #[doc = #write_comment]
+            pub fn #write_field_name(&mut self, #field_name: #type_ident) {
+                #bitfield_ident::#write_field_name(&mut self.data, #field_name)
+            }
+        };
+    }
+
+    let read_all_comment = format!("Calls [`{bitfield_ident}::from_bytes`] on the stored data.");
+    let write_all_comment = format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
 
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         #attrs
-        #vis struct #ident
+        #vis struct #bitfield_ident
         #fields
 
         #[derive(Clone, Default, PartialEq, Eq)]
-        pub struct #register_ident {
-            data: [u8; <#ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
+        pub struct #ident {
+            data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
         }
 
-        impl core::fmt::Debug for #register_ident {
-            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                #ident::from(self).fmt(f)
+        impl #ident {
+            #forward_fns
+
+            #[inline]
+            #[doc = #read_all_comment]
+            fn read_all(&self) -> #bitfield_ident {
+                use bondrewd::Bitfields;
+                #bitfield_ident::from_bytes(self.data)
+            }
+
+            #[inline]
+            #[doc = #write_all_comment]
+            fn write_all(&mut self, value: #bitfield_ident) {
+                use bondrewd::Bitfields;
+                self.data = value.into_bytes();
             }
         }
 
-        impl defmt::Format for #register_ident {
+        impl core::fmt::Debug for #ident {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                #bitfield_ident::from(self).fmt(f)
+            }
+        }
+
+        impl defmt::Format for #ident {
             fn format(&self, f: defmt::Formatter) {
                 defmt::write!(
                     f,
-                    "#register_ident {{ data: {}, bitfield: {} }}",
+                    "{} {{ data: {}, bitfield: {} }}",
+                    stringify!(#ident),
                     self.data,
-                    #ident::from(self)
+                    #bitfield_ident::from(self)
                 )
             }
         }
 
-        impl embedded_registers::Register for #register_ident {
+        impl embedded_registers::Register for #ident {
             type Data = [u8; Self::REGISTER_SIZE];
-            type Bitfield = #ident;
+            type Bitfield = #bitfield_ident;
 
-            const REGISTER_SIZE: usize = <#ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
+            const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
             const ADDRESS: u8 = 0b001;
 
+            #[inline]
             fn data(&self) -> &[u8] {
                 &self.data
             }
 
+            #[inline]
             fn data_mut(&mut self) -> &mut [u8] {
                 &mut self.data
             }
         }
 
-        impl From<&#register_ident> for #ident {
-            fn from(val: &#register_ident) -> Self {
+        impl From<&#ident> for #bitfield_ident {
+            #[inline]
+            fn from(val: &#ident) -> Self {
                 use bondrewd::Bitfields;
-                #ident::from_bytes(val.data)
+                #bitfield_ident::from_bytes(val.data)
             }
         }
 
-        impl From<#ident> for #register_ident {
-            fn from(value: #ident) -> Self {
+        impl From<#bitfield_ident> for #ident {
+            #[inline]
+            fn from(value: #bitfield_ident) -> Self {
                 use bondrewd::Bitfields;
                 Self {
                     data: value.into_bytes(),
@@ -109,16 +164,15 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
     if args.read.is_some() {
         output.append_all(quote! {
-            impl embedded_registers::RegisterRead for #register_ident {}
+            impl embedded_registers::RegisterRead for #ident {}
         });
     }
 
     if args.write.is_some() {
         output.append_all(quote! {
-            impl embedded_registers::RegisterWrite for #register_ident {}
+            impl embedded_registers::RegisterWrite for #ident {}
         });
     }
 
-    println!("{}", output.to_token_stream());
     Ok(output)
 }

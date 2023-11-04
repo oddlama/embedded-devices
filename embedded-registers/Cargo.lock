@@ -107,6 +107,7 @@ name = "embedded-registers-derive"
 version = "1.0.0"
 dependencies = [
  "bondrewd",
+ "bondrewd-derive",
  "darling",
  "defmt",
  "embedded-registers",
