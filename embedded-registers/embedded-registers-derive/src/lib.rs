@@ -257,7 +257,6 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         }
 
         impl embedded_registers::Register for #ident {
-            type Data = [u8; Self::REGISTER_SIZE];
             type Bitfield = #bitfield_ident;
 
             const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;

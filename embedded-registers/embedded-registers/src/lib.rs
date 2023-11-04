@@ -5,19 +5,32 @@
 
 use embedded_hal::i2c::Operation;
 
+/// The basis trait for all registers. A register is a type
+/// that maps to a specific register on an embedded device and
+/// should own the raw data required for this register.
+///
+/// Additionally, a register knows the virtual address ossociated
+/// to the embedded device, and a bitfield representation of the
+/// data content.
 pub trait Register: Default + Clone {
+    /// The size of the register in bytes
     const REGISTER_SIZE: usize;
+    /// The virtual address of this register
     const ADDRESS: u8;
 
+    /// The associated bondrewd bitfield type
     type Bitfield;
-    type Data;
 
+    /// Provides immutable access to the raw data.
     fn data(&self) -> &[u8];
+    /// Provides mutable access to the raw data.
     fn data_mut(&mut self) -> &mut [u8];
 }
 
+/// This trait is implemented by any register that can be read via a specific bus interface.
 #[allow(async_fn_in_trait)]
 pub trait RegisterRead: Register {
+    /// Asynchronously read this register from the given i2c bus and device address.
     #[inline]
     async fn read_i2c<I>(i2c: &mut I, address: u8) -> Result<Self, I::Error>
     where
@@ -29,6 +42,7 @@ pub trait RegisterRead: Register {
         Ok(register)
     }
 
+    /// Synchronously read this register from the given i2c bus and device address.
     #[inline]
     fn read_i2c_blocking<I>(i2c: &mut I, address: u8) -> Result<Self, I::Error>
     where
@@ -40,8 +54,10 @@ pub trait RegisterRead: Register {
     }
 }
 
+/// This trait is implemented by any register that can be written via a specific bus interface.
 #[allow(async_fn_in_trait)]
 pub trait RegisterWrite: Register {
+    /// Asynchronously write this register to the given i2c bus and device address.
     #[inline]
     async fn write_i2c<I>(&self, i2c: &mut I, address: u8) -> Result<(), I::Error>
     where
@@ -57,6 +73,7 @@ pub trait RegisterWrite: Register {
         .await
     }
 
+    /// Synchronously write this register to the given i2c bus and device address.
     #[inline]
     fn write_i2c_blocking<I>(&self, i2c: &mut I, address: u8) -> Result<(), I::Error>
     where
