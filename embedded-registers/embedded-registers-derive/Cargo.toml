@@ -25,4 +25,4 @@ defmt = "0.3.5"
 [dev-dependencies]
 embedded-hal = "1.0.0-rc.1"
 embedded-hal-async = "1.0.0-rc.1"
-embedded-registers = { version = "0.9.0", path = "../embedded-registers", features = ["derive"] }
+embedded-registers = { path = "../embedded-registers", features = ["derive"] }
