@@ -37,8 +37,7 @@ pub trait RegisterRead: Register {
         I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
     {
         let mut register = Self::default();
-        i2c.write_read(address, &[Self::ADDRESS], register.data_mut())
-            .await?;
+        i2c.write_read(address, &[Self::ADDRESS], register.data_mut()).await?;
         Ok(register)
     }
 
@@ -65,10 +64,7 @@ pub trait RegisterWrite: Register {
     {
         i2c.transaction(
             address,
-            &mut [
-                Operation::Write(&[Self::ADDRESS]),
-                Operation::Write(self.data()),
-            ],
+            &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
         )
         .await
     }
@@ -81,10 +77,7 @@ pub trait RegisterWrite: Register {
     {
         i2c.transaction(
             address,
-            &mut [
-                Operation::Write(&[Self::ADDRESS]),
-                Operation::Write(self.data()),
-            ],
+            &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
         )
     }
 }

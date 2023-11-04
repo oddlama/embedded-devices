@@ -187,16 +187,14 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let mut forward_fns = quote! {};
     for field in input.fields {
         let type_ident = field.ty;
-        let field_name = field.ident.ok_or_else(|| {
-            syn::Error::new(args_span, "A field contains a field without an identifier")
-        })?;
+        let field_name = field
+            .ident
+            .ok_or_else(|| syn::Error::new(args_span, "A field contains a field without an identifier"))?;
 
         let read_field_name = format_ident!("read_{field_name}");
-        let read_comment =
-            format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
+        let read_comment = format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
         let write_field_name = format_ident!("write_{field_name}");
-        let write_comment =
-            format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
+        let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
 
         forward_fns = quote! {
             #forward_fns
@@ -216,8 +214,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     }
 
     let read_all_comment = format!("Calls [`{bitfield_ident}::from_bytes`] on the stored data.");
-    let write_all_comment =
-        format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
+    let write_all_comment = format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
     let address = args.address;
 
     let mut output = quote! {
