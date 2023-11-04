@@ -43,9 +43,12 @@ pub struct DeviceId {
     device_id: u8,
     revision: u8,
 }
+```
 
-// Read the register:
-let mut i2c = /* ... */;
+You may then read the register simply by calling `DeviceId::read_i2c` or `DeviceId::read_i2c_blocking`
+(or similarly write to it if you specified `write` in the definition above):
+
+```rust
 let reg = DeviceId::read_i2c(&mut i2c, 0x24 /* i2c device address */).await?;
 info!("{}", reg);
 // Prints: DeviceId ([4, 0]) => DeviceIdBitfield { device_id: 4, revision: 0 }

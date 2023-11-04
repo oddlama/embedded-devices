@@ -1,11 +1,15 @@
 [package]
 name = "embedded-registers"
 edition = "2021"
+version.workspace = true
 authors.workspace = true
 description.workspace = true
 documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 license.workspace = true
-version.workspace = true
 
 [dependencies]
 embedded-hal = "1.0.0-rc.1"

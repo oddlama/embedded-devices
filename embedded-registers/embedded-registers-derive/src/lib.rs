@@ -1,3 +1,8 @@
+//!
+//!
+//!
+//!
+
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro as pc;
@@ -41,7 +46,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     }
 
     let ident = input.ident;
-    let debug_format_str = format!("{} ({{:?}}) => {{:?}}", ident.to_string());
+    let debug_format_str = format!("{} ({{:?}}) => {{:?}}", ident);
     let vis = input.vis;
     let fields = input.fields.clone();
     let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();

@@ -1,11 +1,15 @@
 [package]
 name = "embedded-registers-derive"
 edition = "2021"
+version.workspace = true
 authors.workspace = true
 description.workspace = true
 documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 license.workspace = true
-version.workspace = true
 
 [lib]
 proc-macro = true

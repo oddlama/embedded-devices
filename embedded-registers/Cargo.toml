@@ -8,6 +8,10 @@ members = [
 [workspace.package]
 version = "1.0.0"
 authors = ["oddlama <oddlama@oddlama.org>"]
-description = ""
-documentation = "https://example.com/bar"
+description = "Procedural macro for effortless definitions of registers in embedded device drivers"
+documentation = "https://github.com/oddlama/embedded-registers"
+homepage = "https://github.com/oddlama/embedded-registers"
+repository = "https://github.com/oddlama/embedded-registers"
+keywords = ["register", "registers", "bitfield", "derive", "sensor"]
+categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
 license = "MIT OR Apache-2.0"
