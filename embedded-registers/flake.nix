@@ -110,24 +110,6 @@
             inherit (commonArgs) src;
             inherit advisory-db;
           };
-
-          # Run tests with cargo-nextest
-          # Consider setting `doCheck = false` on `embedded-registers` if you do not want
-          # the tests to run twice
-          embedded-registers-nextest = craneLib.cargoNextest (commonArgs
-            // {
-              inherit cargoArtifacts;
-              partitions = 1;
-              partitionType = "count";
-            });
-        }
-        // lib.optionalAttrs (localSystem == "x86_64-linux") {
-          # NB: cargo-tarpaulin only supports x86_64 systems
-          # Check code coverage (note: this will not upload coverage anywhere)
-          embedded-registers-coverage = craneLib.cargoTarpaulin (commonArgs
-            // {
-              inherit cargoArtifacts;
-            });
         }
         // {
           pre-commit = pre-commit-hooks.lib.${localSystem}.run {
