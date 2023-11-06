@@ -6,10 +6,13 @@ pub mod address;
 pub mod configuration;
 pub mod device_id_revision;
 pub mod manufacturer_id;
+pub mod resolution;
+pub mod temperature;
 
 use crate::devices::mcp9808::address::Address;
 use crate::devices::mcp9808::device_id_revision::{DeviceIdRevision, DEVICE_ID_VALID};
 use crate::devices::mcp9808::manufacturer_id::{ManufacturerId, MANUFACTURER_ID_VALID};
+use crate::devices::mcp9808::temperature::TemperatureLimitCrit;
 
 /// All possible errors in this crate
 #[derive(Debug, defmt::Format)]
@@ -79,6 +82,9 @@ where
             // TODO     return Error()
         }
         info!("{:?} {:?}", device_id, manufacturer_id);
+
+        let tc = self.read_register::<TemperatureLimitCrit>().await?;
+        let b = tc.read_temperature_limit();
 
         // TODO expose init error for this!
         //assert_eq!(config.device_id, 0x04);

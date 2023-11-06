@@ -140,7 +140,7 @@ pub enum AlertMode {
 /// The MCP9808 has a 16-bit Configuration register that allows the user
 /// to set various functions for a robust temperature monitoring system.
 // TODO #[register(MCP9808, address = 0b001, read, write)]
-#[register(address = 0b001, read, write)]
+#[register(address = 0b0001, read, write)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]

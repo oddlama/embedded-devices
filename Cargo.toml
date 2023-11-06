@@ -4,7 +4,7 @@ edition = "2021"
 version = "0.0.1"
 authors = ["oddlama <oddlama@oddlama.org>"]
 description = "Device driver implementations for many embedded sensors and devices"
-documentation = "https://github.com/oddlama/embedded-devices"
+documentation = "https://docs.rs/embedded-devices"
 homepage = "https://github.com/oddlama/embedded-devices"
 repository = "https://github.com/oddlama/embedded-devices"
 keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
@@ -17,6 +17,7 @@ defmt = "0.3.5"
 embedded-hal = "1.0.0-rc.1"
 embedded-hal-async = "1.0.0-rc.1"
 embedded-registers = "0.9.1"
+uom = { version = "0.35.0", features = ["autoconvert", "f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
 
 [features]
 default = []
