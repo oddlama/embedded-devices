@@ -195,6 +195,8 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         let read_comment = format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
         let write_field_name = format_ident!("write_{field_name}");
         let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
+        let with_field_name = format_ident!("with_{field_name}");
+        let with_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data and returns self for chaining.");
 
         forward_fns = quote! {
             #forward_fns
@@ -209,6 +211,13 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             #[doc = #write_comment]
             pub fn #write_field_name(&mut self, #field_name: #type_ident) {
                 #bitfield_ident::#write_field_name(&mut self.data, #field_name)
+            }
+
+            #[inline]
+            #[doc = #with_comment]
+            pub fn #with_field_name(mut self, #field_name: #type_ident) -> Self {
+                #bitfield_ident::#write_field_name(&mut self.data, #field_name);
+                self
             }
         };
     }

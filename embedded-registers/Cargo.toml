@@ -6,7 +6,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.9.1"
+version = "0.9.2"
 authors = ["oddlama <oddlama@oddlama.org>"]
 description = "Procedural macro for effortless definitions of registers in embedded device drivers"
 homepage = "https://github.com/oddlama/embedded-registers"

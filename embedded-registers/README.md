@@ -56,3 +56,12 @@ info!("{}", reg);
 ```
 
 For more information and more complex examples, please refer to the [embededded-registers docs](https://docs.rs/embedded-registers) and the [bondrewd docs](https://docs.rs/bondrewd-derive).
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
