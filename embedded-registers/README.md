@@ -27,7 +27,7 @@ Add this to your `Cargo.toml`:
 [dependencies]
 # You will need this to define your own bitfield-capable enums
 bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
-embedded-registers = "0.9.1"
+embedded-registers = "0.9.2"
 ```
 
 For a simple register definition example, take a look at this `DeviceId` register
