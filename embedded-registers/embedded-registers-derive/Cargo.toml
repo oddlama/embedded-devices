@@ -1,10 +1,10 @@
 [package]
 name = "embedded-registers-derive"
 edition = "2021"
+documentation = "https://docs.rs/embedded-registers-derive"
 version.workspace = true
 authors.workspace = true
 description.workspace = true
-documentation.workspace = true
 homepage.workspace = true
 readme.workspace = true
 repository.workspace = true
