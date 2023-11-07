@@ -1,1 +1,1 @@
-pub mod mcp9808;
+pub mod microchip;

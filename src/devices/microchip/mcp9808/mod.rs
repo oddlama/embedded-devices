@@ -8,9 +8,9 @@ pub mod manufacturer_id;
 pub mod resolution;
 pub mod temperature;
 
-use crate::devices::mcp9808::address::Address;
-use crate::devices::mcp9808::device_id_revision::{DeviceIdRevision, DEVICE_ID_VALID};
-use crate::devices::mcp9808::manufacturer_id::{ManufacturerId, MANUFACTURER_ID_VALID};
+use self::address::Address;
+use self::device_id_revision::{DeviceIdRevision, DEVICE_ID_VALID};
+use self::manufacturer_id::{ManufacturerId, MANUFACTURER_ID_VALID};
 
 /// All possible errors in this crate
 #[derive(Debug, defmt::Format)]
