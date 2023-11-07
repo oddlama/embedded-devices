@@ -23,9 +23,9 @@ pub enum TemperatureResolution {
 #[register(address = 0b1000, read, write)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Resolution {
-    #[bondrewd(bit_length = 7, reserve)]
+    #[bondrewd(bit_length = 6, reserve)]
     #[allow(dead_code)]
     reserved: u8,
-    #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
     pub temperature_resolution: TemperatureResolution,
 }
