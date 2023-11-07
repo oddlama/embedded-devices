@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "0.9.2"
+version = "0.9.3"
 dependencies = [
  "embedded-hal",
  "embedded-hal-async",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "0.9.2"
+version = "0.9.3"
 dependencies = [
  "bondrewd",
  "darling",

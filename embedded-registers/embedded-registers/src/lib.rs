@@ -3,8 +3,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use embedded_hal::i2c::Operation;
-
 /// The basis trait for all registers. A register is a type
 /// that maps to a specific register on an embedded device and
 /// should own the raw data required for this register.
@@ -62,11 +60,19 @@ pub trait RegisterWrite: Register {
     where
         I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
     {
-        i2c.transaction(
-            address,
-            &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
-        )
-        .await
+        // FIXME: transaction is currently not implemented in embedded_hal_async,
+        // so we need to construct an array...
+        //i2c.transaction(
+        //    address,
+        //    &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
+        //)
+        //.await
+
+        let mut data = [0u8; 8];
+        let len = 1 + self.data().len();
+        data[0] = Self::ADDRESS;
+        data[1..len + 1].copy_from_slice(self.data());
+        i2c.write(address, &data).await
     }
 
     /// Synchronously write this register to the given i2c bus and device address.
@@ -75,10 +81,18 @@ pub trait RegisterWrite: Register {
     where
         I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
     {
-        i2c.transaction(
-            address,
-            &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
-        )
+        let mut data = [0u8; 8];
+        let len = 1 + self.data().len();
+        data[0] = Self::ADDRESS;
+        data[1..len + 1].copy_from_slice(self.data());
+        i2c.write(address, &data)
+
+        // FIXME: transaction is currently not implemented in embedded_hal_async,
+        // so we need to construct an array...
+        //i2c.transaction(
+        //    address,
+        //    &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
+        //)
     }
 }
 
