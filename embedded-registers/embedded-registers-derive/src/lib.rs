@@ -68,7 +68,9 @@
 //! # Complex Example
 //!
 //! A more complex example may involve adding your own Bondrewd-capable enums.
-//! Have a look at this excerpt of the Configuration register from the MCP9808:
+//! We also make sure to annotate the correct fields with #[default] to allow
+//! reconstructing the power-up defaults easily. Have a look at this excerpt
+//! of the Configuration register from the MCP9808:
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
@@ -77,18 +79,20 @@
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
-//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
+//! #[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, Format)]
 //! #[bondrewd_enum(u8)]
 //! pub enum Hysteresis {
+//!     #[default]
 //!     Deg_0_0C = 0b00,
 //!     Deg_1_5C = 0b01,
 //!     Deg_3_0C = 0b10,
 //!     Deg_6_0C = 0b11,
 //! }
 //!
-//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
+//! #[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, Format)]
 //! #[bondrewd_enum(u8)]
 //! pub enum ShutdownMode {
+//!     #[default]
 //!     Continuous = 0,
 //!     Shutdown = 1,
 //! }
@@ -105,6 +109,7 @@
 //!     pub hysteresis: Hysteresis,
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
 //!     pub shutdown_mode: ShutdownMode,
+//!
 //!     // ... all 16 bits must be filled
 //!     # #[bondrewd(bit_length = 8, reserve)]
 //!     # #[allow(dead_code)]
@@ -227,12 +232,12 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let address = args.address;
 
     let mut output = quote! {
-        #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
+        #[derive(bondrewd::Bitfields, Clone, Default, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         #attrs
         #vis struct #bitfield_ident
         #fields
 
-        #[derive(Clone, Default, PartialEq, Eq)]
+        #[derive(Clone, PartialEq, Eq)]
         pub struct #ident {
             data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
         }
@@ -252,6 +257,15 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             fn write_all(&mut self, value: #bitfield_ident) {
                 use bondrewd::Bitfields;
                 self.data = value.into_bytes();
+            }
+        }
+
+        impl Default for #ident {
+            fn default() -> Self {
+                use bondrewd::Bitfields;
+                Self {
+                    data: #bitfield_ident::default().into_bytes(),
+                }
             }
         }
 
