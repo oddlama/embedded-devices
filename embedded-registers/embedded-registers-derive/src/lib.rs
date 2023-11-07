@@ -46,7 +46,7 @@
 //! #![feature(generic_arg_infer)]
 //! use embedded_registers::{register, RegisterRead};
 //!
-//! #[register(address = 0b111, read)]
+//! #[register(address = 0b111, mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct DeviceId {
 //!     device_id: u8,
@@ -97,7 +97,7 @@
 //!     Shutdown = 1,
 //! }
 //!
-//! #[register(address = 0b001, read, write)]
+//! #[register(address = 0b001, mode = "rw")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct Config {
 //!     // padding
@@ -140,20 +140,36 @@
 //! # }
 //! ```
 
-use darling::ast::NestedMeta;
 use darling::FromMeta;
+use darling::{ast::NestedMeta, util::Flag};
 use proc_macro as pc;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
 
 #[derive(Debug, FromMeta)]
+#[darling(and_then = "Self::validate_mode")]
 struct RegisterArgs {
+    #[darling(default)]
+    device: Option<Ident>,
+    /// The address of the register
     address: u8,
+    /// The register mode (one of "r", "w", "rw")
     #[darling(default)]
-    read: Option<()>,
-    #[darling(default)]
-    write: Option<()>,
+    mode: String,
+    /// Include this flag to generate I2C accessors
+    i2c: Flag,
+    /// Include this flag to generate SPI accessors
+    spi: Flag,
+}
+
+impl RegisterArgs {
+    fn validate_mode(self) -> darling::Result<Self> {
+        match self.mode.as_str() {
+            "r" | "w" | "rw" => Ok(self),
+            _ => Err(darling::Error::custom("Unknown mode '{}'").with_span(&self.mode)),
+        }
+    }
 }
 
 #[proc_macro_attribute]
@@ -167,12 +183,6 @@ pub fn register(args: pc::TokenStream, input: pc::TokenStream) -> pc::TokenStrea
 fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
     let args_span = args.span();
     let args = RegisterArgs::from_list(&NestedMeta::parse_meta_list(args)?)?;
-    if args.read.is_none() && args.write.is_none() {
-        return Err(syn::Error::new(
-            args_span,
-            "A register definition must include read, write, or both",
-        ));
-    }
 
     let input = syn::parse2::<syn::ItemStruct>(input)?;
     if !input.attrs.iter().any(|x| x.path().is_ident("bondrewd")) {
@@ -201,7 +211,8 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         let write_field_name = format_ident!("write_{field_name}");
         let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
         let with_field_name = format_ident!("with_{field_name}");
-        let with_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data and returns self for chaining.");
+        let with_comment =
+            format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data and returns self for chaining.");
 
         forward_fns = quote! {
             #forward_fns
@@ -327,13 +338,13 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         }
     };
 
-    if args.read.is_some() {
+    if matches!(args.mode.as_str(), "r" | "rw") {
         output.append_all(quote! {
             impl embedded_registers::RegisterRead for #ident {}
         });
     }
 
-    if args.write.is_some() {
+    if matches!(args.mode.as_str(), "w" | "rw") {
         output.append_all(quote! {
             impl embedded_registers::RegisterWrite for #ident {}
         });
