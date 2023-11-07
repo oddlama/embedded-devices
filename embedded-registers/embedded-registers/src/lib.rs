@@ -69,10 +69,10 @@ pub trait RegisterWrite: Register {
         //.await
 
         let mut data = [0u8; 8];
-        let len = 1 + self.data().len();
+        let len = self.data().len();
         data[0] = Self::ADDRESS;
         data[1..len + 1].copy_from_slice(self.data());
-        i2c.write(address, &data).await
+        i2c.write(address, &data[0..len]).await
     }
 
     /// Synchronously write this register to the given i2c bus and device address.
@@ -82,10 +82,10 @@ pub trait RegisterWrite: Register {
         I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
     {
         let mut data = [0u8; 8];
-        let len = 1 + self.data().len();
+        let len = self.data().len();
         data[0] = Self::ADDRESS;
         data[1..len + 1].copy_from_slice(self.data());
-        i2c.write(address, &data)
+        i2c.write(address, &data[0..len])
 
         // FIXME: transaction is currently not implemented in embedded_hal_async,
         // so we need to construct an array...
