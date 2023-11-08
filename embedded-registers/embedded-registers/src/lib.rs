@@ -34,11 +34,16 @@ pub trait ReadableRegister: Register {}
 /// This trait is a marker trait implemented by any register that can be written via a specific bus interface.
 pub trait WritableRegister: Register {}
 
-/// A trait that is implemented by any async bus interface and allows
-/// devices with registers to share read implementations independent
-/// of the actual interface.
+/// A trait that is implemented by any bus interface and allows
+/// devices with registers to share register read/write implementations
+/// independent of the actual interface in use.
 #[allow(async_fn_in_trait)]
-pub trait RegisterInterfaceAsync {
+#[maybe_async_cfg::maybe(
+    sync(not(feature="async")),
+    async(feature="async"),
+    keep_self
+)]
+pub trait RegisterInterface {
     type Error;
 
     /// Reads the given register via this interface
@@ -50,39 +55,6 @@ pub trait RegisterInterfaceAsync {
     async fn write_register<R>(&mut self, register: &R) -> Result<(), Self::Error>
     where
         R: WritableRegister;
-}
-
-/// A trait that is implemented by any sync bus interface and allows
-/// devices with registers to share read implementations independent
-/// of the actual interface.
-pub trait RegisterInterfaceSync {
-    type Error;
-
-    /// Reads the given register via this interface
-    fn read_register<R>(&mut self) -> Result<R, Self::Error>
-    where
-        R: ReadableRegister;
-
-    /// Writes the given register via this interface
-    fn write_register<R>(&mut self, register: &R) -> Result<(), Self::Error>
-    where
-        R: WritableRegister;
-}
-
-/// Represents an object that owns a specific async register interface.
-pub trait RegisterInterfaceOwnerAsync<I>
-where
-    I: RegisterInterfaceAsync,
-{
-    fn interface(&mut self) -> &mut I;
-}
-
-/// Represents an object that owns a specific sync register interface.
-pub trait RegisterInterfaceOwnerSync<I>
-where
-    I: RegisterInterfaceSync,
-{
-    fn interface(&mut self) -> &mut I;
 }
 
 // re-export the derive stuff

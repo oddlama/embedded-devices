@@ -17,7 +17,6 @@ proc-macro = true
 
 [dependencies]
 bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
-convert_case = "0.6.0"
 darling = "0.20.3"
 defmt = "0.3.5"
 proc-macro2 = "1.0"
@@ -27,4 +26,4 @@ syn = { version = "2.0", features = ["full"] }
 [dev-dependencies]
 embedded-hal = "1.0.0-rc.1"
 embedded-hal-async = "1.0.0-rc.1"
-embedded-registers = { path = "../embedded-registers", features = ["derive"] }
+embedded-registers = { path = "../embedded-registers" }
