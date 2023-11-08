@@ -1,3 +1,5 @@
+use super::{MCP9808RegisterProviderAsync, MCP9808RegisterProviderSync};
+
 use bondrewd::BitfieldEnum;
 use embedded_registers::register;
 
@@ -6,10 +8,11 @@ use embedded_registers::register;
 /// This cannot be altered when either of the lock bits are set ([CriticalLock::Locked] / [WindowLock::Locked]).
 /// This bit can be programmed in Shutdown mode.
 #[allow(non_camel_case_types)]
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum Hysteresis {
     /// 0.0°C (power-up default)
+    #[default]
     Deg_0_0C = 0b00,
     /// 1.5°C
     Deg_1_5C = 0b01,
@@ -24,10 +27,11 @@ pub enum Hysteresis {
 ///
 /// This cannot be set to `1` when either of the lock bits are set ([CriticalLock::Locked] / [WindowLock::Locked]).
 /// However, it can be cleared to `0` for continuous conversion while locked.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum ShutdownMode {
     /// Continuous conversion (power-up default)
+    #[default]
     Continuous = 0,
     /// Shutdown (Low-Power mode)
     Shutdown = 1,
@@ -36,10 +40,11 @@ pub enum ShutdownMode {
 /// T_CRIT lock bit.
 ///
 /// When enabled, this bit remains set to `1` (locked) until cleared by a Power-on Reset.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum CriticalLock {
     /// T_CRIT register can be written (power-up default)
+    #[default]
     Unlocked = 0,
     /// T_CRIT register cannot be written
     Locked = 1,
@@ -48,10 +53,11 @@ pub enum CriticalLock {
 /// T_UPPER and T_LOWER Window Lock bit.
 ///
 /// When enabled, this bit remains set to `1` (locked) until cleared by a Power-on Reset.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum WindowLock {
     /// T_UPPER and T_LOWER registers can be written (power-up default)
+    #[default]
     Unlocked = 0,
     /// T_UPPER and T_LOWER registers cannot be written
     Locked = 1,
@@ -61,10 +67,11 @@ pub enum WindowLock {
 ///
 /// This bit cannot be set to `1` in Shutdown mode,
 /// but it can be cleared after the device enters Shutdown Mode.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum InterruptClear {
     /// No effect (power-up default)
+    #[default]
     NoEffect = 0,
     /// Clear interrupt output. When read, this bit returns to `0` ([InterruptClear::NoEffect])
     ClearInterruptOutput = 1,
@@ -76,10 +83,11 @@ pub enum InterruptClear {
 /// However, if the Alert output is configured as Interrupt mode, and the host controller
 /// clears the interrupt bit by reading [InterruptClear] in Shutdown mode,
 /// then this bit will also be cleared to `0` [AlertStatus::NotAsserted].
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertStatus {
     /// Alert output is not asserted by the device (power-up default)
+    #[default]
     NotAsserted = 0,
     /// Alert output is asserted as a comparator/Interrupt or critical temperature output
     Asserted = 1,
@@ -89,10 +97,11 @@ pub enum AlertStatus {
 ///
 /// This cannot be altered when either of the lock bits are set ([CriticalLock::Locked] / [WindowLock::Locked]).
 /// This bit can be programmed in Shutdown mode, but the Alert output will not assert or deassert.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertControl {
     /// power-up default
+    #[default]
     Disabled = 0,
     Enabled = 1,
 }
@@ -101,10 +110,11 @@ pub enum AlertControl {
 ///
 /// This cannot be altered when the window lock bit is set ([WindowLock::Locked]).
 /// This bit can be programmed in Shutdown mode, but the Alert output will not assert or deassert.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertSelect {
     /// Alert output for T_UPPER, T_LOWER and T_CRIT (power-up default)
+    #[default]
     All = 0,
     /// T_A > T CRIT only (T_UPPER and T_LOWER temperature boundaries are disabled)
     TCritOnly = 1,
@@ -114,10 +124,11 @@ pub enum AlertSelect {
 ///
 /// This cannot be altered when either of the lock bits are set ([CriticalLock::Locked] / [WindowLock::Locked]).
 /// This bit can be programmed in Shutdown mode, but the Alert output will not assert or deassert.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertPolarity {
     /// power-up default; pull-up resistor required
+    #[default]
     ActiveLow = 0,
     ActiveHigh = 1,
 }
@@ -126,10 +137,11 @@ pub enum AlertPolarity {
 ///
 /// This cannot be altered when either of the lock bits are set ([CriticalLock::Locked] / [WindowLock::Locked]).
 /// This bit can be programmed in Shutdown mode, but the Alert output will not assert or deassert.
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertMode {
     /// Comparator output (power-up default)
+    #[default]
     Comparator = 0,
     /// Interrupt output
     Interrupt = 1,
@@ -139,8 +151,7 @@ pub enum AlertMode {
 ///
 /// The MCP9808 has a 16-bit Configuration register that allows the user
 /// to set various functions for a robust temperature monitoring system.
-// TODO #[register(MCP9808, address = 0b001, read, write)]
-#[register(address = 0b0001, read, write)]
+#[register(provider = MCP9808, address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]

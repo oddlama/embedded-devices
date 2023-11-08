@@ -35,6 +35,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -131,8 +140,6 @@ dependencies = [
 [[package]]
 name = "embedded-registers"
 version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3677923d726409042b8abb56636559703713a1499ba49cd198dd5bd43fdfbea"
 dependencies = [
  "embedded-hal",
  "embedded-hal-async",
@@ -142,10 +149,9 @@ dependencies = [
 [[package]]
 name = "embedded-registers-derive"
 version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5841c91e0fc752bb7b929f6d9e44b5e4b8f231dc32483021fa230612da9a1bb"
 dependencies = [
  "bondrewd",
+ "convert_case",
  "darling",
  "defmt",
  "proc-macro2",
@@ -296,6 +302,12 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "uom"

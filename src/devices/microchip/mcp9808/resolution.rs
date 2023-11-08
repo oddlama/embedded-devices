@@ -1,9 +1,11 @@
+use super::{MCP9808RegisterProviderAsync, MCP9808RegisterProviderSync};
+
 use bondrewd::BitfieldEnum;
 use embedded_registers::register;
 
 /// Temperature resolution. Affects both sensor accuracy and conversion time.
 #[allow(non_camel_case_types)]
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum TemperatureResolution {
     /// +0.5°C (t_CONV = 30 ms typical)
@@ -13,6 +15,7 @@ pub enum TemperatureResolution {
     /// +0.125°C (t_CONV = 130 ms typical)
     Deg_0_125C = 0b10,
     /// +0.0625°C (power-up default, t_CONV = 250 ms typical)
+    #[default]
     Deg_0_0625C = 0b11,
 }
 
@@ -20,7 +23,7 @@ pub enum TemperatureResolution {
 ///
 /// This register allows the user to change the sensor resolution.
 /// The Power-on Reset default resolution is +0.0625°C.
-#[register(address = 0b1000, read, write)]
+#[register(provider = MCP9808, address = 0b1000, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Resolution {
     #[bondrewd(bit_length = 6, reserve)]
