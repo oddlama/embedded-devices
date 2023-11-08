@@ -3,6 +3,9 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod i2c;
+pub mod spi;
+
 /// The basis trait for all registers. A register is a type
 /// that maps to a specific register on an embedded device and
 /// should own the raw data required for this register.
@@ -25,75 +28,61 @@ pub trait Register: Default + Clone {
     fn data_mut(&mut self) -> &mut [u8];
 }
 
-/// This trait is implemented by any register that can be read via a specific bus interface.
-#[allow(async_fn_in_trait)]
-pub trait RegisterRead: Register {
-    /// Asynchronously read this register from the given i2c bus and device address.
-    #[inline]
-    async fn read_i2c<I>(i2c: &mut I, address: u8) -> Result<Self, I::Error>
-    where
-        I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
-    {
-        let mut register = Self::default();
-        i2c.write_read(address, &[Self::ADDRESS], register.data_mut()).await?;
-        Ok(register)
-    }
+/// This trait is a marker trait implemented by any register that can be read via a specific bus interface.
+pub trait ReadableRegister: Register {}
 
-    /// Synchronously read this register from the given i2c bus and device address.
-    #[inline]
-    fn read_i2c_blocking<I>(i2c: &mut I, address: u8) -> Result<Self, I::Error>
+/// This trait is a marker trait implemented by any register that can be written via a specific bus interface.
+pub trait WritableRegister: Register {}
+
+/// A trait that is implemented by any async bus interface and allows
+/// devices with registers to share read implementations independent
+/// of the actual interface.
+#[allow(async_fn_in_trait)]
+pub trait RegisterInterfaceAsync {
+    type Error;
+
+    /// Reads the given register via this interface
+    async fn read_register<R>(&mut self) -> Result<R, Self::Error>
     where
-        I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
-    {
-        let mut register = Self::default();
-        i2c.write_read(address, &[Self::ADDRESS], register.data_mut())?;
-        Ok(register)
-    }
+        R: ReadableRegister;
+
+    /// Writes the given register via this interface
+    async fn write_register<R>(&mut self, register: &R) -> Result<(), Self::Error>
+    where
+        R: WritableRegister;
 }
 
-/// This trait is implemented by any register that can be written via a specific bus interface.
-#[allow(async_fn_in_trait)]
-pub trait RegisterWrite: Register {
-    /// Asynchronously write this register to the given i2c bus and device address.
-    #[inline]
-    async fn write_i2c<I>(&self, i2c: &mut I, address: u8) -> Result<(), I::Error>
+/// A trait that is implemented by any sync bus interface and allows
+/// devices with registers to share read implementations independent
+/// of the actual interface.
+pub trait RegisterInterfaceSync {
+    type Error;
+
+    /// Reads the given register via this interface
+    fn read_register<R>(&mut self) -> Result<R, Self::Error>
     where
-        I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
-    {
-        // FIXME: transaction is currently not implemented in embedded_hal_async,
-        // so we need to construct an array...
-        //i2c.transaction(
-        //    address,
-        //    &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
-        //)
-        //.await
+        R: ReadableRegister;
 
-        let mut data = [0u8; 8];
-        let len = self.data().len();
-        data[0] = Self::ADDRESS;
-        data[1..len + 1].copy_from_slice(self.data());
-        i2c.write(address, &data[0..len]).await
-    }
-
-    /// Synchronously write this register to the given i2c bus and device address.
-    #[inline]
-    fn write_i2c_blocking<I>(&self, i2c: &mut I, address: u8) -> Result<(), I::Error>
+    /// Writes the given register via this interface
+    fn write_register<R>(&mut self, register: &R) -> Result<(), Self::Error>
     where
-        I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
-    {
-        let mut data = [0u8; 8];
-        let len = self.data().len();
-        data[0] = Self::ADDRESS;
-        data[1..len + 1].copy_from_slice(self.data());
-        i2c.write(address, &data[0..len])
+        R: WritableRegister;
+}
 
-        // FIXME: transaction is currently not implemented in embedded_hal_async,
-        // so we need to construct an array...
-        //i2c.transaction(
-        //    address,
-        //    &mut [Operation::Write(&[Self::ADDRESS]), Operation::Write(self.data())],
-        //)
-    }
+/// Represents an object that owns a specific async register interface.
+pub trait RegisterInterfaceOwnerAsync<I>
+where
+    I: RegisterInterfaceAsync,
+{
+    fn interface(&mut self) -> &mut I;
+}
+
+/// Represents an object that owns a specific sync register interface.
+pub trait RegisterInterfaceOwnerSync<I>
+where
+    I: RegisterInterfaceSync,
+{
+    fn interface(&mut self) -> &mut I;
 }
 
 // re-export the derive stuff

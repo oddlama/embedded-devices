@@ -16,12 +16,13 @@ license.workspace = true
 proc-macro = true
 
 [dependencies]
+bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+convert_case = "0.6.0"
+darling = "0.20.3"
+defmt = "0.3.5"
+proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
-proc-macro2 = "1.0"
-darling = "0.20.3"
-bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
-defmt = "0.3.5"
 
 [dev-dependencies]
 embedded-hal = "1.0.0-rc.1"

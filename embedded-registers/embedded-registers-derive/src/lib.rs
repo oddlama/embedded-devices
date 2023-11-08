@@ -44,7 +44,7 @@
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::{register, RegisterRead};
+//! use embedded_registers::{register, ReadableRegister};
 //!
 //! #[register(address = 0b111, mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
@@ -75,7 +75,7 @@
 //! ```
 //! #![feature(generic_arg_infer)]
 //! # use defmt::{info, Format};
-//! use embedded_registers::{register, RegisterRead, RegisterWrite};
+//! use embedded_registers::{register, ReadableRegister, WritableRegister};
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
@@ -140,8 +140,9 @@
 //! # }
 //! ```
 
+use convert_case::{Case, Casing};
+use darling::ast::NestedMeta;
 use darling::FromMeta;
-use darling::{ast::NestedMeta, util::Flag};
 use proc_macro as pc;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
@@ -150,17 +151,19 @@ use syn::spanned::Spanned;
 #[derive(Debug, FromMeta)]
 #[darling(and_then = "Self::validate_mode")]
 struct RegisterArgs {
+    /// If given, the register will be made available via the given provider trait
+    /// by implementing `<provider>RegisterProvider{Async,Sync}`.
+    ///
+    /// TODO: FIXME: is this accurate?
+    /// This provider trait should have been defined with the [`define_register_provider!()`] macro
+    /// or the [`RegisterProvider`] derive macro.
     #[darling(default)]
-    device: Option<Ident>,
+    provider: Option<Ident>,
     /// The address of the register
     address: u8,
     /// The register mode (one of "r", "w", "rw")
     #[darling(default)]
     mode: String,
-    /// Include this flag to generate I2C accessors
-    i2c: Flag,
-    /// Include this flag to generate SPI accessors
-    spi: Flag,
 }
 
 impl RegisterArgs {
@@ -241,6 +244,87 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let read_all_comment = format!("Calls [`{bitfield_ident}::from_bytes`] on the stored data.");
     let write_all_comment = format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
     let address = args.address;
+
+    let is_read = matches!(args.mode.as_str(), "r" | "rw");
+    let is_write = matches!(args.mode.as_str(), "w" | "rw");
+    let mut provider_traits = quote! {};
+
+    if let Some(provider) = args.provider {
+        let ident_register_accessor_async = format_ident!("{ident}RegisterAccessorAsync");
+        let ident_register_accessor_sync = format_ident!("{ident}RegisterAccessorSync");
+        let ident_specific_register_provider_async = format_ident!("{provider}RegisterProviderAsync");
+        let ident_specific_register_provider_sync = format_ident!("{provider}RegisterProviderSync");
+
+        let mut register_accessor_trait_async_read = quote! {};
+        let mut register_accessor_trait_async_write = quote! {};
+        let mut register_accessor_trait_sync_read = quote! {};
+        let mut register_accessor_trait_sync_write = quote! {};
+
+        let snake_ident = ident.to_string().to_case(Case::Snake);
+        let read_fn_name = format_ident!("read_{snake_ident}");
+        let write_fn_name = format_ident!("write_{snake_ident}");
+
+        if is_read {
+            register_accessor_trait_async_read = quote! {
+                #[inline]
+                async fn #read_fn_name(&mut self) -> Result<#ident, I::Error> {
+                    self.interface().read_register::<#ident>().await
+                }
+            };
+            register_accessor_trait_sync_read = quote! {
+                #[inline]
+                fn #read_fn_name(&mut self) -> Result<#ident, I::Error> {
+                    self.interface().read_register::<#ident>()
+                }
+            };
+        }
+
+        if is_write {
+            register_accessor_trait_async_write = quote! {
+                #[inline]
+                async fn #write_fn_name(&mut self, register: &#ident) -> Result<(), I::Error> {
+                    self.interface().write_register::<#ident>(register).await
+                }
+            };
+            register_accessor_trait_sync_write = quote! {
+                #[inline]
+                fn #write_fn_name(&mut self, register: &#ident) -> Result<(), I::Error> {
+                    self.interface().write_register::<#ident>(register)
+                }
+            };
+        }
+
+        provider_traits = quote! {
+            #[allow(async_fn_in_trait)]
+            pub trait #ident_register_accessor_async<I>: embedded_registers::RegisterInterfaceOwnerAsync<I>
+            where
+                I: embedded_registers::RegisterInterfaceAsync,
+            {
+                #register_accessor_trait_async_read
+                #register_accessor_trait_async_write
+            }
+
+            pub trait #ident_register_accessor_sync<I>: embedded_registers::RegisterInterfaceOwnerSync<I>
+            where
+                I: embedded_registers::RegisterInterfaceSync,
+            {
+                #register_accessor_trait_sync_read
+                #register_accessor_trait_sync_write
+            }
+
+            impl<I, T> #ident_register_accessor_async<I> for T
+            where
+                I: embedded_registers::RegisterInterfaceAsync,
+                T: #ident_specific_register_provider_async<I> + embedded_registers::RegisterInterfaceOwnerAsync<I>,
+            { }
+
+            impl<I, T> #ident_register_accessor_sync<I> for T
+            where
+                I: embedded_registers::RegisterInterfaceSync,
+                T: #ident_specific_register_provider_sync<I> + embedded_registers::RegisterInterfaceOwnerSync<I>,
+            { }
+        };
+    }
 
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, Default, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
@@ -336,19 +420,22 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
                 }
             }
         }
+
+        #provider_traits
     };
 
-    if matches!(args.mode.as_str(), "r" | "rw") {
+    if is_read {
         output.append_all(quote! {
-            impl embedded_registers::RegisterRead for #ident {}
+            impl embedded_registers::ReadableRegister for #ident {}
         });
     }
 
-    if matches!(args.mode.as_str(), "w" | "rw") {
+    if is_write {
         output.append_all(quote! {
-            impl embedded_registers::RegisterWrite for #ident {}
+            impl embedded_registers::WritableRegister for #ident {}
         });
     }
 
+    println!("{}", output);
     Ok(output)
 }
