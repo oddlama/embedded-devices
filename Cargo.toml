@@ -18,11 +18,14 @@ embedded-hal = "1.0.0-rc.1"
 embedded-hal-async = "1.0.0-rc.1"
 #embedded-registers = "0.9.3"
 embedded-registers = { path = "../embedded-registers/embedded-registers" }
+maybe-async-cfg = "0.2.3"
+paste = "1.0.14"
 uom = { version = "0.35.0", features = ["autoconvert", "f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
 
 [patch.crates-io]
 embedded-registers-derive = { path = "../embedded-registers/embedded-registers-derive" }
 
 [features]
-default = []
+async = []
+default = ["async", "embedded-registers/async"]
 std = []

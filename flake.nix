@@ -1,5 +1,5 @@
 {
-  description = "Le hardware project of le me";
+  description = "Device driver implementations for many embedded sensors and devices";
   inputs = {
     advisory-db = {
       url = "github:rustsec/advisory-db";

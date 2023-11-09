@@ -1,5 +1,3 @@
-use super::{MCP9808RegisterProviderAsync, MCP9808RegisterProviderSync};
-
 use bondrewd::BitfieldEnum;
 use embedded_registers::register;
 
@@ -151,7 +149,7 @@ pub enum AlertMode {
 ///
 /// The MCP9808 has a 16-bit Configuration register that allows the user
 /// to set various functions for a robust temperature monitoring system.
-#[register(provider = MCP9808, address = 0b0001, mode = "rw")]
+#[register(address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]
@@ -178,3 +176,5 @@ pub struct Configuration {
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
     pub alert_mode: AlertMode,
 }
+
+crate::simple_device::add_register!(super::MCP9808, Configuration, rw);

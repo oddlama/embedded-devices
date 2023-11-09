@@ -1,5 +1,3 @@
-use super::{MCP9808RegisterProviderAsync, MCP9808RegisterProviderSync};
-
 use bondrewd::BitfieldEnum;
 use embedded_registers::register;
 
@@ -23,7 +21,7 @@ pub enum TemperatureResolution {
 ///
 /// This register allows the user to change the sensor resolution.
 /// The Power-on Reset default resolution is +0.0625°C.
-#[register(provider = MCP9808, address = 0b1000, mode = "rw")]
+#[register(address = 0b1000, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Resolution {
     #[bondrewd(bit_length = 6, reserve)]
@@ -32,3 +30,5 @@ pub struct Resolution {
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
     pub temperature_resolution: TemperatureResolution,
 }
+
+crate::simple_device::add_register!(super::MCP9808, Resolution, rw);

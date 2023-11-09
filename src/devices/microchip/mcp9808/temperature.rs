@@ -1,5 +1,3 @@
-use super::{MCP9808RegisterProviderAsync, MCP9808RegisterProviderSync};
-
 use embedded_registers::register;
 use uom::num_rational::Rational32;
 use uom::si::rational32::ThermodynamicTemperature;
@@ -21,7 +19,7 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 ///
 /// The three least significant temperature bits may stay `0` depending on the
 /// resolution register.
-#[register(provider = MCP9808, address = 0b0101, mode = "r")]
+#[register(address = 0b0101, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AmbientTemperature {
     /// Whether T_A is greater than or equal to T_CRIT
@@ -35,6 +33,8 @@ pub struct AmbientTemperature {
     pub raw_temperature: i16,
 }
 
+crate::simple_device::add_register!(super::MCP9808, AmbientTemperature, r);
+
 impl AmbientTemperature {
     pub fn read_temperature(&self) -> ThermodynamicTemperature {
         ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(self.read_raw_temperature().into(), 16))
@@ -44,7 +44,7 @@ impl AmbientTemperature {
 macro_rules! define_temp_limit_register {
     ($name:ident, $address:expr, $doc:expr) => {
         #[doc = $doc]
-        #[register(provider = MCP9808, address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             #[bondrewd(bit_length = 3, reserve)]
@@ -57,6 +57,8 @@ macro_rules! define_temp_limit_register {
             #[allow(dead_code)]
             reserved1: u8,
         }
+
+        crate::simple_device::add_register!(super::MCP9808, $name, rw);
 
         impl $name {
             pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
