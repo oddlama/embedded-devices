@@ -2,7 +2,7 @@
 /// Simple here means that the device can be instanciated without
 /// requiring additional generics or constructor arguments except
 /// for the interface.
-macro_rules! define_device {
+macro_rules! device {
     ($device:ident) => {
         #[doc = concat!("A device of type `", stringify!($device), "` on the specified bus `I`.")]
         pub struct $device<I>
@@ -109,5 +109,5 @@ macro_rules! add_register {
 }
 
 pub(crate) use add_register;
-pub(crate) use define_device;
+pub(crate) use device;
 pub(crate) use i2c;

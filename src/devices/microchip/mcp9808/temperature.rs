@@ -62,14 +62,19 @@ macro_rules! define_temp_limit_register {
 
         impl $name {
             pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-                ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(
-                    self.read_raw_temperature_limit().into(),
-                    4,
-                ))
+                ThermodynamicTemperature::new::<degree_celsius>(
+                    Rational32::new_raw(self.read_raw_temperature_limit().into(), 4).reduced(),
+                )
             }
 
-            pub fn write_temperature_limit(&self) {
-                // TODO
+            pub fn write_temperature_limit(
+                &mut self,
+                temperature_limit: ThermodynamicTemperature,
+            ) -> Result<(), core::num::TryFromIntError> {
+                let temp = temperature_limit.get::<degree_celsius>();
+                let temp: i16 = (temp * Rational32::from_integer(4)).to_integer().try_into()?;
+                self.write_raw_temperature_limit(temp);
+                Ok(())
             }
         }
     };
