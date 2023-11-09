@@ -68,7 +68,7 @@
 //! # Complex Example
 //!
 //! A more complex example may involve adding your own Bondrewd-capable enums.
-//! We also make sure to annotate the correct fields with #[default] to allow
+//! We also make sure to annotate the correct fields with `#[default]` to allow
 //! reconstructing the power-up defaults easily. Have a look at this excerpt
 //! of the Configuration register from the MCP9808:
 //!
