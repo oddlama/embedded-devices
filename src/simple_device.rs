@@ -3,8 +3,10 @@
 /// requiring additional generics or constructor arguments except
 /// for the interface.
 macro_rules! device {
-    ($device:ident) => {
-        #[doc = concat!("A device of type `", stringify!($device), "` on the specified bus `I`.")]
+    ($device:ident, $struct_doc:expr) => {
+        #[doc = concat!("This represents a device of type `", stringify!($device), "` on the specified bus `I`.")]
+        #[doc = ""]
+        #[doc = $struct_doc]
         pub struct $device<I>
         where
             I: embedded_registers::RegisterInterface,

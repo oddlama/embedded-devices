@@ -1,3 +1,48 @@
+//! # MCP9808
+//!
+//! Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
+//! -20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
+//!
+//! The MCP9808 comes with user-programmable registers that provide flexibility for temperature sensing
+//! applications. The registers allow user-selectable settings such as Shutdown or Low-Power modes and
+//! the specification of temperature Alert window limits and critical output limits.
+//!
+//! When the temperature changes beyond the specified boundary limits, the MCP9808 outputs an Alert signal.
+//! The user has the option of setting the Alert output signal polarity as an active-low or active-high
+//! comparator output for thermostat operation, or as a temperature Alert interrupt output for
+//! microprocessor-based systems. The Alert output can also be configured as a critical temperature output only.
+//!
+//! This sensor has an industry standard 400 kHz, 2-wire, SMBus/I2C compatible serial interface,
+//! allowing up to eight or sixteen sensors to be controlled with a single serial bus.
+//! These features make the MCP9808 ideal for sophisticated, multi-zone, temperature-monitoring applications.
+//!
+//! ## Usage
+//!
+//! ```
+//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! # {
+//! use embedded_devices::devices::microchip::mcp9808::{MCP9808, address::Address};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut mcp9808 = MCP9808::new_i2c(i2c, Address::Default);
+//! mcp9808.init().await.unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let temp = mcp9808
+//!     .read_ambient_temperature()
+//!     .await?
+//!     .read_temperature()
+//!     .get::<degree_celsius>()
+//!     .to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+
 use embedded_registers::RegisterInterface;
 
 pub mod address;
@@ -7,7 +52,16 @@ pub mod manufacturer_id;
 pub mod resolution;
 pub mod temperature;
 
-crate::simple_device::device!(MCP9808);
+crate::simple_device::device!(
+    MCP9808,
+    r#"
+Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
+-20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
+
+For a full description and usage examples, refer to the [module documentation](self).
+"#
+);
+
 crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
 
 /// All possible errors in this crate
