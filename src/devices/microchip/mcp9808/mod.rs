@@ -46,11 +46,7 @@
 use embedded_registers::RegisterInterface;
 
 pub mod address;
-pub mod configuration;
-pub mod device_id_revision;
-pub mod manufacturer_id;
-pub mod resolution;
-pub mod temperature;
+pub mod registers;
 
 crate::simple_device::device!(
     MCP9808,
@@ -64,7 +60,7 @@ For a full description and usage examples, refer to the [module documentation](s
 
 crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
 
-/// All possible errors in this crate
+/// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format)]
 pub enum InitError<BusError> {
     /// Bus error
@@ -84,12 +80,12 @@ where
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
         let device_id = self.read_device_id_revision().await.map_err(InitError::Bus)?;
-        if device_id.read_device_id() != self::device_id_revision::DEVICE_ID_VALID {
+        if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
             return Err(InitError::InvalidDeviceId);
         }
 
         let manufacturer_id = self.read_manufacturer_id().await.map_err(InitError::Bus)?;
-        if manufacturer_id.read_manufacturer_id() != self::manufacturer_id::MANUFACTURER_ID_VALID {
+        if manufacturer_id.read_manufacturer_id() != self::registers::MANUFACTURER_ID_VALID {
             return Err(InitError::InvalidManufacturerId);
         }
 
