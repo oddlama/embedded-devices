@@ -191,6 +191,12 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let vis = input.vis;
     let fields = input.fields.clone();
     let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();
+    let docattrs: TokenStream = input
+        .attrs
+        .iter()
+        .filter(|x| x.path().is_ident("doc"))
+        .map(ToTokens::to_token_stream)
+        .collect();
     let bitfield_ident = format_ident!("{}Bitfield", ident);
 
     let mut forward_fns = quote! {};
@@ -199,32 +205,44 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         let field_name = field
             .ident
             .ok_or_else(|| syn::Error::new(args_span, "A field contains a field without an identifier"))?;
+        let field_docattrs: TokenStream = field
+            .attrs
+            .iter()
+            .filter(|x| x.path().is_ident("doc"))
+            .map(ToTokens::to_token_stream)
+            .collect();
 
         let read_field_name = format_ident!("read_{field_name}");
-        let read_comment = format!("Calls [`{bitfield_ident}::{read_field_name}`] on the stored data.");
+        let read_comment = format!("Retrieves the value of [`{bitfield_ident}::{field_name}`] from this register:");
         let write_field_name = format_ident!("write_{field_name}");
-        let write_comment = format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data.");
+        let write_comment = format!("Updates the value of [`{bitfield_ident}::{field_name}`] in this register:");
         let with_field_name = format_ident!("with_{field_name}");
         let with_comment =
-            format!("Calls [`{bitfield_ident}::{write_field_name}`] on the stored data and returns self for chaining.");
+            format!("Updates the value of [`{bitfield_ident}::{field_name}`] in this register and allows chaining:");
 
         forward_fns = quote! {
             #forward_fns
 
-            #[inline]
             #[doc = #read_comment]
+            #[doc = ""]
+            #field_docattrs
+            #[inline]
             pub fn #read_field_name(&self) -> #type_ident {
                 #bitfield_ident::#read_field_name(&self.data)
             }
 
-            #[inline]
             #[doc = #write_comment]
+            #[doc = ""]
+            #field_docattrs
+            #[inline]
             pub fn #write_field_name(&mut self, #field_name: #type_ident) {
                 #bitfield_ident::#write_field_name(&mut self.data, #field_name)
             }
 
-            #[inline]
             #[doc = #with_comment]
+            #[doc = ""]
+            #field_docattrs
+            #[inline]
             pub fn #with_field_name(mut self, #field_name: #type_ident) -> Self {
                 #bitfield_ident::#write_field_name(&mut self.data, #field_name);
                 self
@@ -232,8 +250,8 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         };
     }
 
-    let read_all_comment = format!("Calls [`{bitfield_ident}::from_bytes`] on the stored data.");
-    let write_all_comment = format!("Calls [`{bitfield_ident}::to_bytes`] replacing the stored data.");
+    let read_all_comment = format!("Unpack all fields and return them as a [`{bitfield_ident}`]. This is more expensive than just using the appropriate `read_*` functions directly, in case you only need to read a few specific fields.");
+    let write_all_comment = format!("Pack all fields in the given [`{bitfield_ident}`] representation. This is more expensive than just using the appropriate `write_*` functions directly, in case you only need to write a few specific fields.");
     let address = args.address;
 
     let is_read = matches!(args.mode.as_str(), "r" | "rw");
@@ -246,6 +264,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         #fields
 
         #[derive(Clone, PartialEq, Eq)]
+        #docattrs
         pub struct #ident {
             data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
         }
