@@ -1,5 +1,5 @@
 use bondrewd::BitfieldEnum;
-use embedded_registers::register;
+use embedded_devices_derive::simple_device_register;
 
 /// T_{UPPER} and T_{LOWER} Limit Hysteresis bits.
 ///
@@ -149,7 +149,7 @@ pub enum AlertMode {
 ///
 /// The MCP9808 has a 16-bit Configuration register that allows the user
 /// to set various functions for a robust temperature monitoring system.
-#[register(address = 0b0001, mode = "rw")]
+#[simple_device_register(device = super::MCP9808, address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]
@@ -177,4 +177,4 @@ pub struct Configuration {
     pub alert_mode: AlertMode,
 }
 
-crate::simple_device::add_register!(super::MCP9808, Configuration, rw);
+//crate::simple_device::add_register!(super::MCP9808, Configuration, rw);

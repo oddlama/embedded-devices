@@ -1,0 +1,22 @@
+[package]
+name = "embedded-devices-derive"
+edition = "2021"
+version = "0.0.1"
+authors = ["oddlama <oddlama@oddlama.org>"]
+description = "Internal macros to define devices in embedded-devices"
+documentation = "https://docs.rs/embedded-devices-derive"
+homepage = "https://github.com/oddlama/embedded-devices-derive"
+repository = "https://github.com/oddlama/embedded-devices-derive"
+keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
+categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
+license = "MIT OR Apache-2.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.6.0"
+darling = "0.20.3"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }

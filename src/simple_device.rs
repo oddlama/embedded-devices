@@ -76,38 +76,5 @@ macro_rules! i2c {
     };
 }
 
-/// This adds accessor functions for the given register.
-macro_rules! add_register {
-    ($($device_path:ident)::*, $register:ident, rw) => {
-        crate::simple_device::add_register!($($device_path)::*, $register, r);
-        crate::simple_device::add_register!($($device_path)::*, $register, w);
-    };
-    ($($device_path:ident)::*, $register:ident, r) => {
-        impl<I> $($device_path)::*<I>
-        where
-            I: embedded_registers::RegisterInterface,
-        {
-            paste::item! {
-                pub async fn [<read_ $register:snake>](&mut self) -> Result<$register, I::Error> {
-                    self.interface.read_register::<$register>().await
-                }
-            }
-        }
-    };
-    ($($device_path:ident)::*, $register:ident, w) => {
-        impl<I> $($device_path)::*<I>
-        where
-            I: embedded_registers::RegisterInterface,
-        {
-            paste::item! {
-                pub async fn [<write_ $register:snake>](&mut self, register: &$register) -> Result<(), I::Error> {
-                    self.interface.write_register::<$register>(register).await
-                }
-            }
-        }
-    };
-}
-
-pub(crate) use add_register;
 pub(crate) use device;
 pub(crate) use i2c;
