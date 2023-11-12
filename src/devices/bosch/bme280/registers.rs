@@ -181,10 +181,14 @@ pub enum StandbyTime {
     T_500 = 0b100,
     /// 1000ms
     T_1000 = 0b101,
-    /// 10ms
+    /// 10ms (BME280 only)
     T_10 = 0b110,
-    /// 20ms
+    /// 20ms (BME280 only)
     T_20 = 0b111,
+    //TODO /// 2000ms (BMP280 only)
+    //TODO T_2000 = 0b110,
+    //TODO /// 4000ms (BMP280 only)
+    //TODO T_4000 = 0b111,
 }
 
 /// Lowpass filter settings for pressure and temperature values.
@@ -228,6 +232,38 @@ pub struct Config {
     #[allow(dead_code)]
     /// Whether to enable the SPI 3-wire interface.
     pub spi_3wire: bool,
+}
+
+#[simple_device_register(device = super::BME280, address = 0x88, mode = "r")]
+#[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 26)]
+pub struct TrimmingParameters1 {
+    pub dig_t1: u16,
+    pub dig_t2: i16,
+    pub dig_t3: i16,
+    pub dig_p1: u16,
+    pub dig_p2: i16,
+    pub dig_p3: i16,
+    pub dig_p4: i16,
+    pub dig_p5: i16,
+    pub dig_p6: i16,
+    pub dig_p7: i16,
+    pub dig_p8: i16,
+    pub dig_p9: i16,
+    #[bondrewd(reserve)]
+    #[allow(dead_code)]
+    reserved0: u8,
+    pub dig_h1: u8,
+}
+
+#[simple_device_register(device = super::BME280, address = 0xe1, mode = "r")]
+#[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 7)]
+pub struct TrimmingParameters2 {
+    pub dig_h2: i16,
+    pub dig_h3: u8,
+    pub dig_h4_msb: i8,
+    pub dig_h5_lsn_h4_lsn: i8,
+    pub dig_h5_msb: i8,
+    pub dig_h6: i8,
 }
 
 /// This register contains the raw pressure measurement

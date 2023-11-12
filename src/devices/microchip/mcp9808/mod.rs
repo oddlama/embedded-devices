@@ -43,20 +43,21 @@
 //! # }
 //! ```
 
+use embedded_devices_derive::{device, device_impl};
 use embedded_registers::RegisterInterface;
 
 pub mod address;
 pub mod registers;
 
-crate::simple_device::device!(
-    MCP9808,
-    r#"
-Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
--20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
-
-For a full description and usage examples, refer to the [module documentation](self).
-"#
-);
+/// Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
+/// -20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
+///
+/// For a full description and usage examples, refer to the [module documentation](self).
+#[device]
+pub struct MCP9808<I: RegisterInterface> {
+    /// The interface to communicate with the device
+    interface: I,
+}
 
 crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
 
@@ -71,7 +72,7 @@ pub enum InitError<BusError> {
     InvalidManufacturerId,
 }
 
-#[maybe_async_cfg::maybe(sync(not(feature = "async")), async(feature = "async"), keep_self)]
+#[device_impl]
 impl<I> MCP9808<I>
 where
     I: RegisterInterface,

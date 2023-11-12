@@ -85,6 +85,7 @@
 //! # }
 //! ```
 
+use embedded_devices_derive::{device, device_impl};
 use embedded_registers::RegisterInterface;
 
 pub mod address;
@@ -94,52 +95,118 @@ pub mod registers;
 // TODO make proc macro instead of rules! macro, so we can use
 //      arbitrary extra <I, ...> generics
 // TODO make #simple_device_register able to specify multiple parents
-// TODO read_all is missing.
 // TODO measure, reset, config, ... functions for normal use
 // TODO spi support missing
 
-crate::simple_device::device!(
-    BME280,
-    r#"
-The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
-sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
-a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
-consumption allow the implementation in battery driven devices such as handsets, GPS modules or
-watches.
+/// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
+/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
+/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
+/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
+/// watches.
+///
+/// For a full description and usage examples, refer to the [module documentation](self).
+#[device]
+pub struct BME280<I: RegisterInterface> {
+    /// The interface to communicate with the device
+    interface: I,
+}
 
-For a full description and usage examples, refer to the [module documentation](self).
-"#
-);
-
-crate::simple_device::i2c!(BME280, self::address::Address, init_wanted);
-// TODO crate::simple_device::spi!(BME280, self::address::Address, init_wanted);
+crate::simple_device::i2c!(BME280, self::address::Address, init_required);
+// TODO crate::simple_device::spi!(BME280, self::address::Address, init_required);
 
 /// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format)]
 pub enum InitError<BusError> {
     /// Bus error
     Bus(BusError),
-    /// Invalid Device Id was encountered
-    InvalidDeviceId,
-    /// Invalid Manufacturer Id was encountered
-    InvalidManufacturerId,
+    /// Invalid ChipId was encountered
+    InvalidChipId(registers::ChipId),
 }
 
-#[maybe_async_cfg::maybe(sync(not(feature = "async")), async(feature = "async"), keep_self)]
+#[derive(Debug)]
+struct CalibrationData {
+    dig_t1: u16,
+    dig_t2: i16,
+    dig_t3: i16,
+    dig_p1: u16,
+    dig_p2: i16,
+    dig_p3: i16,
+    dig_p4: i16,
+    dig_p5: i16,
+    dig_p6: i16,
+    dig_p7: i16,
+    dig_p8: i16,
+    dig_p9: i16,
+    dig_h1: u8,
+    dig_h2: i16,
+    dig_h3: u8,
+    dig_h4: i16,
+    dig_h5: i16,
+    dig_h6: i8,
+    t_fine: i32,
+}
+
+impl CalibrationData {
+    pub fn new(params1: registers::TrimmingParameters1, params2: registers::TrimmingParameters2) -> Self {
+        let params1 = params1.read_all();
+        let params2 = params2.read_all();
+        let dig_h4 = (params2.dig_h4_msb as i16 * 16) | ((params2.dig_h5_lsn_h4_lsn as i16) & 0x0F);
+        let dig_h5 = (params2.dig_h5_msb as i16 * 16) | (((params2.dig_h5_lsn_h4_lsn as i16) & 0xF0) >> 4);
+        Self {
+            dig_t1: params1.dig_t1,
+            dig_t2: params1.dig_t2,
+            dig_t3: params1.dig_t3,
+            dig_p1: params1.dig_p1,
+            dig_p2: params1.dig_p2,
+            dig_p3: params1.dig_p3,
+            dig_p4: params1.dig_p4,
+            dig_p5: params1.dig_p5,
+            dig_p6: params1.dig_p6,
+            dig_p7: params1.dig_p7,
+            dig_p8: params1.dig_p8,
+            dig_p9: params1.dig_p9,
+            dig_h1: params1.dig_h1,
+            dig_h2: params2.dig_h2,
+            dig_h3: params2.dig_h3,
+            dig_h4,
+            dig_h5,
+            dig_h6: params2.dig_h6,
+            t_fine: 0,
+        }
+    }
+}
+
+#[device_impl]
 impl<I> BME280<I>
 where
     I: RegisterInterface,
 {
-    /// Initialize the sensor by verifying its device id and manufacturer id.
-    /// Not mandatory, but recommended.
+    /// Initialize the sensor by performing a soft-reset, verifying its chip id
+    /// and reading calibration data.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
-        //let device_id = self.read_device_id_revision().await.map_err(InitError::Bus)?;
-        //if device_id.read_device_id() != self::device_id_revision::DEVICE_ID_VALID {
-        //    return Err(InitError::InvalidDeviceId);
-        //}
+        self.reset().await?;
+
+        let chip_id = self.read_id().await.map_err(InitError::Bus)?.read_chip_id();
+        if let self::registers::ChipId::Invalid(_) = chip_id {
+            return Err(InitError::InvalidChipId(chip_id));
+        }
+
+        self.calibrate().await?;
 
         Ok(())
     }
 
-    // TODO reset()
+    ///
+    pub async fn calibrate(&mut self) -> Result<(), InitError<I::Error>> {
+        let params1 = self.read_trimming_parameters_1().await.map_err(InitError::Bus)?;
+        let params2 = self.read_trimming_parameters_2().await.map_err(InitError::Bus)?;
+        self.calibration_data = CalibrationData::new(params1, params2);
+
+        Ok(())
+    }
+
+    ///
+    pub async fn reset(&mut self) -> Result<(), InitError<I::Error>> {
+        Ok(())
+    }
 }

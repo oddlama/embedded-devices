@@ -1,42 +1,3 @@
-/// This defines a simple device with the given name.
-/// Simple here means that the device can be instanciated without
-/// requiring additional generics or constructor arguments except
-/// for the interface.
-macro_rules! device {
-    ($device:ident, $struct_doc:expr) => {
-        #[doc = concat!("This represents a device of type `", stringify!($device), "` on the specified bus `I`.")]
-        #[doc = ""]
-        #[doc = $struct_doc]
-        pub struct $device<I>
-        where
-            I: embedded_registers::RegisterInterface,
-        {
-            #[doc = "The interface to communicate with the device"]
-            interface: I,
-        }
-
-        impl<I> core::ops::Deref for $device<I>
-        where
-            I: embedded_registers::RegisterInterface,
-        {
-            type Target = I;
-
-            fn deref(&self) -> &Self::Target {
-                &self.interface
-            }
-        }
-
-        impl<I> core::ops::DerefMut for $device<I>
-        where
-            I: embedded_registers::RegisterInterface,
-        {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.interface
-            }
-        }
-    };
-}
-
 /// This defines a constructor to create a new simple device
 /// from an i2c bus and address. The provided address type
 /// must be convertible to u8.
@@ -78,5 +39,4 @@ macro_rules! i2c {
     };
 }
 
-pub(crate) use device;
 pub(crate) use i2c;
