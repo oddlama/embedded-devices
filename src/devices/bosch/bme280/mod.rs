@@ -92,8 +92,6 @@ pub mod address;
 pub mod registers;
 
 // TODO create a second device for BMP280.
-// TODO make proc macro instead of rules! macro, so we can use
-//      arbitrary extra <I, ...> generics
 // TODO make #simple_device_register able to specify multiple parents
 // TODO measure, reset, config, ... functions for normal use
 // TODO spi support missing
@@ -109,6 +107,8 @@ pub mod registers;
 pub struct BME280<I: RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
+    ///// Calibration data
+    //calibration_data: CalibrationData,
 }
 
 crate::simple_device::i2c!(BME280, self::address::Address, init_required);
@@ -147,11 +147,9 @@ struct CalibrationData {
 }
 
 impl CalibrationData {
-    pub fn new(params1: registers::TrimmingParameters1, params2: registers::TrimmingParameters2) -> Self {
+    pub fn new(params1: self::registers::TrimmingParameters1, params2: self::registers::TrimmingParameters2) -> Self {
         let params1 = params1.read_all();
         let params2 = params2.read_all();
-        let dig_h4 = (params2.dig_h4_msb as i16 * 16) | ((params2.dig_h5_lsn_h4_lsn as i16) & 0x0F);
-        let dig_h5 = (params2.dig_h5_msb as i16 * 16) | (((params2.dig_h5_lsn_h4_lsn as i16) & 0xF0) >> 4);
         Self {
             dig_t1: params1.dig_t1,
             dig_t2: params1.dig_t2,
@@ -168,8 +166,8 @@ impl CalibrationData {
             dig_h1: params1.dig_h1,
             dig_h2: params2.dig_h2,
             dig_h3: params2.dig_h3,
-            dig_h4,
-            dig_h5,
+            dig_h4: (params2.dig_h4_msb as i16 * 16) | ((params2.dig_h5_lsn_h4_lsn as i16) & 0x0F),
+            dig_h5: (params2.dig_h5_msb as i16 * 16) | (((params2.dig_h5_lsn_h4_lsn as i16) & 0xF0) >> 4),
             dig_h6: params2.dig_h6,
             t_fine: 0,
         }
@@ -184,9 +182,11 @@ where
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
+        use self::registers::Id;
+
         self.reset().await?;
 
-        let chip_id = self.read_id().await.map_err(InitError::Bus)?.read_chip_id();
+        let chip_id = self.read_register::<Id>().await.map_err(InitError::Bus)?.read_chip_id();
         if let self::registers::ChipId::Invalid(_) = chip_id {
             return Err(InitError::InvalidChipId(chip_id));
         }
@@ -198,8 +198,17 @@ where
 
     ///
     pub async fn calibrate(&mut self) -> Result<(), InitError<I::Error>> {
-        let params1 = self.read_trimming_parameters_1().await.map_err(InitError::Bus)?;
-        let params2 = self.read_trimming_parameters_2().await.map_err(InitError::Bus)?;
+        use self::registers::TrimmingParameters1;
+        use self::registers::TrimmingParameters2;
+
+        let params1 = self
+            .read_register::<TrimmingParameters1>()
+            .await
+            .map_err(InitError::Bus)?;
+        let params2 = self
+            .read_register::<TrimmingParameters2>()
+            .await
+            .map_err(InitError::Bus)?;
         self.calibration_data = CalibrationData::new(params1, params2);
 
         Ok(())

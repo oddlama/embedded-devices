@@ -49,6 +49,17 @@ use embedded_registers::RegisterInterface;
 pub mod address;
 pub mod registers;
 
+/// All possible errors that may occur in device initialization
+#[derive(Debug, defmt::Format)]
+pub enum InitError<BusError> {
+    /// Bus error
+    Bus(BusError),
+    /// Invalid Device Id was encountered
+    InvalidDeviceId,
+    /// Invalid Manufacturer Id was encountered
+    InvalidManufacturerId,
+}
+
 /// Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
 /// -20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
 ///
@@ -61,17 +72,6 @@ pub struct MCP9808<I: RegisterInterface> {
 
 crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
 
-/// All possible errors that may occur in device initialization
-#[derive(Debug, defmt::Format)]
-pub enum InitError<BusError> {
-    /// Bus error
-    Bus(BusError),
-    /// Invalid Device Id was encountered
-    InvalidDeviceId,
-    /// Invalid Manufacturer Id was encountered
-    InvalidManufacturerId,
-}
-
 #[device_impl]
 impl<I> MCP9808<I>
 where
@@ -80,12 +80,15 @@ where
     /// Initialize the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
-        let device_id = self.read_device_id_revision().await.map_err(InitError::Bus)?;
+        use self::registers::DeviceIdRevision;
+        use self::registers::ManufacturerId;
+
+        let device_id = self.read_register::<DeviceIdRevision>().await.map_err(InitError::Bus)?;
         if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
             return Err(InitError::InvalidDeviceId);
         }
 
-        let manufacturer_id = self.read_manufacturer_id().await.map_err(InitError::Bus)?;
+        let manufacturer_id = self.read_register::<ManufacturerId>().await.map_err(InitError::Bus)?;
         if manufacturer_id.read_manufacturer_id() != self::registers::MANUFACTURER_ID_VALID {
             return Err(InitError::InvalidManufacturerId);
         }

@@ -1,5 +1,6 @@
 use bondrewd::BitfieldEnum;
-use embedded_devices_derive::simple_device_register;
+use embedded_devices_derive::device_register;
+use embedded_registers::register;
 use uom::num_rational::Rational32;
 use uom::si::rational32::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -155,7 +156,8 @@ pub enum AlertMode {
 ///
 /// The MCP9808 has a 16-bit Configuration register that allows the user
 /// to set various functions for a robust temperature monitoring system.
-#[simple_device_register(device = super::MCP9808, address = 0b0001, mode = "rw")]
+#[device_register(super::MCP9808)]
+#[register(address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]
@@ -184,7 +186,8 @@ pub struct Configuration {
 }
 
 /// The device-id and revision register.
-#[simple_device_register(device = super::MCP9808, address = 0b0111, mode = "r")]
+#[device_register(super::MCP9808)]
+#[register(address = 0b0111, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceIdRevision {
     /// The Device ID for the MCP9808 is `0x04`.
@@ -195,7 +198,8 @@ pub struct DeviceIdRevision {
 }
 
 /// The device-id and revision register.
-#[simple_device_register(device = super::MCP9808, address = 0b0110, mode = "r")]
+#[device_register(super::MCP9808)]
+#[register(address = 0b0110, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ManufacturerId {
     /// The Manufacturer ID for the MCP9808 is `0x0054`.
@@ -222,7 +226,8 @@ pub enum TemperatureResolution {
 ///
 /// This register allows the user to change the sensor resolution.
 /// The Power-on Reset default resolution is +0.0625°C.
-#[simple_device_register(device = super::MCP9808, address = 0b1000, mode = "rw")]
+#[device_register(super::MCP9808)]
+#[register(address = 0b1000, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Resolution {
     #[bondrewd(bit_length = 6, reserve)]
@@ -248,7 +253,8 @@ pub struct Resolution {
 ///
 /// The three least significant temperature bits may stay `0` depending on the
 /// resolution register.
-#[simple_device_register(device = super::MCP9808, address = 0b0101, mode = "r")]
+#[device_register(super::MCP9808)]
+#[register(address = 0b0101, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AmbientTemperature {
     /// Whether T_A is greater than or equal to T_CRIT
@@ -272,7 +278,8 @@ impl AmbientTemperature {
 macro_rules! define_temp_limit_register {
     ($name:ident, $address:expr, $doc:expr) => {
         #[doc = $doc]
-        #[simple_device_register(device = super::MCP9808, address = $address, mode = "rw")]
+        #[device_register(super::MCP9808)]
+        #[register(address = $address, mode = "rw")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             #[bondrewd(bit_length = 3, reserve)]

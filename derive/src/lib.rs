@@ -4,7 +4,7 @@ use proc_macro as pc;
 
 mod device;
 mod device_impl;
-mod simple_device_register;
+mod device_register;
 
 #[proc_macro_attribute]
 pub fn device(args: pc::TokenStream, input: pc::TokenStream) -> pc::TokenStream {
@@ -23,8 +23,8 @@ pub fn device_impl(args: pc::TokenStream, input: pc::TokenStream) -> pc::TokenSt
 }
 
 #[proc_macro_attribute]
-pub fn simple_device_register(args: pc::TokenStream, input: pc::TokenStream) -> pc::TokenStream {
-    match simple_device_register::simple_device_register(args.into(), input.into()) {
+pub fn device_register(args: pc::TokenStream, input: pc::TokenStream) -> pc::TokenStream {
+    match device_register::device_register(args.into(), input.into()) {
         Ok(result) => result.into(),
         Err(e) => e.into_compile_error().into(),
     }
