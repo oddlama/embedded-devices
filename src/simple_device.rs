@@ -3,10 +3,10 @@
 /// must be convertible to u8.
 macro_rules! i2c {
     ($device:ident, $address_type:ty, init_required) => {
-        crate::simple_device::i2c!($device, $address_type, "Before using this device, you must call the [`Self::init`] method which initializes the sensor and ensures that it is working correctly.");
+        crate::simple_device::i2c!($device, $address_type, "Before using this device, you must call the [`Self::init`] method which initializes the device and ensures that it is working correctly.");
     };
     ($device:ident, $address_type:ty, init_wanted) => {
-        crate::simple_device::i2c!($device, $address_type, "Before using this device, you should call the [`Self::init`] method which ensures that the sensor is working correctly.");
+        crate::simple_device::i2c!($device, $address_type, "Before using this device, you should call the [`Self::init`] method which ensures that the device is working correctly.");
     };
     ($device:ident, $address_type:ty) => {
         crate::simple_device::i2c!($device, $address_type, "");

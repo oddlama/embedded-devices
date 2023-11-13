@@ -3,7 +3,7 @@
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::spanned::Spanned;
 
 #[derive(Debug, FromMeta)]
@@ -32,9 +32,12 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
     last_segment.ident = format_ident!("{}Register", last_segment.ident);
     last_segment.arguments = syn::PathArguments::None;
 
+    let read_register_doc = format!("Reads from the given register. For a list of all available registers, refer to implentors of [`{}`].", (&register_marker).to_token_stream());
+    let write_register_doc = format!("Writes to the given register. For a list of all available registers, refer to implentors of [`{}`].", (&register_marker).to_token_stream());
+
     let additional_items = vec![
         quote! {
-            /// Reads the given register
+            #[doc = #read_register_doc]
             #[inline]
             pub async fn read_register<R>(&mut self) -> Result<R, I::Error>
             where
@@ -44,7 +47,7 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
             }
         },
         quote! {
-            /// Writes the given register
+            #[doc = #write_register_doc]
             #[inline]
             pub async fn write_register<R>(&mut self, register: &R) -> Result<(), I::Error>
             where

@@ -73,10 +73,7 @@ pub struct MCP9808<I: RegisterInterface> {
 crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
 
 #[device_impl]
-impl<I> MCP9808<I>
-where
-    I: RegisterInterface,
-{
+impl<I: RegisterInterface> MCP9808<I> {
     /// Initialize the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
