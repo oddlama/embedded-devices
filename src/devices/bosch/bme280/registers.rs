@@ -2,6 +2,7 @@ use bondrewd::{BitfieldEnum, Bitfields};
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
+/// Known chip ids
 #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
@@ -241,6 +242,7 @@ pub struct Config {
     pub spi_3wire: bool,
 }
 
+/// Device-internal calibration registers (section 1)
 #[device_register(super::BME280)]
 #[register(address = 0x88, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 26)]
@@ -263,6 +265,7 @@ pub struct TrimmingParameters1 {
     pub dig_h1: u8,
 }
 
+/// Device-internal calibration registers (section 2)
 #[device_register(super::BME280)]
 #[register(address = 0xe1, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 7)]
@@ -312,6 +315,7 @@ pub struct Humidity {
     pub humidity: u16,
 }
 
+/// Burst register read of pressure and temperature
 #[device_register(super::BME280)]
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
@@ -322,6 +326,7 @@ pub struct BurstMeasurementsPT {
     pub temperature: TemperatureBitfield,
 }
 
+/// Burst register read of pressure, temperature and humidity
 #[device_register(super::BME280)]
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 8)]

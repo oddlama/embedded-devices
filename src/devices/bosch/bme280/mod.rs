@@ -277,7 +277,7 @@ impl CalibrationData {
             var5
         };
 
-        let humidity = Rational32::new_raw(var5, 100i32 << 22);
+        let humidity = Rational32::new_raw(var5, 1i32 << 22);
         Ratio::new::<percent>(humidity)
     }
 }
@@ -316,9 +316,8 @@ impl<I: RegisterInterface> BME280<I> {
     pub async fn init<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         use self::registers::Id;
 
-        // Soft-reset device and wait until startup is done
-        self.reset().await.map_err(InitError::Bus)?;
-        delay.delay_ms(2).await;
+        // Soft-reset device
+        self.reset(delay).await.map_err(InitError::Bus)?;
 
         // Verify chip id
         let chip_id = self.read_register::<Id>().await.map_err(InitError::Bus)?.read_chip_id();
@@ -346,22 +345,39 @@ impl<I: RegisterInterface> BME280<I> {
         Ok(())
     }
 
-    /// Performs a soft-reset of the device. It is recommended to wait
-    /// 2 milliseconds before further communication. The datasheet doesn't explicitly
-    /// state the time required to perform this reset, but the given self-test
-    /// procedure also waits 2 milliseconds.
+    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
+    /// of 2ms, which is automatically awaited before allowing further communication.
+    ///
+    /// This will also check the status register for success, returning an error otherwise.
     #[inline]
-    pub async fn reset(&mut self) -> Result<(), I::Error> {
-        self.write_register(&self::registers::Reset::default()).await
+    pub async fn reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
+        self.write_register(&self::registers::Reset::default()).await?;
+        delay.delay_ms(2).await;
+        // TODO read status register
+        Ok(())
     }
+
+    // TODO reset_try_up_to try_reset
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
     /// which will cause it to take a measurement and return to sleep mode afterwards.
     ///
-    /// This function will wait until the data is acquired, perform a burst-register read
+    /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
-    pub async fn measure(&mut self) -> Result<Measurements, MeasurementError<I::Error>> {
-        use self::registers::BurstMeasurementsPTH;
+    pub async fn measure<D: hal::delay::DelayUs>(
+        &mut self,
+        delay: &mut D,
+    ) -> Result<Measurements, MeasurementError<I::Error>> {
+        use self::registers::SensorMode;
+        use self::registers::{BurstMeasurementsPTH, ControlMeasurement};
+
+        self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        // TODO calc wait time
+        delay.delay_ms(40).await;
+
         let raw_data = self
             .read_register::<BurstMeasurementsPTH>()
             .await
