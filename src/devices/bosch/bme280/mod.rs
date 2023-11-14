@@ -47,12 +47,8 @@
 //! bme280.init().await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let temp = bme280
-//!     .read_ambient_temperature()
-//!     .await?
-//!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
+//! let measurements = bme280.measure(&mut Delay).await?;
+//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -97,23 +93,21 @@ pub mod address;
 pub mod registers;
 
 use self::address::Address;
+use self::registers::{
+    BurstMeasurementsPTH, ControlMeasurement, Id, Oversampling, SensorMode, TrimmingParameters1, TrimmingParameters2,
+};
 
-/// All possible errors that may occur in device initialization
+/// All possible errors that may occur when using this device
 #[derive(Debug, defmt::Format)]
-pub enum InitError<BusError> {
+pub enum Error<BusError> {
     /// Bus error
     Bus(BusError),
-    /// Invalid ChipId was encountered
+    /// Invalid ChipId was encountered in `init`
     InvalidChipId(registers::ChipId),
-}
-
-/// All possible errors that may occur in measurement
-#[derive(Debug, defmt::Format)]
-pub enum MeasurementError<BusError> {
-    /// Bus error
-    Bus(BusError),
-    /// The calibration data was not yet read from the device. Call `init` or `calibrate` first.
+    /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     NotCalibrated,
+    /// NVM data copy is still in progress.
+    NvmCopyInProgress,
 }
 
 /// Measurement data
@@ -130,10 +124,9 @@ pub struct Measurements {
 /// Fine temperature coefficient calculated when compensating temperature
 /// and required to compensate pressure and humidity
 #[derive(Debug, Clone, Copy)]
-pub struct TFine(i32);
+struct TFine(i32);
 
 // TODO create a second device for BMP280.
-// TODO measure, reset, config, ... functions for normal use
 // TODO spi support missing
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
@@ -313,20 +306,18 @@ where
 impl<I: RegisterInterface> BME280<I> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
-    pub async fn init<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
-        use self::registers::Id;
-
+    pub async fn init<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         // Soft-reset device
-        self.reset(delay).await.map_err(InitError::Bus)?;
+        self.reset(delay).await?;
 
         // Verify chip id
-        let chip_id = self.read_register::<Id>().await.map_err(InitError::Bus)?.read_chip_id();
+        let chip_id = self.read_register::<Id>().await.map_err(Error::Bus)?.read_chip_id();
         if let self::registers::ChipId::Invalid(_) = chip_id {
-            return Err(InitError::InvalidChipId(chip_id));
+            return Err(Error::InvalidChipId(chip_id));
         }
 
         // Read calibration data
-        self.calibrate().await.map_err(InitError::Bus)?;
+        self.calibrate().await.map_err(Error::Bus)?;
         Ok(())
     }
 
@@ -335,9 +326,6 @@ impl<I: RegisterInterface> BME280<I> {
     /// before taking any measurements. Calling [`Self::init`] will
     /// automatically do this.
     pub async fn calibrate(&mut self) -> Result<(), I::Error> {
-        use self::registers::TrimmingParameters1;
-        use self::registers::TrimmingParameters2;
-
         let params1 = self.read_register::<TrimmingParameters1>().await?;
         let params2 = self.read_register::<TrimmingParameters2>().await?;
         self.calibration_data = Some(CalibrationData::new(params1, params2));
@@ -348,43 +336,75 @@ impl<I: RegisterInterface> BME280<I> {
     /// Performs a soft-reset of the device. The datasheet specifies a start-up time
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
-    /// This will also check the status register for success, returning an error otherwise.
-    #[inline]
-    pub async fn reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
-        self.write_register(&self::registers::Reset::default()).await?;
-        delay.delay_ms(2).await;
-        // TODO read status register
-        Ok(())
+    /// This will try resetting up to 5 times in case of an error.
+    pub async fn reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+        const TRIES: u8 = 5;
+        for _ in 0..TRIES {
+            match self.try_reset(delay).await {
+                Ok(()) => return Ok(()),
+                Err(Error::<I::Error>::NvmCopyInProgress) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(Error::<I::Error>::NvmCopyInProgress)
     }
 
-    // TODO reset_try_up_to try_reset
+    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
+    /// of 2ms, which is automatically awaited before allowing further communication.
+    ///
+    /// This will check the status register for success, returning an error otherwise.
+    pub async fn try_reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+        self.write_register(&self::registers::Reset::default())
+            .await
+            .map_err(Error::Bus)?;
+        delay.delay_ms(2).await;
+
+        if self
+            .read_register::<self::registers::Status>()
+            .await
+            .map_err(Error::Bus)?
+            .read_update()
+        {
+            return Err(Error::NvmCopyInProgress);
+        }
+        Ok(())
+    }
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
     /// which will cause it to take a measurement and return to sleep mode afterwards.
     ///
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
-    pub async fn measure<D: hal::delay::DelayUs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<Measurements, MeasurementError<I::Error>> {
-        use self::registers::SensorMode;
-        use self::registers::{BurstMeasurementsPTH, ControlMeasurement};
-
+    pub async fn measure<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
         self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
             .await
-            .map_err(MeasurementError::Bus)?;
+            .map_err(Error::Bus)?;
 
-        // TODO calc wait time
-        delay.delay_ms(40).await;
+        // TODO read config or store config....
+        let o_t = Oversampling::X_16;
+        let o_p = Oversampling::X_16;
+        let o_h = Oversampling::X_16;
+
+        // Maximum time required to perform the measurement.
+        // See chapter 9 of the datasheet for more information.
+        let mut max_measurement_delay_ms = 1250 + 2300 * o_t.factor();
+        if o_p.factor() > 0 {
+            max_measurement_delay_ms += 575 + 2300 * o_p.factor();
+        }
+        if o_h.factor() > 0 {
+            max_measurement_delay_ms += 575 + 2300 * o_h.factor();
+        }
+
+        delay.delay_ms(max_measurement_delay_ms).await;
 
         let raw_data = self
             .read_register::<BurstMeasurementsPTH>()
             .await
-            .map_err(MeasurementError::Bus)?
+            .map_err(Error::Bus)?
             .read_all();
         let Some(ref cal) = self.calibration_data else {
-            return Err(MeasurementError::NotCalibrated);
+            return Err(Error::NotCalibrated);
         };
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);

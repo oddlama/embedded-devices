@@ -92,6 +92,21 @@ pub enum Oversampling {
     Invalid(u8),
 }
 
+impl Oversampling {
+    /// Returns the oversampling factor (1 for X_1, 16 for X_16)
+    pub fn factor(&self) -> u32 {
+        match self {
+            Oversampling::Disabled => 0,
+            Oversampling::X_1 => 1,
+            Oversampling::X_2 => 2,
+            Oversampling::X_4 => 4,
+            Oversampling::X_8 => 8,
+            Oversampling::X_16 => 16,
+            Oversampling::Invalid(_) => 0,
+        }
+    }
+}
+
 /// The humidity control register. Changes to this register only become effective
 /// after a write to the ControlMeasurement register!
 #[device_register(super::BME280)]
@@ -117,7 +132,7 @@ pub struct Status {
     reserved0: u8,
 
     /// Automatically set to `1` whenever a conversion is running and back to `0` when the results have been transferred to the data registers.
-    measuring: bool,
+    pub measuring: bool,
 
     #[bondrewd(bit_length = 2, reserve)]
     #[allow(dead_code)]
@@ -125,7 +140,7 @@ pub struct Status {
 
     /// Automatically set to `1` when the NVM data are being copied to image registers and back to `0` when the
     /// copying is done. The data are copied at power-on-reset and before every conversion.
-    update: bool,
+    pub update: bool,
 }
 
 /// Sensor operating mode
