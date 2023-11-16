@@ -94,7 +94,8 @@ pub mod registers;
 
 use self::address::Address;
 use self::registers::{
-    BurstMeasurementsPTH, ControlMeasurement, Id, Oversampling, SensorMode, TrimmingParameters1, TrimmingParameters2,
+    BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
+    TrimmingParameters1, TrimmingParameters2,
 };
 
 /// All possible errors that may occur when using this device
@@ -128,6 +129,7 @@ struct TFine(i32);
 
 // TODO create a second device for BMP280.
 // TODO spi support missing
+// TODO should registers implement copy by default?
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 /// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
@@ -142,6 +144,21 @@ pub struct BME280<I: RegisterInterface> {
     interface: I,
     /// Calibration data
     calibration_data: Option<CalibrationData>,
+}
+
+/// Common configuration values for the BME280 sensor.
+/// The power-on-reset default is to set all oversampling settings to 1X
+/// and use no IIR filter.
+#[derive(Debug, Clone, Default)]
+pub struct Configuration {
+    /// The oversampling rate for temperature mesurements
+    temperature_oversampling: Oversampling,
+    /// The oversampling rate for pressure mesurements
+    pressure_oversampling: Oversampling,
+    /// The oversampling rate for humidity mesurements
+    humidity_oversampling: Oversampling,
+    /// The iir filter to use
+    iir_filter: IIRFilter,
 }
 
 #[derive(Debug)]
@@ -371,6 +388,30 @@ impl<I: RegisterInterface> BME280<I> {
         Ok(())
     }
 
+    /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
+    /// Check sensor mode beforehand and call [`reset`] if necessary. To configure
+    /// advanced settings, please directly update the respective registers.
+    pub async fn configure<D: hal::delay::DelayUs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
+        // TODO only if BME not BMP
+        self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
+            .await
+            .map_err(Error::Bus)?;
+
+        self.write_register(
+            &ControlMeasurement::default()
+                .with_temperature_oversampling(config.temperature_oversampling)
+                .with_pressure_oversampling(config.pressure_oversampling),
+        )
+        .await
+        .map_err(Error::Bus)?;
+
+        let mut reg_config = self.read_register::<Config>().await.map_err(Error::Bus)?;
+        reg_config.write_filter(config.iir_filter);
+        self.write_register(&reg_config).await.map_err(Error::Bus)?;
+
+        Ok(())
+    }
+
     /// Performs a one-shot measurement. This will transition the device into forced mode,
     /// which will cause it to take a measurement and return to sleep mode afterwards.
     ///
@@ -381,10 +422,14 @@ impl<I: RegisterInterface> BME280<I> {
             .await
             .map_err(Error::Bus)?;
 
-        // TODO read config or store config....
-        let o_t = Oversampling::X_16;
-        let o_p = Oversampling::X_16;
-        let o_h = Oversampling::X_16;
+        // Read current oversampling config to determine required measurement delay
+        // TODO only if BME not BMP
+        let reg_ctrl_h = self.read_register::<ControlHumidity>().await.map_err(Error::Bus)?;
+        let o_h = reg_ctrl_h.read_oversampling();
+
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        let o_t = reg_ctrl_m.read_temperature_oversampling();
+        let o_p = reg_ctrl_m.read_pressure_oversampling();
 
         // Maximum time required to perform the measurement.
         // See chapter 9 of the datasheet for more information.
@@ -392,6 +437,7 @@ impl<I: RegisterInterface> BME280<I> {
         if o_p.factor() > 0 {
             max_measurement_delay_ms += 575 + 2300 * o_p.factor();
         }
+        // TODO only if BME not BMP
         if o_h.factor() > 0 {
             max_measurement_delay_ms += 575 + 2300 * o_h.factor();
         }
@@ -409,8 +455,10 @@ impl<I: RegisterInterface> BME280<I> {
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
         let pressure = cal.compensate_pressure(raw_data.pressure.pressure, t_fine);
+        // TODO only if BME not BMP
         let humidity = cal.compensate_humidity(raw_data.humidity.humidity, t_fine);
 
+        // TODO only if BME not BMP
         Ok(Measurements {
             temperature,
             pressure,

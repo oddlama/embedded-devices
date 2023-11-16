@@ -3,7 +3,7 @@ use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
 /// Known chip ids
-#[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum ChipId {
@@ -35,7 +35,7 @@ pub struct Id {
     pub chip_id: ChipId,
 }
 
-#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum ResetMagic {
@@ -60,7 +60,7 @@ pub struct Reset {
 /// Oversampling settings for temperature, pressure, and humidity measurements.
 /// See sections 3.4ff of the manual for measurement flow and recommended values.
 /// The default is 1x, i.e., no oversampling.
-#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
@@ -144,7 +144,7 @@ pub struct Status {
 }
 
 /// Sensor operating mode
-#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum SensorMode {
@@ -185,7 +185,7 @@ pub struct ControlMeasurement {
 }
 
 /// The standby time between measurements in [`SensorMode::Normal`].
-#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
@@ -216,7 +216,7 @@ pub enum StandbyTime {
 /// Lowpass filter settings for pressure and temperature values.
 /// Enabling any filter option increases the resolution of the
 /// respective measured quantity to 20 bits.
-#[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum IIRFilter {
