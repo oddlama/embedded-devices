@@ -433,16 +433,16 @@ impl<I: RegisterInterface> BME280<I> {
 
         // Maximum time required to perform the measurement.
         // See chapter 9 of the datasheet for more information.
-        let mut max_measurement_delay_ms = 1250 + 2300 * o_t.factor();
+        let mut max_measurement_delay_us = 1250 + 2300 * o_t.factor();
         if o_p.factor() > 0 {
-            max_measurement_delay_ms += 575 + 2300 * o_p.factor();
+            max_measurement_delay_us += 575 + 2300 * o_p.factor();
         }
         // TODO only if BME not BMP
         if o_h.factor() > 0 {
-            max_measurement_delay_ms += 575 + 2300 * o_h.factor();
+            max_measurement_delay_us += 575 + 2300 * o_h.factor();
         }
 
-        delay.delay_ms(max_measurement_delay_ms).await;
+        delay.delay_us(max_measurement_delay_us).await;
 
         let raw_data = self
             .read_register::<BurstMeasurementsPTH>()
