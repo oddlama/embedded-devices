@@ -323,7 +323,7 @@ where
 impl<I: RegisterInterface> BME280<I> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
-    pub async fn init<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         // Soft-reset device
         self.reset(delay).await?;
 
@@ -354,7 +354,7 @@ impl<I: RegisterInterface> BME280<I> {
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             match self.try_reset(delay).await {
@@ -371,7 +371,7 @@ impl<I: RegisterInterface> BME280<I> {
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         self.write_register(&self::registers::Reset::default())
             .await
             .map_err(Error::Bus)?;
@@ -391,7 +391,7 @@ impl<I: RegisterInterface> BME280<I> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure<D: hal::delay::DelayUs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
+    pub async fn configure<D: hal::delay::DelayNs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
         // TODO only if BME not BMP
         self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await
@@ -417,7 +417,7 @@ impl<I: RegisterInterface> BME280<I> {
     ///
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
-    pub async fn measure<D: hal::delay::DelayUs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
+    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
         self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
             .await
             .map_err(Error::Bus)?;
