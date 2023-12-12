@@ -27,7 +27,7 @@ impl Default for ChipId {
 
 /// The chip identification number. This number can
 /// be read as soon as the device finished the power-on-reset.
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xd0, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Id {
@@ -49,7 +49,7 @@ pub enum ResetMagic {
 /// The reset register. If the value 0xB6 is written to the register,
 /// the device is reset using the complete power-on-reset procedure.
 /// Writing other values than 0xB6 has no effect.
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xe0, mode = "w")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Reset {
@@ -109,7 +109,7 @@ impl Oversampling {
 
 /// The humidity control register. Changes to this register only become effective
 /// after a write to the ControlMeasurement register!
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf2, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ControlHumidity {
@@ -123,7 +123,7 @@ pub struct ControlHumidity {
 }
 
 /// The status register.
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf3, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Status {
@@ -169,7 +169,7 @@ pub enum SensorMode {
 /// The measurement control register sets the pressure and temperature
 /// data acquisition options of the device. The register needs to be written
 /// after changing [`ControlHumidity`] for those changes to become effective.
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf4, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ControlMeasurement {
@@ -238,7 +238,7 @@ pub enum IIRFilter {
 /// The config register sets the rate, filter and interface options of the device.
 /// Writes to this register in [`SensorMode::Normal`] may be ignored.
 /// In [`SensorMode::Sleep`] writes are not ignored.
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf4, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Config {
@@ -258,7 +258,7 @@ pub struct Config {
 }
 
 /// Device-internal calibration registers (section 1)
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0x88, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 26)]
 pub struct TrimmingParameters1 {
@@ -281,7 +281,7 @@ pub struct TrimmingParameters1 {
 }
 
 /// Device-internal calibration registers (section 2)
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xe1, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 7)]
 pub struct TrimmingParameters2 {
@@ -294,7 +294,7 @@ pub struct TrimmingParameters2 {
 }
 
 /// This register contains the raw pressure measurement
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Pressure {
@@ -308,7 +308,7 @@ pub struct Pressure {
 }
 
 /// This register contains the raw temperature measurement
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xfa, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Temperature {
@@ -322,7 +322,7 @@ pub struct Temperature {
 }
 
 /// This register contains the raw humidity measurement
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xfd, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Humidity {
@@ -331,7 +331,7 @@ pub struct Humidity {
 }
 
 /// Burst register read of pressure and temperature
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct BurstMeasurementsPT {
@@ -342,7 +342,7 @@ pub struct BurstMeasurementsPT {
 }
 
 /// Burst register read of pressure, temperature and humidity
-#[device_register(super::BME280)]
+#[device_register(super::BME280Common)]
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 8)]
 pub struct BurstMeasurementsPTH {

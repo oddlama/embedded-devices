@@ -81,6 +81,8 @@
 //! # }
 //! ```
 
+// TODO spi support missing
+
 use embedded_devices_derive::{device, device_impl};
 use embedded_registers::{i2c::I2cDevice, RegisterInterface};
 use uom::num_rational::Rational32;
@@ -113,6 +115,15 @@ pub enum Error<BusError> {
 
 /// Measurement data
 #[derive(Debug)]
+pub struct MeasurementsPT {
+    /// Current temperature
+    pub temperature: ThermodynamicTemperature,
+    /// Current pressure or None if the sensor reported and invalid value
+    pub pressure: Option<Pressure>,
+}
+
+/// Measurement data
+#[derive(Debug)]
 pub struct Measurements {
     /// Current temperature
     pub temperature: ThermodynamicTemperature,
@@ -125,11 +136,7 @@ pub struct Measurements {
 /// Fine temperature coefficient calculated when compensating temperature
 /// and required to compensate pressure and humidity
 #[derive(Debug, Clone, Copy)]
-struct TFine(i32);
-
-// TODO create a second device for BMP280.
-// TODO spi support missing
-// TODO should registers implement copy by default?
+pub(super) struct TFine(i32);
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 /// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
@@ -139,12 +146,15 @@ struct TFine(i32);
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct BME280<I: RegisterInterface> {
+pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
     /// The interface to communicate with the device
     interface: I,
     /// Calibration data
-    calibration_data: Option<CalibrationData>,
+    pub(super) calibration_data: Option<CalibrationData>,
 }
+
+pub type BME280<I> = BME280Common<I, true>;
+pub type BMP280<I> = BME280Common<I, false>;
 
 /// Common configuration values for the BME280 sensor.
 /// The power-on-reset default is to set all oversampling settings to 1X
@@ -162,7 +172,7 @@ pub struct Configuration {
 }
 
 #[derive(Debug)]
-struct CalibrationData {
+pub(super) struct CalibrationData {
     dig_t1: u16,
     dig_t2: i16,
     dig_t3: i16,
@@ -209,7 +219,7 @@ impl CalibrationData {
         }
     }
 
-    fn compensate_temperature(&self, uncompensated: u32) -> (ThermodynamicTemperature, TFine) {
+    pub(super) fn compensate_temperature(&self, uncompensated: u32) -> (ThermodynamicTemperature, TFine) {
         let dig_t1 = self.dig_t1 as i32;
         let dig_t2 = self.dig_t2 as i32;
         let dig_t3 = self.dig_t3 as i32;
@@ -227,7 +237,7 @@ impl CalibrationData {
         )
     }
 
-    fn compensate_pressure(&self, uncompensated: u32, t_fine: TFine) -> Option<Pressure> {
+    pub(super) fn compensate_pressure(&self, uncompensated: u32, t_fine: TFine) -> Option<Pressure> {
         let t_fine = t_fine.0;
 
         let dig_p1 = self.dig_p1 as i64;
@@ -298,7 +308,7 @@ impl CalibrationData {
     async(feature = "async"),
     keep_self
 )]
-impl<I> BME280<I2cDevice<I>>
+impl<I, const IS_BME: bool> BME280Common<I2cDevice<I>, IS_BME>
 where
     I: hal::i2c::I2c + hal::i2c::ErrorType,
 {
@@ -320,7 +330,7 @@ where
 }
 
 #[device_impl]
-impl<I: RegisterInterface> BME280<I> {
+impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
@@ -387,12 +397,19 @@ impl<I: RegisterInterface> BME280<I> {
         }
         Ok(())
     }
+}
 
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
+    sync(not(feature = "async")),
+    async(feature = "async"),
+    keep_self
+)]
+impl<I: RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
     pub async fn configure<D: hal::delay::DelayNs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
-        // TODO only if BME not BMP
         self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await
             .map_err(Error::Bus)?;
@@ -423,7 +440,6 @@ impl<I: RegisterInterface> BME280<I> {
             .map_err(Error::Bus)?;
 
         // Read current oversampling config to determine required measurement delay
-        // TODO only if BME not BMP
         let reg_ctrl_h = self.read_register::<ControlHumidity>().await.map_err(Error::Bus)?;
         let o_h = reg_ctrl_h.read_oversampling();
 
@@ -437,7 +453,6 @@ impl<I: RegisterInterface> BME280<I> {
         if o_p.factor() > 0 {
             max_measurement_delay_us += 575 + 2300 * o_p.factor();
         }
-        // TODO only if BME not BMP
         if o_h.factor() > 0 {
             max_measurement_delay_us += 575 + 2300 * o_h.factor();
         }
@@ -455,10 +470,8 @@ impl<I: RegisterInterface> BME280<I> {
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
         let pressure = cal.compensate_pressure(raw_data.pressure.pressure, t_fine);
-        // TODO only if BME not BMP
         let humidity = cal.compensate_humidity(raw_data.humidity.humidity, t_fine);
 
-        // TODO only if BME not BMP
         Ok(Measurements {
             temperature,
             pressure,

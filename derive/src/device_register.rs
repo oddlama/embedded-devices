@@ -5,8 +5,6 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 
-/// This adds accessor functions for the given register and
-/// proxies the embedded_registers::register attribute.
 pub(crate) fn device_register(args: TokenStream, orig_input: TokenStream) -> syn::Result<TokenStream> {
     let args_span = args.span();
     let args = NestedMeta::parse_meta_list(args)?;
