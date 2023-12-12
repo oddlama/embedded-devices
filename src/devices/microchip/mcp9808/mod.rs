@@ -23,7 +23,7 @@
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! use embedded_devices::devices::microchip::mcp9808::{MCP9808, address::Address};
+//! use embedded_devices::devices::microchip::mcp9808::{MCP9808, address::Address, registers::AmbientTemperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
@@ -33,7 +33,7 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let temp = mcp9808
-//!     .read_ambient_temperature()
+//!     .read_register::<AmbientTemperature>()
 //!     .await?
 //!     .read_temperature()
 //!     .get::<degree_celsius>()

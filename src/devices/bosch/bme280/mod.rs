@@ -1,4 +1,4 @@
-//! # BME280 / BMP280
+//! # BME280
 //!
 //! The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 //! sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package with
@@ -31,51 +31,25 @@
 //! In order to tailor data rate, noise, response time and current consumption to the needs of the user, a
 //! variety of oversampling modes, filter modes and data rates can be selected.
 //!
-//! ## Usage (BME280)
+//! ## Usage
 //!
 //! ```
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::microchip::bme280::{BME280, address::Address};
+//! use embedded_devices::devices::bosch::bme280::{BME280, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280::new_i2c(i2c, Address::Primary);
-//! bme280.init().await.unwrap();
+//! bme280.init(&mut Delay).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bme280.measure(&mut Delay).await?;
 //! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
-//! println!("Current temperature: {:?}°C", temp);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Usage (BMP280)
-//!
-//! ```
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
-//! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
-//! # {
-//! use embedded_devices::devices::microchip::bmp280::{BMP280, address::Address};
-//! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
-//!
-//! // Create and initialize the device
-//! let mut bmp280 = BMP280::new_i2c(i2c, Address::Primary);
-//! bmp280.init().await.unwrap();
-//!
-//! // Read the current temperature in °C and convert it to a float
-//! let temp = bmp280
-//!     .read_ambient_temperature()
-//!     .await?
-//!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -407,7 +381,7 @@ impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
 )]
 impl<I: RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
-    /// Check sensor mode beforehand and call [`reset`] if necessary. To configure
+    /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
     pub async fn configure<D: hal::delay::DelayNs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
         self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
