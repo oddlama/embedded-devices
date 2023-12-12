@@ -37,8 +37,7 @@
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::bosch::bmp280::BMP280;
-//! use embedded_devices::devices::bosch::bme280::address::Address;
+//! use embedded_devices::devices::bosch::bmp280::{address::Address, BMP280};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
@@ -57,10 +56,8 @@
 use embedded_registers::RegisterInterface;
 use uom::si::rational32::{Pressure, ThermodynamicTemperature};
 
-use super::bme280::{
-    registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
-    BME280Common, Error,
-};
+use super::bme280::registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode};
+pub use super::bme280::*;
 
 /// Measurement data
 #[derive(Debug)]

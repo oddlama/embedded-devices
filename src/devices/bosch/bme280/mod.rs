@@ -118,7 +118,7 @@ pub(super) struct TFine(i32);
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
 ///
-/// For a full description and usage examples, refer to the [module documentation](self).
+/// For a full description and usage examples, refer to the for the [BME280](self) and [BMP280](super::bmp280).
 #[device]
 pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
     /// The interface to communicate with the device
