@@ -46,7 +46,7 @@
 //! #![feature(generic_arg_infer)]
 //! use embedded_registers::{register, i2c::I2cDevice, RegisterInterface, ReadableRegister};
 //!
-//! #[register(address = 0b111, mode = "r")]
+//! #[register(address = [0b111], mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct DeviceId {
 //!     device_id: u8,
@@ -97,7 +97,7 @@
 //!     Shutdown = 1,
 //! }
 //!
-//! #[register(address = 0b001, mode = "rw")]
+//! #[register(address = [0b001], mode = "rw")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct Config {
 //!     // padding
@@ -145,13 +145,13 @@ use darling::FromMeta;
 use proc_macro as pc;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, ExprArray};
 
 #[derive(Debug, FromMeta)]
 #[darling(and_then = "Self::validate_mode")]
 struct RegisterArgs {
     /// The address of the register
-    address: u8,
+    address: ExprArray,
     /// The register mode (one of "r", "w", "rw")
     #[darling(default)]
     mode: String,
@@ -250,8 +250,8 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         };
     }
 
-    let read_all_comment = format!("Unpack all fields and return them as a [`{bitfield_ident}`]. This is more expensive than just using the appropriate `read_*` functions directly, in case you only need to read a few specific fields.");
-    let write_all_comment = format!("Pack all fields in the given [`{bitfield_ident}`] representation. This is more expensive than just using the appropriate `write_*` functions directly, in case you only need to write a few specific fields.");
+    let read_all_comment = format!("Unpack all fields and return them as a [`{bitfield_ident}`]. If you don't need all fields, this is more expensive than just using the appropriate `read_*` functions directly.");
+    let write_all_comment = format!("Pack all fields in the given [`{bitfield_ident}`] representation. If you only want to write some fields, this is more expensive than just using the appropriate `write_*` functions directly.");
     let address = args.address;
 
     let is_read = matches!(args.mode.as_str(), "r" | "rw");
@@ -274,14 +274,14 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
             #[inline]
             #[doc = #read_all_comment]
-            fn read_all(&self) -> #bitfield_ident {
+            pub fn read_all(&self) -> #bitfield_ident {
                 use bondrewd::Bitfields;
                 #bitfield_ident::from_bytes(self.data)
             }
 
             #[inline]
             #[doc = #write_all_comment]
-            fn write_all(&mut self, value: #bitfield_ident) {
+            pub fn write_all(&mut self, value: #bitfield_ident) {
                 use bondrewd::Bitfields;
                 self.data = value.into_bytes();
             }
@@ -322,7 +322,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             type Bitfield = #bitfield_ident;
 
             const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
-            const ADDRESS: u8 = #address;
+            const ADDRESS: &'static [u8] = &#address;
 
             #[inline]
             fn data(&self) -> &[u8] {

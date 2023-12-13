@@ -17,7 +17,7 @@ pub trait Register: Default + Clone {
     /// The size of the register in bytes
     const REGISTER_SIZE: usize;
     /// The virtual address of this register
-    const ADDRESS: u8;
+    const ADDRESS: &'static [u8];
 
     /// The associated bondrewd bitfield type
     type Bitfield;
@@ -38,11 +38,7 @@ pub trait WritableRegister: Register {}
 /// devices with registers to share register read/write implementations
 /// independent of the actual interface in use.
 #[allow(async_fn_in_trait)]
-#[maybe_async_cfg::maybe(
-    sync(not(feature="async")),
-    async(feature="async"),
-    keep_self
-)]
+#[maybe_async_cfg::maybe(sync(not(feature = "async")), async(feature = "async"), keep_self)]
 pub trait RegisterInterface {
     type Error;
 
@@ -52,7 +48,7 @@ pub trait RegisterInterface {
         R: ReadableRegister;
 
     /// Writes the given register via this interface
-    async fn write_register<R>(&mut self, register: &R) -> Result<(), Self::Error>
+    async fn write_register<R>(&mut self, register: impl AsRef<R>) -> Result<(), Self::Error>
     where
         R: WritableRegister;
 }

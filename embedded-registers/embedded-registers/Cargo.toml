@@ -13,8 +13,8 @@ categories.workspace = true
 license.workspace = true
 
 [dependencies]
-embedded-hal = "1.0.0-rc.1"
-embedded-hal-async = { version = "1.0.0-rc.1", optional = true }
+embedded-hal = "1.0.0-rc.2"
+embedded-hal-async = { version = "1.0.0-rc.2", optional = true }
 embedded-registers-derive = { version = "0.9.3", path = "../embedded-registers-derive", optional = true }
 maybe-async-cfg = "0.2.3"
 
