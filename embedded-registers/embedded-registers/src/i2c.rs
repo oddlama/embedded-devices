@@ -61,13 +61,8 @@ where
         //    .await
 
         let mut data: ArrayVec<_, 64> = ArrayVec::new();
-        let addr_len = R::ADDRESS.len();
-        let data_len = register.as_ref().data().len();
-        let len = addr_len + data_len;
-        assert!(len <= data.capacity());
-
-        data[0..addr_len].copy_from_slice(R::ADDRESS);
-        data[addr_len..len].copy_from_slice(register.as_ref().data());
-        self.interface.write(self.address, &data[..len]).await
+        data.try_extend_from_slice(R::ADDRESS).unwrap();
+        data.try_extend_from_slice(register.as_ref().data()).unwrap();
+        self.interface.write(self.address, &data).await
     }
 }
