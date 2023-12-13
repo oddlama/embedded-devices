@@ -36,7 +36,7 @@ Below you will find all supported devices. Please visit their respective documen
 
 ## Contributing
 
-**If you have any suggestions or ideas to improve the current architecture, please feel encouraged to open an issue or reach out to via [Matrix](https://matrix.to/#/@oddlama:matrix.org)**
+**If you have any suggestions or ideas to improve the current architecture, please feel encouraged to open an issue or reach out via [Matrix](https://matrix.to/#/@oddlama:matrix.org)**
 
 Contributions are whole-heartedly welcome! Please feel free to suggest new features, implement device drivers,
 or generally suggest improvements.

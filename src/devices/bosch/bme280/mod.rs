@@ -89,15 +89,6 @@ pub enum Error<BusError> {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct MeasurementsPT {
-    /// Current temperature
-    pub temperature: ThermodynamicTemperature,
-    /// Current pressure or None if the sensor reported and invalid value
-    pub pressure: Option<Pressure>,
-}
-
-/// Measurement data
-#[derive(Debug)]
 pub struct Measurements {
     /// Current temperature
     pub temperature: ThermodynamicTemperature,
@@ -112,12 +103,7 @@ pub struct Measurements {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct TFine(i32);
 
-/// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
-/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
-/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
-/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
-/// watches.
-///
+/// The common base for both BME280 and BMP280.
 /// For a full description and usage examples, refer to the for the [BME280](self) and [BMP280](super::bmp280).
 #[device]
 pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
@@ -127,8 +113,12 @@ pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
     pub(super) calibration_data: Option<CalibrationData>,
 }
 
+/// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
+/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
+/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
+/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
+/// watches.
 pub type BME280<I> = BME280Common<I, true>;
-pub type BMP280<I> = BME280Common<I, false>;
 
 /// Common configuration values for the BME280 sensor.
 /// The power-on-reset default is to set all oversampling settings to 1X
@@ -136,13 +126,13 @@ pub type BMP280<I> = BME280Common<I, false>;
 #[derive(Debug, Clone, Default)]
 pub struct Configuration {
     /// The oversampling rate for temperature mesurements
-    temperature_oversampling: Oversampling,
+    pub temperature_oversampling: Oversampling,
     /// The oversampling rate for pressure mesurements
-    pressure_oversampling: Oversampling,
+    pub pressure_oversampling: Oversampling,
     /// The oversampling rate for humidity mesurements
-    humidity_oversampling: Oversampling,
+    pub humidity_oversampling: Oversampling,
     /// The iir filter to use
-    iir_filter: IIRFilter,
+    pub iir_filter: IIRFilter,
 }
 
 #[derive(Debug)]

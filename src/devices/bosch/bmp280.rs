@@ -68,6 +68,11 @@ pub struct Measurements {
     pub pressure: Option<Pressure>,
 }
 
+/// The BMP280 is a combined digital pressure and temperature sensor based on proven
+/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
+/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
+/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
+/// watches.
 pub type BMP280<I> = BME280Common<I, false>;
 
 /// Common configuration values for the BMP280 sensor.
