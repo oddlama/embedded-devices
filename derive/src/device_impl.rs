@@ -49,7 +49,7 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
         quote! {
             #[doc = #write_register_doc]
             #[inline]
-            pub async fn write_register<R>(&mut self, register: &R) -> Result<(), I::Error>
+            pub async fn write_register<R>(&mut self, register: impl AsRef<R>) -> Result<(), I::Error>
             where
                 R: embedded_registers::WritableRegister + #register_marker
             {

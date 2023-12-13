@@ -17,8 +17,8 @@ defmt = "0.3.5"
 embedded-hal = "1.0.0-rc.2"
 embedded-hal-async = "1.0.0-rc.2"
 embedded-devices-derive = { path = "./derive" }
-# TODO reeeeeenable before publish embedded-registers = "0.9.3"
-embedded-registers = { path = "../embedded-registers/embedded-registers" }
+embedded-registers = "0.9.6"
+# TODO for quick iteration in development: embedded-registers = { path = "../embedded-registers/embedded-registers" }
 maybe-async-cfg = "0.2.3"
 paste = "1.0.14"
 uom = { version = "0.35.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }

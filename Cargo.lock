@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "arrayvec"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -153,8 +159,11 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "0.9.3"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4331d45f58b53f011d14c9009b584ea7cf99d8352893c6d2255830be4e456a7e"
 dependencies = [
+ "arrayvec",
  "embedded-hal",
  "embedded-hal-async",
  "embedded-registers-derive",
@@ -163,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "0.9.3"
+version = "0.9.6"
 dependencies = [
  "bondrewd",
  "darling",
