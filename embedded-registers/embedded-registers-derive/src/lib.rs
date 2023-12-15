@@ -266,11 +266,20 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         #[derive(Clone, PartialEq, Eq)]
         #docattrs
         pub struct #ident {
-            data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
+            pub data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
         }
 
         impl #ident {
             #forward_fns
+
+            #[inline]
+            #[doc = #write_all_comment]
+            pub fn new(value: #bitfield_ident) -> Self {
+                use bondrewd::Bitfields;
+                Self {
+                    data: value.into_bytes(),
+                }
+            }
 
             #[inline]
             #[doc = #read_all_comment]
@@ -332,6 +341,20 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             #[inline]
             fn data_mut(&mut self) -> &mut [u8] {
                 &mut self.data
+            }
+        }
+
+        impl AsRef<#bitfield_ident> for #bitfield_ident {
+            #[inline]
+            fn as_ref(&self) -> &#bitfield_ident {
+                self
+            }
+        }
+
+        impl AsRef<#ident> for #ident {
+            #[inline]
+            fn as_ref(&self) -> &#ident {
+                self
             }
         }
 

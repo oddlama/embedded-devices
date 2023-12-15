@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "arrayvec",
  "embedded-hal",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "bondrewd",
  "darling",

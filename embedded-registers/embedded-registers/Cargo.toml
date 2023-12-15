@@ -21,6 +21,6 @@ maybe-async-cfg = "0.2.3"
 
 [features]
 async = ["embedded-hal-async"]
-default = ["derive"]
+default = ["derive", "async"]
 derive = ["embedded-registers-derive"]
 std = []
