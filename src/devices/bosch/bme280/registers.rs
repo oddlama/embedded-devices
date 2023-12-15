@@ -32,7 +32,7 @@ impl Default for Chip {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Id {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
-    pub chip_id: Chip,
+    pub chip: Chip,
 }
 
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]

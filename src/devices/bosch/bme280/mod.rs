@@ -70,7 +70,7 @@ pub mod registers;
 
 use self::address::Address;
 use self::registers::{
-    BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
+    BurstMeasurementsPTH, Chip, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
     TrimmingParameters1, TrimmingParameters2,
 };
 
@@ -80,7 +80,7 @@ pub enum Error<BusError> {
     /// Bus error
     Bus(BusError),
     /// Invalid chip id was encountered in `init`
-    InvalidChip(registers::Chip),
+    InvalidChip(Chip),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     NotCalibrated,
     /// NVM data copy is still in progress.
@@ -302,9 +302,9 @@ impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
         self.reset(delay).await?;
 
         // Verify chip id
-        let chip_id = self.read_register::<Id>().await.map_err(Error::Bus)?.read_chip_id();
-        if let self::registers::Chip::Invalid(_) = chip_id {
-            return Err(Error::InvalidChip(chip_id));
+        let chip = self.read_register::<Id>().await.map_err(Error::Bus)?.read_chip();
+        if let self::registers::Chip::Invalid(_) = chip {
+            return Err(Error::InvalidChip(chip));
         }
 
         // Read calibration data

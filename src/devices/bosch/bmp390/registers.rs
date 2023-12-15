@@ -24,7 +24,7 @@ impl Default for Chip {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ChipId {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
-    pub chip_id: Chip,
+    pub chip: Chip,
 }
 
 /// The chip revision register.
@@ -355,9 +355,9 @@ pub struct PowerControl {
     pub reserved1: u8,
 
     /// Whether to enable the temperature sensor.
-    pub temperature_enabled: bool,
+    pub temperature_enable: bool,
     /// Whether to enable the pressure sensor.
-    pub pressure_enabled: bool,
+    pub pressure_enable: bool,
 }
 
 /// Oversampling settings for temperature and pressure measurements.
