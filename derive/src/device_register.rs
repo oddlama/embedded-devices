@@ -36,12 +36,6 @@ pub(crate) fn device_register(args: TokenStream, orig_input: TokenStream) -> syn
         output = quote! {
             #output
             impl #register_marker for #ident {}
-            impl AsRef<#ident> for #ident {
-                #[inline]
-                fn as_ref(&self) -> &#ident {
-                    self
-                }
-            }
         };
     }
 

@@ -6,7 +6,7 @@ use embedded_registers::register;
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
-pub enum ChipId {
+pub enum Chip {
     /// A BMP280 production sample
     BMP280Sample1 = 0x56,
     /// A BMP280 production sample
@@ -19,7 +19,7 @@ pub enum ChipId {
     Invalid(u8),
 }
 
-impl Default for ChipId {
+impl Default for Chip {
     fn default() -> Self {
         Self::Invalid(0)
     }
@@ -32,7 +32,7 @@ impl Default for ChipId {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Id {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
-    pub chip_id: ChipId,
+    pub chip_id: Chip,
 }
 
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
@@ -115,7 +115,7 @@ impl Oversampling {
 pub struct ControlHumidity {
     #[bondrewd(bit_length = 5, reserve)]
     #[allow(dead_code)]
-    reserved0: u8,
+    pub reserved0: u8,
 
     /// Controls oversampling of humidity data.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
@@ -129,14 +129,14 @@ pub struct ControlHumidity {
 pub struct Status {
     #[bondrewd(bit_length = 4, reserve)]
     #[allow(dead_code)]
-    reserved0: u8,
+    pub reserved0: u8,
 
     /// Automatically set to `1` whenever a conversion is running and back to `0` when the results have been transferred to the data registers.
     pub measuring: bool,
 
     #[bondrewd(bit_length = 2, reserve)]
     #[allow(dead_code)]
-    reserved1: u8,
+    pub reserved1: u8,
 
     /// Automatically set to `1` when the NVM data are being copied to image registers and back to `0` when the
     /// copying is done. The data are copied at power-on-reset and before every conversion.
@@ -192,7 +192,7 @@ pub struct ControlMeasurement {
 pub enum StandbyTime {
     /// 0.5ms
     #[default]
-    T_0_5ms = 0b000,
+    T_0_5 = 0b000,
     /// 62.5ms
     T_62_5 = 0b001,
     /// 125ms
@@ -250,7 +250,7 @@ pub struct Config {
     pub filter: IIRFilter,
     #[bondrewd(reserve)]
     #[allow(dead_code)]
-    reserved0: bool,
+    pub reserved0: bool,
     #[bondrewd(reserve)]
     #[allow(dead_code)]
     /// Whether to enable the SPI 3-wire interface.
@@ -276,7 +276,7 @@ pub struct TrimmingParameters1 {
     pub dig_p9: i16,
     #[bondrewd(reserve)]
     #[allow(dead_code)]
-    reserved0: u8,
+    pub reserved0: u8,
     pub dig_h1: u8,
 }
 
@@ -304,7 +304,7 @@ pub struct Pressure {
 
     #[bondrewd(bit_length = 4, reserve)]
     #[allow(dead_code)]
-    reserved0: u8,
+    pub reserved0: u8,
 }
 
 /// This register contains the raw temperature measurement
@@ -318,7 +318,7 @@ pub struct Temperature {
 
     #[bondrewd(bit_length = 4, reserve)]
     #[allow(dead_code)]
-    reserved0: u8,
+    pub reserved0: u8,
 }
 
 /// This register contains the raw humidity measurement

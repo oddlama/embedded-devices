@@ -55,15 +55,12 @@ to allow reading and writing those registers via I2C or SPI.
 A register usually refers to a specific memory address (or consecutive memory region) on the device by
 specifiying its start address. We also associate each register to a specific device by
 specifying a marker trait. This prevents the generated API from accepting registers of unrelated devices.
-
 In the following, we'll have a short look at how to define and work with register based devices.
 
 ### Defining a register
 
 First, lets start with a very simple register definition. We will later create a device struct which can
-read from and write to this register.
-
-So to define our very simple register, we
+read from and write to this register. So to define our very simple register, we
 
 1. specify which device belongs to using the `#[device_register]` macro (we will later define this `MyDevice`),
 2. define the start address and mode (read-only, write-only, read-write) using the `#[register]` macro,
@@ -135,10 +132,6 @@ A more complex register might contain more than just simple values. Often there 
 enums, or bitflags involved, which we can luckily also represent with bondrewd. Using
 bondrewd's attribute macros, we can specify exactly which bit corresponds to which field:
 
-> [!NOTE]
-> Instead of naming all registers `*Register`, in reality we would likely place all registers
-> in a common `registers` module for convenience and drop the suffix.
-
 ```rust
 #[allow(non_camel_case_types)]
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
@@ -163,6 +156,10 @@ pub struct ComplexRegister {
     pub temperature_resolution: TemperatureResolution,
 }
 ```
+
+> [!NOTE]
+> Instead of naming all registers `*Register`, in reality we would likely place all registers
+> in a common `registers` module for convenience and drop the suffix.
 
 ### Defining a device
 

@@ -162,7 +162,7 @@ pub enum AlertMode {
 pub struct Configuration {
     #[bondrewd(bit_length = 5, reserve)]
     #[allow(dead_code)]
-    reserved: u8,
+    pub reserved: u8,
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
     pub hysteresis: Hysteresis,
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
@@ -191,10 +191,10 @@ pub struct Configuration {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceIdRevision {
     /// The Device ID for the MCP9808 is `0x04`.
-    device_id: u8,
+    pub device_id: u8,
     /// The revision begins with 0x00 for the first release, with the number
     /// being incremented as revised versions are released.
-    device_revision: u8,
+    pub device_revision: u8,
 }
 
 /// The device-id and revision register.
@@ -232,7 +232,7 @@ pub enum TemperatureResolution {
 pub struct Resolution {
     #[bondrewd(bit_length = 6, reserve)]
     #[allow(dead_code)]
-    reserved: u8,
+    pub reserved: u8,
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
     pub temperature_resolution: TemperatureResolution,
 }
@@ -284,7 +284,7 @@ macro_rules! define_temp_limit_register {
         pub struct $name {
             #[bondrewd(bit_length = 3, reserve)]
             #[allow(dead_code)]
-            reserved0: u8,
+            pub reserved0: u8,
 
             /// The temperature limit in °C with a resolution of 0.25°C/LSB.
             #[bondrewd(bit_length = 11)]
@@ -292,7 +292,7 @@ macro_rules! define_temp_limit_register {
 
             #[bondrewd(bit_length = 2, reserve)]
             #[allow(dead_code)]
-            reserved1: u8,
+            pub reserved1: u8,
         }
 
         impl $name {

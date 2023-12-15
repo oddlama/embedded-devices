@@ -17,10 +17,7 @@ pub mod address;
 pub mod registers;
 
 use self::address::Address;
-use self::registers::{
-    BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
-    TrimmingParameters1, TrimmingParameters2,
-};
+use self::registers::{Config, IIRFilter, Oversampling};
 
 /// All possible errors that may occur when using this device
 #[derive(Debug, defmt::Format)]

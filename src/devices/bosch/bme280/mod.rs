@@ -79,8 +79,8 @@ use self::registers::{
 pub enum Error<BusError> {
     /// Bus error
     Bus(BusError),
-    /// Invalid ChipId was encountered in `init`
-    InvalidChipId(registers::ChipId),
+    /// Invalid chip id was encountered in `init`
+    InvalidChip(registers::Chip),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     NotCalibrated,
     /// NVM data copy is still in progress.
@@ -303,8 +303,8 @@ impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
 
         // Verify chip id
         let chip_id = self.read_register::<Id>().await.map_err(Error::Bus)?.read_chip_id();
-        if let self::registers::ChipId::Invalid(_) = chip_id {
-            return Err(Error::InvalidChipId(chip_id));
+        if let self::registers::Chip::Invalid(_) = chip_id {
+            return Err(Error::InvalidChip(chip_id));
         }
 
         // Read calibration data
