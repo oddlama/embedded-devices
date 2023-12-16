@@ -106,13 +106,13 @@ After defining a register, we may access it through `MyDevice`:
 // Imagine we already have constructed a device:
 let mut dev = MyDevice::new_i2c(i2c_bus /* the i2c bus from your controller */, 0x12 /* address */);
 // We can now retrieve the register
-let mut reg = dev.read_register<ValueRegister>().await?;
+let mut reg = dev.read_register::<ValueRegister>().await?;
 
 // Unpack a specific field from the register and print it
-println!("{}", reg.read_width())
+println!("{}", reg.read_width());
 // If you need all fields (or are not bound to tight resource constraints),
 // you can also unpack all fields and access them more conveniently
-let data = dev.read_all();
+let data = reg.read_all();
 // All bitfields implement Debug and defmt::Format, so you can conveniently
 // print the contents
 println!("{:?}", data);

@@ -196,6 +196,7 @@ pub struct FifoWatermark {
     pub watermark: u16,
 }
 
+/// The first fifo config register.
 #[device_register(super::BMP390)]
 #[register(address = [0x17], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -229,6 +230,7 @@ pub enum DataSource {
     Invalid(u8),
 }
 
+/// The second fifo config register.
 #[device_register(super::BMP390)]
 #[register(address = [0x18], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -262,6 +264,7 @@ pub enum InterruptPolarity {
     ActiveHigh = 1,
 }
 
+/// The interrupt control register.
 #[device_register(super::BMP390)]
 #[register(address = [0x19], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -299,6 +302,7 @@ pub enum WatchdogTimerPeriod {
     T_40 = 1,
 }
 
+/// The interface control register.
 #[device_register(super::BMP390)]
 #[register(address = [0x1a], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -338,6 +342,7 @@ pub enum SensorMode {
     Normal = 0b11,
 }
 
+/// The power control register.
 #[device_register(super::BMP390)]
 #[register(address = [0x1b], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -402,6 +407,7 @@ impl Oversampling {
     }
 }
 
+/// The oversampling control register.
 #[device_register(super::BMP390)]
 #[register(address = [0x1c], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -465,6 +471,7 @@ pub enum DataRate {
     Invalid(u8),
 }
 
+/// The data rate control register.
 #[device_register(super::BMP390)]
 #[register(address = [0x1d], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -502,6 +509,7 @@ pub enum IIRFilter {
     Coefficient127 = 0b111,
 }
 
+/// The general config register.
 #[device_register(super::BMP390)]
 #[register(address = [0x1f], mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
@@ -540,6 +548,7 @@ pub struct TrimmingCoefficients {
     pub par_p11: i8,
 }
 
+/// Available commands
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
@@ -555,6 +564,7 @@ pub enum Cmd {
     Invalid(u8),
 }
 
+/// The command register.
 #[device_register(super::BMP390)]
 #[register(address = [0x7e], mode = "w")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]

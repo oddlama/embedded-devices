@@ -160,10 +160,10 @@ dependencies = [
 [[package]]
 name = "embedded-registers"
 version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4331d45f58b53f011d14c9009b584ea7cf99d8352893c6d2255830be4e456a7e"
 dependencies = [
  "arrayvec",
+ "bondrewd",
+ "defmt",
  "embedded-hal",
  "embedded-hal-async",
  "embedded-registers-derive",

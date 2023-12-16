@@ -58,6 +58,7 @@
 // TODO spi support missing
 
 use embedded_devices_derive::{device, device_impl};
+use embedded_registers::spi::SpiDevice;
 use embedded_registers::{i2c::I2cDevice, RegisterInterface};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
@@ -288,6 +289,30 @@ where
                 interface,
                 address: address.into(),
             },
+            calibration_data: None,
+        }
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
+    sync(not(feature = "async")),
+    async(feature = "async"),
+    keep_self
+)]
+impl<I, const IS_BME: bool> BME280Common<SpiDevice<I>, IS_BME>
+where
+    I: hal::spi::SpiDevice,
+{
+    /// Initializes a new device from the specified SPI device.
+    /// This consumes the SPI device `I`.
+    ///
+    /// Before using this device, you must call the [`Self::init`] method which
+    /// initializes the device and ensures that it is working correctly.
+    #[inline]
+    pub fn new_spi(interface: I) -> Self {
+        Self {
+            interface: SpiDevice { interface },
             calibration_data: None,
         }
     }
