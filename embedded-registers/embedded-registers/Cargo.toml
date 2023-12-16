@@ -14,6 +14,8 @@ license.workspace = true
 
 [dependencies]
 arrayvec = { version = "0.7.4", default-features = false }
+bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+defmt = "0.3.5"
 embedded-hal = "1.0.0-rc.2"
 embedded-hal-async = { version = "1.0.0-rc.2", optional = true }
 embedded-registers-derive = { version = "0.9.6", path = "../embedded-registers-derive", optional = true }

@@ -16,8 +16,8 @@ resulting struct may trivially be extended to work with any other similar commun
 - Only the accessed bitfield members are decoded, conserving memory and saving on CPU time.
 - Supports both async and blocking operation modes
 
-This crate was designed for the [embedded-devices](https://github.com/oddlama/embedded-devices) crate,
-which aims to provide modern async-capable and coherent definitions for many embedded devices.
+This crate was made primarily for [embedded-devices](https://github.com/oddlama/embedded-devices),
+which is a collection of drivers for a variety of different embedded sensors and devices.
 
 ## Usage
 
@@ -30,15 +30,14 @@ bondrewd = { version = "0.1.14", default_features = false, features = ["derive"]
 embedded-registers = "0.9.6"
 ```
 
-For a simple register definition example, take a look at this `DeviceId` register
-from the MCP9808 temperature sensor:
+Registers are defined simply by annotating a bondrewd struct with `#[register(address = [0x42], mode = "rw")]`.
+Take for example this register definition for the device id of a MCP9808:
 
 ```rust
 #![feature(generic_arg_infer)]
-
 use embedded_registers::register;
 
-#[register(address = 0b111, read)]
+#[register(address = [0b111], mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceId {
     device_id: u8,
@@ -46,16 +45,7 @@ pub struct DeviceId {
 }
 ```
 
-You may then read the register simply by calling `DeviceId::read_i2c` or `DeviceId::read_i2c_blocking`
-(or similarly write to it if you specified `write` in the definition above):
-
-```rust
-let reg = DeviceId::read_i2c(&mut i2c, 0x24 /* i2c device address */).await?;
-info!("{}", reg);
-// Prints: DeviceId ([4, 0]) => DeviceIdBitfield { device_id: 4, revision: 0 }
-```
-
-For more information and more complex examples, please refer to the [embededded-registers docs](https://docs.rs/embedded-registers) and the [bondrewd docs](https://docs.rs/bondrewd-derive).
+For more specific usage information and more complex examples, please refer to the [embededded-registers docs](https://docs.rs/embedded-registers) and the [bondrewd docs](https://docs.rs/bondrewd-derive).
 
 ## License
 

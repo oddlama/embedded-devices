@@ -121,6 +121,8 @@ name = "embedded-registers"
 version = "0.9.6"
 dependencies = [
  "arrayvec",
+ "bondrewd",
+ "defmt",
  "embedded-hal",
  "embedded-hal-async",
  "embedded-registers-derive",
