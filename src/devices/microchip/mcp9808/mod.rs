@@ -72,7 +72,13 @@ pub struct MCP9808<I: RegisterInterface> {
     interface: I,
 }
 
-crate::simple_device::i2c!(MCP9808, self::address::Address, MCP9808I2cCodec, init_wanted);
+crate::simple_device::i2c!(
+    MCP9808,
+    self::address::Address,
+    SevenBitAddress,
+    MCP9808I2cCodec,
+    init_wanted
+);
 
 #[device_impl]
 impl<I: RegisterInterface> MCP9808<I> {

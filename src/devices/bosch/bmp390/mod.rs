@@ -6,11 +6,7 @@
 //! driven devices such as mobile phones, GPS modules or watches.
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{
-    i2c::I2cDevice,
-    spi::SpiDevice,
-    RegisterInterface,
-};
+use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
 use uom::si::rational32::{Pressure, ThermodynamicTemperature};
@@ -136,9 +132,9 @@ pub struct Configuration {
     async(feature = "async"),
     keep_self
 )]
-impl<I> BMP390<I2cDevice<I, BME390I2cCodec>>
+impl<I> BMP390<I2cDevice<I, hal::i2c::SevenBitAddress, BME390I2cCodec>>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.

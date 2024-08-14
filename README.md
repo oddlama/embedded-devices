@@ -188,19 +188,28 @@ allows us to create a new device from a real I2C bus and an address. The `embedd
 also provides a struct called `I2cDevice` that implements `RegisterInterface` for I2C, so
 we just use that as our interface.
 
-For very simple devices that need no additional fields,
-there is a convenience macro called `simple_device::i2c!` that defines the rest for us:
+For very simple devices that need no additional fields
+there is a convenience macro called `simple_device::i2c!` that defines the necessary device for you:
 
 ```rust
-simple_device::i2c!(MyDevice, MyAddress);
+simple_device::i2c!(MyDevice, MyAddress, SevenBitAddress, OneByteRegAddrCodec);
 ```
 
 The address enum `MyAddress` should contain all valid addresses for the device,
 plus a variant to allow specifying arbitrary addresses, in case the user uses an
-address translation unit. The address could be anything convertible to `u8` with `.into()`.
-For an example, refer to `mcp9808::Address`.
+address translation unit. The address can be any type that is convertible to the
+convertible to the underlying `embedded_hal::i2c::AddressMode` of the bus
+(7-bit or 10-bit addressing). For a real example, refer to `mcp9808::Address`.
 
-This macro actually just defines a constructor for our device and is equivalent to this `impl` block below.
+The third parameter is either `SevenBitAddress` or `TenBitAddress`, depending on the
+addressing mode of your device. In most cases, devices use seven bit addresses.
+
+The last parameter specifies the codec that is used to read or write registers over I2C.
+Again, this is usually a simple codec that just prepends the register address before reading
+or writing data, but depending on the device it can be more complex. This would be the
+location where you can adjust the required protocol.
+
+Finally, this macro actually just defines a constructor for our device and is equivalent to this `impl` block below.
 We'll later see why we need `#[maybe_async_cfg]`.
 
 ```rust
@@ -210,19 +219,16 @@ We'll later see why we need `#[maybe_async_cfg]`.
     async(feature = "async"),
     keep_self
 )]
-impl<I> MyDevice<I2cDevice<I>>
+impl<I> MyDevice<I2cDevice<I, hal::i2c::SevenBitAddress, OneByteRegAddrCodec>>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
     #[inline]
     pub fn new_i2c(interface: I, address: MyAddress) -> Self {
         Self {
-            interface: I2cDevice {
-                interface,
-                address: address.into(),
-            }
+            interface: I2cDevice::new(interface, address.into(), OneByteRegAddrCodec::default()),
         }
     }
 }

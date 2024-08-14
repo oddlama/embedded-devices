@@ -268,9 +268,9 @@ impl CalibrationData {
     async(feature = "async"),
     keep_self
 )]
-impl<I, const IS_BME: bool> BME280Common<I2cDevice<I, BME280I2cCodec>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<I2cDevice<I, hal::i2c::SevenBitAddress, BME280I2cCodec>, IS_BME>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
