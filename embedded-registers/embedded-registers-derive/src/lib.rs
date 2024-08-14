@@ -46,7 +46,7 @@
 //! #![feature(generic_arg_infer)]
 //! use embedded_registers::{register, i2c::I2cDevice, RegisterInterface, ReadableRegister};
 //!
-//! #[register(address = [0b111], mode = "r")]
+//! #[register(address = 0b111, mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct DeviceId {
 //!     device_id: u8,
@@ -97,7 +97,7 @@
 //!     Shutdown = 1,
 //! }
 //!
-//! #[register(address = [0b001], mode = "rw")]
+//! #[register(address = 0b001, mode = "rw")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct Config {
 //!     // padding
@@ -145,16 +145,19 @@ use darling::FromMeta;
 use proc_macro as pc;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use syn::{spanned::Spanned, ExprArray};
+use syn::{spanned::Spanned, Expr, Type};
 
 #[derive(Debug, FromMeta)]
 #[darling(and_then = "Self::validate_mode")]
 struct RegisterArgs {
     /// The address of the register
-    address: ExprArray,
+    address: Expr,
     /// The register mode (one of "r", "w", "rw")
     #[darling(default)]
     mode: String,
+    /// The default SPI codec for this register
+    #[darling(default)]
+    spi_codec: Option<Type>,
 }
 
 impl RegisterArgs {
@@ -257,13 +260,18 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let is_read = matches!(args.mode.as_str(), "r" | "rw");
     let is_write = matches!(args.mode.as_str(), "w" | "rw");
 
+    let spi_codec = args
+        .spi_codec
+        .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::spi::codecs::NoCodec").unwrap());
+
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, Default, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         #attrs
         #vis struct #bitfield_ident
         #fields
 
-        #[derive(Clone, PartialEq, Eq)]
+        #[derive(Copy, Clone, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+        #[repr(transparent)]
         #docattrs
         pub struct #ident {
             pub data: [u8; <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE],
@@ -329,9 +337,10 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
         impl embedded_registers::Register for #ident {
             type Bitfield = #bitfield_ident;
+            type SpiCodec = #spi_codec;
 
             const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
-            const ADDRESS: &'static [u8] = &#address;
+            const ADDRESS: u64 = #address;
 
             #[inline]
             fn data(&self) -> &[u8] {

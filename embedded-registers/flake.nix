@@ -1,10 +1,5 @@
 {
   inputs = {
-    devshell = {
-      url = "github:numtide/devshell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     flake-parts.url = "github:hercules-ci/flake-parts";
     nci.url = "github:yusdacra/nix-cargo-integration";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

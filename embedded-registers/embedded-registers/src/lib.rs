@@ -17,15 +17,15 @@
 //!
 //! ## Defining a register
 //!
-//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = [0x42], mode = "rw")]`.
+//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw")]`.
 //! The necessary derive attribute is added automatically.
-//! Take for example this read-write register at device address `0x42,0x43`, which contains two `u8` values:
+//! Take for example this 2-byte read-write register at device address `0x42,0x43`, which contains two `u8` values:
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
 //! use embedded_registers::register;
 //!
-//! #[register(address = [0x42], mode = "rw")]
+//! #[register(address = 0x42, mode = "rw")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct ValueRegister {
 //!     pub width: u8,
@@ -57,7 +57,7 @@
 //! # #![feature(generic_arg_infer)]
 //! # use embedded_registers::register;
 //!
-//! # #[register(address = [0x42], mode = "rw")]
+//! # #[register(address = 0x42, mode = "rw")]
 //! # #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! # pub struct ValueRegister {
 //! #     pub width: u8,
@@ -103,6 +103,10 @@
 pub mod i2c;
 pub mod spi;
 
+// Re-exports for derive macro
+pub use bytemuck;
+pub use bondrewd;
+
 /// The basis trait for all registers. A register is a type
 /// that maps to a specific register on an embedded device and
 /// should own the raw data required for this register.
@@ -110,14 +114,19 @@ pub mod spi;
 /// Additionally, a register knows the virtual address ossociated
 /// to the embedded device, and a bitfield representation of the
 /// data content.
-pub trait Register: Default + Clone {
+pub trait Register: Default + Clone + bytemuck::Pod {
     /// The size of the register in bytes
     const REGISTER_SIZE: usize;
     /// The virtual address of this register
-    const ADDRESS: &'static [u8];
+    const ADDRESS: u64;
 
     /// The associated bondrewd bitfield type
     type Bitfield;
+    /// The spi codec that should be used for this register when no
+    /// codec is specified by the user. Setting this to `spi::codecs::NoCodec`
+    /// will automatically use the device's default codec.
+    /// If the device doesn't support SPI communication, this can be ignored.
+    type SpiCodec: spi::Codec;
 
     /// Provides immutable access to the raw data.
     fn data(&self) -> &[u8];

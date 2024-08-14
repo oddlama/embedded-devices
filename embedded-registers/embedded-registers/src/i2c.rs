@@ -8,7 +8,7 @@ use crate::{ReadableRegister, RegisterInterface, WritableRegister};
     async(feature = "async"),
     keep_self
 )]
-/// This represents an i2c device on an async i2c bus
+/// This represents an i2c device on an i2c bus
 pub struct I2cDevice<I>
 where
     I: hal::i2c::I2c + hal::i2c::ErrorType,
@@ -37,10 +37,10 @@ where
     where
         R: ReadableRegister,
     {
-        let mut register = R::default();
-        self.interface
-            .write_read(self.address, R::ADDRESS, register.data_mut())
-            .await?;
+        let mut register = R::zeroed();
+        // self.interface
+        //     .write_read(self.address, R::ADDRESS, register.data_mut())
+        //     .await?;
         Ok(register)
     }
 
@@ -60,8 +60,11 @@ where
         //    )
         //    .await
 
+        // TODO this may be wrong for registers with > 1 byte size.
+        // most devies use auto increment only in read, so this would require interspersing
+        // addresses! Make a (generic) parameter to set the correct config for that.
         let mut data: ArrayVec<_, 64> = ArrayVec::new();
-        data.try_extend_from_slice(R::ADDRESS).unwrap();
+        // data.try_extend_from_slice(R::ADDRESS).unwrap();
         data.try_extend_from_slice(register.as_ref().data()).unwrap();
         self.interface.write(self.address, &data).await
     }

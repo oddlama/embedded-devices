@@ -14,7 +14,7 @@ pub struct StatusMagnetometer {
     reserved: u8,
 }
 
-#[register(address = [0x04], mode = "r")]
+#[register(address = 0x04, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[bondrewd(struct_size = 1)]
