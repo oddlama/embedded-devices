@@ -2,23 +2,23 @@
 /// from an i2c bus and address. The provided address type
 /// must be convertible to u8.
 macro_rules! i2c {
-    ($device:ident, $address_type:ty, init_required) => {
-        crate::simple_device::i2c!($device, $address_type, "Before using this device, you must call the [`Self::init`] method which initializes the device and ensures that it is working correctly.");
+    ($device:ident, $AddressType:ty, $DefaultCodec:ty, init_required) => {
+        crate::simple_device::i2c!($device, $AddressType, $DefaultCodec, "Before using this device, you must call the [`Self::init`] method which initializes the device and ensures that it is working correctly.");
     };
-    ($device:ident, $address_type:ty, init_wanted) => {
-        crate::simple_device::i2c!($device, $address_type, "Before using this device, you should call the [`Self::init`] method which ensures that the device is working correctly.");
+    ($device:ident, $AddressType:ty, $DefaultCodec:ty, init_wanted) => {
+        crate::simple_device::i2c!($device, $AddressType, $DefaultCodec, "Before using this device, you should call the [`Self::init`] method which ensures that the device is working correctly.");
     };
-    ($device:ident, $address_type:ty) => {
-        crate::simple_device::i2c!($device, $address_type, "");
+    ($device:ident, $AddressType:ty, $DefaultCodec:ty) => {
+        crate::simple_device::i2c!($device, $AddressType, $DefaultCodec, "");
     };
-    ($device:ident, $address_type:ty, $ctor_doc:expr) => {
+    ($device:ident, $AddressType:ty, $DefaultCodec:ty, $ctor_doc:expr) => {
         #[maybe_async_cfg::maybe(
             idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
             sync(not(feature = "async")),
             async(feature = "async"),
             keep_self
         )]
-        impl<I> $device<embedded_registers::i2c::I2cDevice<I>>
+        impl<I> $device<embedded_registers::i2c::I2cDevice<I, $DefaultCodec>>
         where
             I: hal::i2c::I2c + hal::i2c::ErrorType,
         {
@@ -27,12 +27,9 @@ macro_rules! i2c {
             #[doc = ""]
             #[doc = $ctor_doc]
             #[inline]
-            pub fn new_i2c(interface: I, address: $address_type) -> Self {
+            pub fn new_i2c(interface: I, address: $AddressType) -> Self {
                 Self {
-                    interface: embedded_registers::i2c::I2cDevice {
-                        interface,
-                        address: address.into(),
-                    },
+                    interface: embedded_registers::i2c::I2cDevice::new(interface, address.into(), <$DefaultCodec>::default())
                 }
             }
         }

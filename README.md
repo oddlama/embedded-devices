@@ -70,13 +70,13 @@ Most devices support a burst-read/write operations, where you can begin reading 
 values from the consecutive memory region until you stop reading. This means you can define registers with a `size > 1 byte`
 and will get the content you expect.
 
-Let's imagine our `MyDevice` had a read-write register at device address `0x42,0x43`, which contains two `u8` values.
+Let's imagine our `MyDevice` had a 2-byte read-write register at device address `0x42(,0x43)`, which contains two `u8` values.
 The corresponding register can be defined like this:
 
 ```rust
 /// Insert explanation of this register from the datasheet.
 #[device_register(MyDevice)]
-#[register(address = [0x42], mode = "rw")]
+#[register(address = 0x42, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ValueRegister {
     /// Insert explanation of this value from the datasheet.
@@ -94,7 +94,7 @@ You will always interface with a device using the packed data, which can be tran
 > [!NOTE]
 > I find it a bit misleading that the members written in `ValueRegister` end up in `ValueRegisterBitfield`.
 > So this might change in the future, but I currently cannot think of another design that is as simple
-> to use as this one right now. The issue is that we need a struct for the packed data and one for
+> to use as the one we have now. The issue is that we need a struct for the packed data and one for
 > the unpacked data. Since we usually deal with the packed data, and want to allow direct read/write
 > operations on the packed data for performance, the naming gets confusing quite quickly.
 
@@ -145,7 +145,7 @@ pub enum TemperatureResolution {
 }
 
 #[device_register(MyDevice)]
-#[register(address = [0x44], mode = "rw")]
+#[register(address = 0x44, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ComplexRegister {
     #[bondrewd(bit_length = 6, reserve)]

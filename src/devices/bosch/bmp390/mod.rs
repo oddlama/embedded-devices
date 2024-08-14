@@ -6,7 +6,11 @@
 //! driven devices such as mobile phones, GPS modules or watches.
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
+use embedded_registers::{
+    i2c::I2cDevice,
+    spi::SpiDevice,
+    RegisterInterface,
+};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
 use uom::si::rational32::{Pressure, ThermodynamicTemperature};
@@ -20,6 +24,9 @@ use self::registers::{
     BurstMeasurements, Chip, ChipId, Cmd, Config, IIRFilter, Oversampling, OversamplingControl, PowerControl,
     SensorMode, TrimmingCoefficients, TrimmingCoefficientsBitfield,
 };
+
+type BME390SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 1>;
+type BME390I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur when using this device
 #[derive(Debug, defmt::Format)]
@@ -80,7 +87,8 @@ impl CalibrationData {
         let v2 = ((self.0.par_p11 as i64) * v6) >> 16;
         let v3 = (v2 * uncompensated as i64) >> 7;
         let v4 = (offset / 4) + v1 + v5 + v3;
-        let pressure = ((v4 * 25) >> 32) as i32;
+        let pressure = ((v4 >> 32) * 25) as i32;
+        // TODO this is wrong ^------------
         // actually pressure in 0.01° = (v4 * 25) >> 40, but we save some extra precision
         // by only shifting by 32 and doing / 256 in the denominator
         let pressure = Rational32::new_raw(pressure, 100 << 8);
@@ -128,7 +136,7 @@ pub struct Configuration {
     async(feature = "async"),
     keep_self
 )]
-impl<I> BMP390<I2cDevice<I>>
+impl<I> BMP390<I2cDevice<I, BME390I2cCodec>>
 where
     I: hal::i2c::I2c + hal::i2c::ErrorType,
 {
@@ -140,10 +148,7 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: Address) -> Self {
         Self {
-            interface: I2cDevice {
-                interface,
-                address: address.into(),
-            },
+            interface: I2cDevice::new(interface, address.into(), BME390I2cCodec::default()),
             calibration_data: None,
         }
     }
@@ -155,7 +160,7 @@ where
     async(feature = "async"),
     keep_self
 )]
-impl<I> BMP390<SpiDevice<I>>
+impl<I> BMP390<SpiDevice<I, BME390SpiCodec>>
 where
     I: hal::spi::SpiDevice,
 {
@@ -167,7 +172,10 @@ where
     #[inline]
     pub fn new_spi(interface: I) -> Self {
         Self {
-            interface: SpiDevice { interface },
+            interface: SpiDevice {
+                interface,
+                default_codec: BME390SpiCodec::default(),
+            },
             calibration_data: None,
         }
     }

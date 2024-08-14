@@ -49,6 +49,8 @@ use embedded_registers::RegisterInterface;
 pub mod address;
 pub mod registers;
 
+type MCP9808I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+
 /// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format)]
 pub enum InitError<BusError> {
@@ -70,7 +72,7 @@ pub struct MCP9808<I: RegisterInterface> {
     interface: I,
 }
 
-crate::simple_device::i2c!(MCP9808, self::address::Address, init_wanted);
+crate::simple_device::i2c!(MCP9808, self::address::Address, MCP9808I2cCodec, init_wanted);
 
 #[device_impl]
 impl<I: RegisterInterface> MCP9808<I> {

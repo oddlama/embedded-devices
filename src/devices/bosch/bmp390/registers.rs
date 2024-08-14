@@ -20,7 +20,7 @@ impl Default for Chip {
 
 /// The chip identification register.
 #[device_register(super::BMP390)]
-#[register(address = [0x00], mode = "r")]
+#[register(address = 0x00, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ChipId {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
@@ -29,7 +29,7 @@ pub struct ChipId {
 
 /// The chip revision register.
 #[device_register(super::BMP390)]
-#[register(address = [0x01], mode = "r")]
+#[register(address = 0x01, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct RevId {
     pub revision: u8,
@@ -37,7 +37,7 @@ pub struct RevId {
 
 /// The error condition register.
 #[device_register(super::BMP390)]
-#[register(address = [0x02], mode = "r")]
+#[register(address = 0x02, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Error {
     #[bondrewd(bit_length = 5, reserve)]
@@ -65,7 +65,7 @@ pub enum AlertPolarity {
 
 /// The status flag register
 #[device_register(super::BMP390)]
-#[register(address = [0x03], mode = "r")]
+#[register(address = 0x03, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Status {
     #[bondrewd(bit_length = 1, reserve)]
@@ -86,7 +86,7 @@ pub struct Status {
 
 /// This register contains the raw pressure measurement
 #[device_register(super::BMP390)]
-#[register(address = [0x04], mode = "r")]
+#[register(address = 0x04, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct Pressure {
     #[bondrewd(bit_length = 24)]
@@ -96,7 +96,7 @@ pub struct Pressure {
 
 /// This register contains the raw temperature measurement
 #[device_register(super::BMP390)]
-#[register(address = [0x07], mode = "r")]
+#[register(address = 0x07, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct Temperature {
     #[bondrewd(bit_length = 24)]
@@ -106,7 +106,7 @@ pub struct Temperature {
 
 /// This register contains the raw sensor time
 #[device_register(super::BMP390)]
-#[register(address = [0x0c], mode = "r")]
+#[register(address = 0x0c, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct SensorTime {
     #[bondrewd(bit_length = 24)]
@@ -116,7 +116,7 @@ pub struct SensorTime {
 
 /// The event register. Cleared on read.
 #[device_register(super::BMP390)]
-#[register(address = [0x10], mode = "r")]
+#[register(address = 0x10, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Event {
     #[bondrewd(bit_length = 6, reserve)]
@@ -134,7 +134,7 @@ pub struct Event {
 /// The interrupt status register.
 /// Cleared on read.
 #[device_register(super::BMP390)]
-#[register(address = [0x11], mode = "r")]
+#[register(address = 0x11, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct InterruptStatus {
     #[bondrewd(bit_length = 4, reserve)]
@@ -160,7 +160,7 @@ pub struct InterruptStatus {
 // TODO FIXME wrong: https://github.com/Devlyn-Nelson/Bondrewd/issues/12
 /// This register contains the raw sensor time
 #[device_register(super::BMP390)]
-#[register(address = [0x12], mode = "r")]
+#[register(address = 0x12, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 2)]
 pub struct FifoLength {
     #[bondrewd(bit_length = 7, reserve)]
@@ -174,7 +174,7 @@ pub struct FifoLength {
 
 /// This register contains the fifo data
 #[device_register(super::BMP390)]
-#[register(address = [0x14], mode = "r")]
+#[register(address = 0x14, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct FifoData {
     /// The data
@@ -184,7 +184,7 @@ pub struct FifoData {
 // TODO FIXME wrong: https://github.com/Devlyn-Nelson/Bondrewd/issues/12
 /// This register contains the fifo watermark
 #[device_register(super::BMP390)]
-#[register(address = [0x15], mode = "rw")]
+#[register(address = 0x15, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 2)]
 pub struct FifoWatermark {
     #[bondrewd(bit_length = 7, reserve)]
@@ -198,7 +198,7 @@ pub struct FifoWatermark {
 
 /// The first fifo config register.
 #[device_register(super::BMP390)]
-#[register(address = [0x17], mode = "rw")]
+#[register(address = 0x17, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct FifoConfig1 {
     #[bondrewd(bit_length = 3, reserve)]
@@ -232,7 +232,7 @@ pub enum DataSource {
 
 /// The second fifo config register.
 #[device_register(super::BMP390)]
-#[register(address = [0x18], mode = "rw")]
+#[register(address = 0x18, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct FifoConfig2 {
     #[bondrewd(bit_length = 3, reserve)]
@@ -266,7 +266,7 @@ pub enum InterruptPolarity {
 
 /// The interrupt control register.
 #[device_register(super::BMP390)]
-#[register(address = [0x19], mode = "rw")]
+#[register(address = 0x19, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct InterruptControl {
     #[bondrewd(bit_length = 1, reserve)]
@@ -304,7 +304,7 @@ pub enum WatchdogTimerPeriod {
 
 /// The interface control register.
 #[device_register(super::BMP390)]
-#[register(address = [0x1a], mode = "rw")]
+#[register(address = 0x1a, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct InterfaceControl {
     #[bondrewd(bit_length = 5, reserve)]
@@ -344,7 +344,7 @@ pub enum SensorMode {
 
 /// The power control register.
 #[device_register(super::BMP390)]
-#[register(address = [0x1b], mode = "rw")]
+#[register(address = 0x1b, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct PowerControl {
     #[bondrewd(bit_length = 2, reserve)]
@@ -409,7 +409,7 @@ impl Oversampling {
 
 /// The oversampling control register.
 #[device_register(super::BMP390)]
-#[register(address = [0x1c], mode = "rw")]
+#[register(address = 0x1c, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct OversamplingControl {
     #[bondrewd(bit_length = 2, reserve)]
@@ -473,7 +473,7 @@ pub enum DataRate {
 
 /// The data rate control register.
 #[device_register(super::BMP390)]
-#[register(address = [0x1d], mode = "rw")]
+#[register(address = 0x1d, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct DataRateControl {
     #[bondrewd(bit_length = 3, reserve)]
@@ -511,7 +511,7 @@ pub enum IIRFilter {
 
 /// The general config register.
 #[device_register(super::BMP390)]
-#[register(address = [0x1f], mode = "rw")]
+#[register(address = 0x1f, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Config {
     #[bondrewd(bit_length = 4, reserve)]
@@ -529,7 +529,7 @@ pub struct Config {
 
 /// Device-internal trimming coefficients (calibration registers)
 #[device_register(super::BMP390)]
-#[register(address = [0x31], mode = "r")]
+#[register(address = 0x31, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 21)]
 pub struct TrimmingCoefficients {
     pub par_t1: u16,
@@ -566,7 +566,7 @@ pub enum Cmd {
 
 /// The command register.
 #[device_register(super::BMP390)]
-#[register(address = [0x7e], mode = "w")]
+#[register(address = 0x7e, mode = "w")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Command {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
@@ -575,7 +575,7 @@ pub struct Command {
 
 /// Burst register read of pressure and temperature
 #[device_register(super::BMP390)]
-#[register(address = [0x04], mode = "r")]
+#[register(address = 0x04, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct BurstMeasurements {
     #[bondrewd(struct_size = 3)]

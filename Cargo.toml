@@ -12,7 +12,8 @@ categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 defmt = "0.3.8"
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"

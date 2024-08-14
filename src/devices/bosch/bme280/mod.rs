@@ -28,8 +28,9 @@
 //! - sleep mode
 //! - normal mode
 //! - forced mode
-//! In order to tailor data rate, noise, response time and current consumption to the needs of the user, a
-//! variety of oversampling modes, filter modes and data rates can be selected.
+//!
+//! In order to tailor data rate, noise, response time and current consumption to the needs of the user,
+//! a variety of oversampling modes, filter modes and data rates can be selected.
 //!
 //! ## Usage
 //!
@@ -55,11 +56,8 @@
 //! # }
 //! ```
 
-// TODO spi support missing
-
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::spi::SpiDevice;
-use embedded_registers::{i2c::I2cDevice, RegisterInterface};
+use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
@@ -74,6 +72,9 @@ use self::registers::{
     BurstMeasurementsPTH, Chip, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
     TrimmingParameters1, TrimmingParameters2,
 };
+
+type BME280SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 0>;
+type BME280I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur when using this device
 #[derive(Debug, defmt::Format)]
@@ -254,13 +255,7 @@ impl CalibrationData {
         let var3 = var5 * var2;
         let var4 = ((var3 >> 15) * (var3 >> 15)) >> 7;
         let var5 = var3 - ((var4 * dig_h1) >> 4);
-        let var5 = if var5 < 0 {
-            0
-        } else if var5 > 419430400 {
-            419430400
-        } else {
-            var5
-        };
+        let var5 = var5.clamp(0, 419430400);
 
         let humidity = Rational32::new_raw(var5, 1i32 << 22);
         Ratio::new::<percent>(humidity)
@@ -273,7 +268,7 @@ impl CalibrationData {
     async(feature = "async"),
     keep_self
 )]
-impl<I, const IS_BME: bool> BME280Common<I2cDevice<I>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<I2cDevice<I, BME280I2cCodec>, IS_BME>
 where
     I: hal::i2c::I2c + hal::i2c::ErrorType,
 {
@@ -285,10 +280,7 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: Address) -> Self {
         Self {
-            interface: I2cDevice {
-                interface,
-                address: address.into(),
-            },
+            interface: I2cDevice::new(interface, address.into(), BME280I2cCodec::default()),
             calibration_data: None,
         }
     }
@@ -300,7 +292,7 @@ where
     async(feature = "async"),
     keep_self
 )]
-impl<I, const IS_BME: bool> BME280Common<SpiDevice<I>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<SpiDevice<I, BME280SpiCodec>, IS_BME>
 where
     I: hal::spi::SpiDevice,
 {
@@ -312,7 +304,10 @@ where
     #[inline]
     pub fn new_spi(interface: I) -> Self {
         Self {
-            interface: SpiDevice { interface },
+            interface: SpiDevice {
+                interface,
+                default_codec: BME280SpiCodec::default(),
+            },
             calibration_data: None,
         }
     }
