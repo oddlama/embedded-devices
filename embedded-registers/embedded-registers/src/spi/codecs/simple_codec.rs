@@ -1,15 +1,16 @@
 use crate::{spi::Codec, ReadableRegister, Register, WritableRegister};
-use arrayvec::ArrayVec;
 use bytemuck::Zeroable;
 
-/// This codec represents the most commonly found codec for SPI devices.
+/// This codec represents the most commonly found codecs for SPI devices.
 /// It consists of an N-bit big-endian register address, a 1-bit R/W indicator
 /// and uses zero initializion for reserved bits. The header is always a multiple of 8-bit
 /// in width.
 ///
-/// This codec has no information over register sizes or read/write address auto increment.
+/// This codec has no information over register sizes or the existence of
+/// read/write address-auto-increment which some devices support.
 /// It will always send one header and then receive/send the associated register data,
-/// so should be compatible with auto-increment usage.
+/// so it's compatible with auto-increment usage, but cannot be used to read or write
+/// registers that require interspersing the address between bytes.
 ///
 /// Devices often use a mixed mode, where some registers allow auto-increment while others
 /// don't, or where the address is directly associated with a specific, but varying, register size.

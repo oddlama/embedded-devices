@@ -6,11 +6,10 @@ use codecs::NoCodec;
 
 use crate::{ReadableRegister, RegisterInterface, WritableRegister};
 
-/// Represents a trait for SPI codecs. These are the function that is
-/// responsible to write and read data to registers given the register
-/// address and the raw data. Different devices can have different
-/// ways to encode the desired address, R/W bit location, continuous-read
-/// mode and more.
+/// Represents a trait for SPI codecs. These are responsible to perform
+/// writes and reads to registers, given the register address and
+/// the raw data. Different devices can have different ways to encode
+/// the desired address, R/W bit location, continuous-read mode and more.
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
     sync(not(feature = "async")),
@@ -38,7 +37,7 @@ pub trait Codec: Default + 'static {
     async(feature = "async"),
     keep_self
 )]
-/// This represents an spi device on an spi bus.
+/// This represents an SPI device on an SPI bus.
 pub struct SpiDevice<I, C>
 where
     I: hal::spi::SpiDevice,

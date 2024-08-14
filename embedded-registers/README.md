@@ -25,19 +25,20 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-# You will need this to define your own bitfield-capable enums
-bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+# You will need these to define your own bitfield-capable enums
+bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 embedded-registers = "0.9.6"
 ```
 
-Registers are defined simply by annotating a bondrewd struct with `#[register(address = [0x42], mode = "rw")]`.
+Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw")]`.
 Take for example this register definition for the device id of a MCP9808:
 
 ```rust
 #![feature(generic_arg_infer)]
 use embedded_registers::register;
 
-#[register(address = [0b111], mode = "r")]
+#[register(address = 0b111, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceId {
     device_id: u8,

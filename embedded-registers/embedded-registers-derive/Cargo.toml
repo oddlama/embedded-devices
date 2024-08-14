@@ -16,7 +16,7 @@ license.workspace = true
 proc-macro = true
 
 [dependencies]
-bondrewd = { version = "0.1.14", default_features = false, features = ["derive"] }
+bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
 bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 darling = "0.20.10"
 defmt = "0.3.8"

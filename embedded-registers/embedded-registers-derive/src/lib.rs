@@ -44,7 +44,7 @@
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::{register, i2c::I2cDevice, RegisterInterface, ReadableRegister};
+//! use embedded_registers::{register, i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface, ReadableRegister};
 //!
 //! #[register(address = 0b111, mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
@@ -58,7 +58,8 @@
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! let mut dev = I2cDevice { interface: i2c /* bus */, address: 0x24 /* address */ };
+//! // Create new I2cDevice with bus, address, codec
+//! let mut dev = I2cDevice::new(i2c, 0x24, OneByteRegAddrCodec::default());
 //! let reg = dev.read_register::<DeviceId>().await?;
 //! // sync: let reg = DeviceId::read_i2c_blocking(&mut i2c, address);
 //! # Ok(())
@@ -75,7 +76,7 @@
 //! ```
 //! #![feature(generic_arg_infer)]
 //! # use defmt::{info, Format};
-//! use embedded_registers::{register, i2c::I2cDevice, RegisterInterface, ReadableRegister, WritableRegister};
+//! use embedded_registers::{register, i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface, ReadableRegister, WritableRegister};
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
@@ -120,7 +121,7 @@
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! # let mut dev = I2cDevice { interface: i2c /* bus */, address: 0x24 /* address */ };
+//! # let mut dev = I2cDevice::new(i2c, 0x24, OneByteRegAddrCodec::default());
 //! // This now allows us to read and write the register, while only
 //! // unpacking the fields we require:
 //! let mut reg = dev.read_register::<Config>().await?;
@@ -158,6 +159,9 @@ struct RegisterArgs {
     /// The default SPI codec for this register
     #[darling(default)]
     spi_codec: Option<Type>,
+    /// The default I2C codec for this register
+    #[darling(default)]
+    i2c_codec: Option<Type>,
 }
 
 impl RegisterArgs {
@@ -264,6 +268,10 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         .spi_codec
         .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::spi::codecs::NoCodec").unwrap());
 
+    let i2c_codec = args
+        .i2c_codec
+        .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::i2c::codecs::NoCodec").unwrap());
+
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, Default, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         #attrs
@@ -338,6 +346,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         impl embedded_registers::Register for #ident {
             type Bitfield = #bitfield_ident;
             type SpiCodec = #spi_codec;
+            type I2cCodec = #i2c_codec;
 
             const REGISTER_SIZE: usize = <#bitfield_ident as bondrewd::Bitfields<_>>::BYTE_SIZE;
             const ADDRESS: u64 = #address;

@@ -64,17 +64,15 @@
 //! #     pub height: u8,
 //! # }
 //!
-//! use embedded_registers::{i2c::I2cDevice, RegisterInterface};
+//! use embedded_registers::{i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface};
 //!
 //! async fn init<I>(mut i2c_bus: I) -> Result<(), I::Error>
 //! where
 //!     I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! {
-//!     // Imagine we already have constructed a device:
-//!     let mut dev = I2cDevice {
-//!         interface: i2c_bus, /* the i2c bus from your controller */
-//!         address: 0x12, /* device i2c address */
-//!     };
+//!     // Imagine we already have constructed a device using
+//!     // the i2c bus from your controller, a device address and default codec:
+//!     let mut dev = I2cDevice::new(i2c_bus, 0x12, OneByteRegAddrCodec::default());
 //!     // We can now retrieve the register
 //!     let mut reg = dev.read_register::<ValueRegister>().await?;
 //!
@@ -104,8 +102,8 @@ pub mod i2c;
 pub mod spi;
 
 // Re-exports for derive macro
-pub use bytemuck;
 pub use bondrewd;
+pub use bytemuck;
 
 /// The basis trait for all registers. A register is a type
 /// that maps to a specific register on an embedded device and
@@ -122,11 +120,16 @@ pub trait Register: Default + Clone + bytemuck::Pod {
 
     /// The associated bondrewd bitfield type
     type Bitfield;
-    /// The spi codec that should be used for this register when no
+    /// The SPI codec that should be used for this register when no
     /// codec is specified by the user. Setting this to `spi::codecs::NoCodec`
-    /// will automatically use the device's default codec.
+    /// will automatically cause accesses to use the device's default codec.
     /// If the device doesn't support SPI communication, this can be ignored.
     type SpiCodec: spi::Codec;
+    /// The I2C codec that should be used for this register when no
+    /// codec is specified by the user. Setting this to `i2c::codecs::NoCodec`
+    /// will automatically cause accesses to use the device's default codec.
+    /// If the device doesn't support I2C communication, this can be ignored.
+    type I2cCodec: i2c::Codec;
 
     /// Provides immutable access to the raw data.
     fn data(&self) -> &[u8];
