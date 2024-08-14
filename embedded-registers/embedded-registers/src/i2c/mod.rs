@@ -19,20 +19,22 @@ use crate::{ReadableRegister, RegisterInterface, WritableRegister};
 #[allow(async_fn_in_trait)]
 pub trait Codec: Default + 'static {
     /// Read this register from the given I2C interface/device.
-    async fn read_register<R, I>(&mut self, bound_bus: &mut I2cBoundBus<I>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(&mut self, bound_bus: &mut I2cBoundBus<I, A>) -> Result<R, I::Error>
     where
         R: ReadableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType;
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy;
 
     /// Write this register to the given I2C interface/device.
-    async fn write_register<R, I>(
+    async fn write_register<R, I, A>(
         &mut self,
-        bound_bus: &mut I2cBoundBus<I>,
+        bound_bus: &mut I2cBoundBus<I, A>,
         register: impl AsRef<R>,
     ) -> Result<(), I::Error>
     where
         R: WritableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType;
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy;
 }
 
 #[maybe_async_cfg::maybe(
@@ -42,14 +44,15 @@ pub trait Codec: Default + 'static {
     keep_self
 )]
 /// This represents a specific device bound to an I2C bus.
-pub struct I2cBoundBus<I>
+pub struct I2cBoundBus<I, A>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+    A: hal::i2c::AddressMode + Copy,
 {
     /// I2c interface
     pub interface: I,
     /// Device address
-    pub address: u8,
+    pub address: A,
 }
 
 #[maybe_async_cfg::maybe(
@@ -60,13 +63,14 @@ where
 )]
 /// This represents an I2C device on an I2C bus, including
 /// a default codec.
-pub struct I2cDevice<I, C>
+pub struct I2cDevice<I, A, C>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+    A: hal::i2c::AddressMode + Copy,
     C: Codec,
 {
     /// I2c interface and device address
-    pub bound_bus: I2cBoundBus<I>,
+    pub bound_bus: I2cBoundBus<I, A>,
     /// The default codec used to interface with registers
     /// that don't explicitly specify a codec themselves.
     /// Usually this is a simple codec specifying address size and some metadata.
@@ -80,13 +84,14 @@ where
     async(feature = "async"),
     keep_self
 )]
-impl<I, C> I2cDevice<I, C>
+impl<I, A, C> I2cDevice<I, A, C>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+    A: hal::i2c::AddressMode + Copy,
     C: Codec,
 {
     /// Create a new I2cDevice from an interface, device address and default codec.
-    pub fn new(interface: I, address: u8, default_codec: C) -> Self {
+    pub fn new(interface: I, address: A, default_codec: C) -> Self {
         Self {
             bound_bus: I2cBoundBus { interface, address },
             default_codec,
@@ -100,9 +105,10 @@ where
     async(feature = "async"),
     keep_self
 )]
-impl<I, C> RegisterInterface for I2cDevice<I, C>
+impl<I, A, C> RegisterInterface for I2cDevice<I, A, C>
 where
-    I: hal::i2c::I2c + hal::i2c::ErrorType,
+    I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+    A: hal::i2c::AddressMode + Copy,
     C: Codec,
 {
     type Error = I::Error;
@@ -116,10 +122,10 @@ where
         R: ReadableRegister,
     {
         if TypeId::of::<R::I2cCodec>() == TypeId::of::<NoCodec>() {
-            self.default_codec.read_register::<R, _>(&mut self.bound_bus).await
+            self.default_codec.read_register::<R, _, A>(&mut self.bound_bus).await
         } else {
             let mut codec = R::I2cCodec::default();
-            codec.read_register::<R, _>(&mut self.bound_bus).await
+            codec.read_register::<R, _, A>(&mut self.bound_bus).await
         }
     }
 

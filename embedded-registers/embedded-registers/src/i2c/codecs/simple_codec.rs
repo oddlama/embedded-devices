@@ -34,10 +34,11 @@ pub struct SimpleCodec<const HEADER_SIZE: usize> {}
 )]
 impl<const HEADER_SIZE: usize> Codec for SimpleCodec<HEADER_SIZE> {
     #[inline]
-    async fn read_register<R, I>(&mut self, bound_bus: &mut I2cBoundBus<I>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(&mut self, bound_bus: &mut I2cBoundBus<I, A>) -> Result<R, I::Error>
     where
         R: ReadableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType,
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy,
     {
         let header = &R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..];
         let mut register = R::zeroed();
@@ -50,14 +51,15 @@ impl<const HEADER_SIZE: usize> Codec for SimpleCodec<HEADER_SIZE> {
     }
 
     #[inline]
-    async fn write_register<R, I>(
+    async fn write_register<R, I, A>(
         &mut self,
-        bound_bus: &mut I2cBoundBus<I>,
+        bound_bus: &mut I2cBoundBus<I, A>,
         register: impl AsRef<R>,
     ) -> Result<(), I::Error>
     where
         R: WritableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType,
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy,
     {
         #[repr(C, packed(1))]
         #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]

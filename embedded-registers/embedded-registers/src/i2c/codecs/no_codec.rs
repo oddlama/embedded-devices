@@ -1,4 +1,7 @@
-use crate::{i2c::{Codec, I2cBoundBus}, ReadableRegister, WritableRegister};
+use crate::{
+    i2c::{Codec, I2cBoundBus},
+    ReadableRegister, WritableRegister,
+};
 
 /// A codec that represents absense of a codec. This has two main usecases:
 ///
@@ -21,19 +24,25 @@ pub struct NoCodec {}
 )]
 impl Codec for NoCodec {
     #[inline]
-    async fn read_register<R, I>(&mut self, _bound_bus: &mut I2cBoundBus<I>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(&mut self, _bound_bus: &mut I2cBoundBus<I, A>) -> Result<R, I::Error>
     where
         R: ReadableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType,
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy,
     {
         panic!("i2c::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
     }
 
     #[inline]
-    async fn write_register<R, I>(&mut self, _bound_bus: &mut I2cBoundBus<I>, _register: impl AsRef<R>) -> Result<(), I::Error>
+    async fn write_register<R, I, A>(
+        &mut self,
+        _bound_bus: &mut I2cBoundBus<I, A>,
+        _register: impl AsRef<R>,
+    ) -> Result<(), I::Error>
     where
         R: WritableRegister,
-        I: hal::i2c::I2c + hal::i2c::ErrorType,
+        I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
+        A: hal::i2c::AddressMode + Copy,
     {
         panic!("i2c::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
     }
