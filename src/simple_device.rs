@@ -2,10 +2,10 @@
 /// from an i2c bus and address. The provided address type
 /// must be convertible to u8.
 macro_rules! i2c {
-    ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty, init_required) => {
+    ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty, "init=required") => {
         crate::simple_device::i2c!($device, $AddressType, $AddressMode, $DefaultCodec, "Before using this device, you must call the [`Self::init`] method which initializes the device and ensures that it is working correctly.");
     };
-    ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty, init_wanted) => {
+    ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty, "init=wanted") => {
         crate::simple_device::i2c!($device, $AddressType, $AddressMode, $DefaultCodec, "Before using this device, you should call the [`Self::init`] method which ensures that the device is working correctly.");
     };
     ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty) => {

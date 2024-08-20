@@ -5,22 +5,21 @@ use uom::num_rational::Rational32;
 use uom::si::rational32::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
-pub const DEVICE_ID_VALID: u8 = 0x04;
-pub const MANUFACTURER_ID_VALID: u16 = 0x0054;
+pub const DEVICE_ID_VALID: u16 = 0x117;
 
 /// At the end of every conversion, the device updates the temperature
 /// register with the conversion result. Following a reset, the temperature
-/// register reads –256 °C until the first conversion, including averaging, is complete.
+/// register reads –256°C until the first conversion, including averaging, is complete.
 #[device_register(super::TMP117)]
-#[register(address = 0b00, mode = "r")]
+#[register(address = 0b0000, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Temperature {
-    /// The temperature in °C with a resolution of 0.0078125°C/LSB.
+    /// The temperature in °C with a resolution of 7.8125m°C/LSB.
     pub raw_temperature: i16,
 }
 
 impl Temperature {
-    /// Reads the ambient temperature in °C with a resolution of 0.0078125°C/LSB.
+    /// Reads the ambient temperature in °C with a resolution of 7.8125m°C/LSB.
     pub fn read_temperature(&self) -> ThermodynamicTemperature {
         ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(self.read_raw_temperature().into(), 128))
     }
@@ -85,21 +84,57 @@ pub enum AveragingMode {
     /// Disables averaging.
     X_1 = 0b00,
     /// Configures 8x sample averaging. This is the power-on default.
+    /// Minimum conversion time is 125ms, even if a lower conversion cycle is selected.
     #[default]
     X_8 = 0b01,
     /// Configures 32x sample averaging.
+    /// Minimum conversion time is 500ms, even if a lower conversion cycle is selected.
     X_32 = 0b10,
     /// Configures 64x sample averaging.
+    /// Minimum conversion time is 1s, even if a lower conversion cycle is selected.
     X_64 = 0b11,
+}
+
+impl AveragingMode {
+    /// Returns the averaging factor
+    pub fn factor(&self) -> u8 {
+        match self {
+            AveragingMode::X_1 => 1,
+            AveragingMode::X_8 => 8,
+            AveragingMode::X_32 => 32,
+            AveragingMode::X_64 => 64,
+        }
+    }
 }
 
 /// Therm/Alert mode.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertThermMode {
-    /// Power-on default.
+    /// In this mode, the device compares the conversion result at the end of every
+    /// conversion with the values in the low limit register and high limit register.
+    /// If the temperature result exceeds the value in the high limit register,
+    /// the high alert status flag in the configuration register is set. On the other hand,
+    /// if the temperature result is lower than the value in the low limit register,
+    /// the low alert status flag in the configuration register is set.
+    /// This is the power-on default.
+    ///
+    /// This mode effectively makes the device behave like a window limit detector.
+    /// Thus this mode can be used in applications where detecting if the temperature
+    /// goes outside of the specified range is necessary.
     #[default]
     Alert = 0,
+    /// In this mode, the device compares the conversion result at the end of every conversion
+    /// with the values in the low limit register and high limit register and sets the high alert
+    /// status flag in the configuration register if the temperature exceeds the value in the
+    /// high limit register. When set, the device clears the high alert status flag if the conversion
+    /// result goes below the value in the low limit register.
+    ///
+    /// Thus, the difference between the high and low limits effectively acts like a hysteresis.
+    /// In this mode, the low alert status flag is disabled and always reads 0. Unlike the alert
+    /// mode, I2C reads of the configuration register do not affect the status bits. The high alert
+    /// status flag is only set or cleared at the end of conversions based on the value of the
+    /// temperature result compared to the high and low limits.
     Therm = 1,
 }
 
@@ -126,7 +161,7 @@ pub enum AlertPinMode {
 
 /// The device configuration register.
 #[device_register(super::TMP117)]
-#[register(address = 0b01, mode = "rw")]
+#[register(address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     /// Set when the conversion result is higher than the high limit.
@@ -156,7 +191,7 @@ pub struct Configuration {
     /// Amount of time to wait between conversions.
     /// If the time to complete the conversions needed for a given averaging setting is
     /// higher than the conversion setting cycle time, there will be no stand by time
-    /// in the conversion cycle.
+    /// in the conversion cycle. See [`AveragingMode`].
     /// This bit can be persisted into the EEPROM.
     /// This can be persisted in the EEPROM to set the power-up default.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
@@ -186,4 +221,189 @@ pub struct Configuration {
     pub reserved: u8,
 }
 
-// FIXME: todo device.persist::<R>() that writes eeprom, waits, checks ready, resets.
+macro_rules! define_temp_limit_register {
+    ($name:ident, $address:expr, $doc:expr) => {
+        #[doc = $doc]
+        #[device_register(super::TMP117)]
+        #[register(address = $address, mode = "rw")]
+        #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+        pub struct $name {
+            /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.
+            pub raw_temperature_limit: i16,
+        }
+
+        impl $name {
+            /// Reads the temperature limit in °C with a resolution of 7.8125m°C/LSB.
+            pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
+                ThermodynamicTemperature::new::<degree_celsius>(
+                    Rational32::new_raw(self.read_raw_temperature_limit().into(), 128).reduced(),
+                )
+            }
+
+            /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
+            /// The passed temperature will be truncated (rounded down).
+            pub fn write_temperature_limit(
+                &mut self,
+                temperature_limit: ThermodynamicTemperature,
+            ) -> Result<(), core::num::TryFromIntError> {
+                let temp = temperature_limit.get::<degree_celsius>();
+                let temp: i16 = (temp * Rational32::from_integer(128)).to_integer().try_into()?;
+                self.write_raw_temperature_limit(temp);
+                Ok(())
+            }
+        }
+    };
+}
+
+define_temp_limit_register!(
+    TemperatureLimitHigh,
+    0b0010,
+    r#"
+This register stores the high limit for comparison with the temperature result
+with a resolution is 7.8125m°C/LSB. The range of the register is ±256°C.
+Following power-up or a general-call reset, the high-limit register is loaded with the
+stored value from the EEPROM. The factory default reset value is 6000h (192°C).
+"#
+);
+
+define_temp_limit_register!(
+    TemperatureLimitLow,
+    0b0011,
+    r#"
+This register stores the low limit for comparison with the temperature result
+with a resolution is 7.8125m°C/LSB. The range of the register is ±256°C.
+Following power-up or a general-call reset, the low-limit register is loaded with the
+stored value from the EEPROM. The factory default reset value is 8000h (-256°C).
+"#
+);
+
+/// EEPROM lock mode.
+#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[bondrewd_enum(u8)]
+pub enum EepromLockMode {
+    /// EEPROM is locked for programming: writes to all EEPROM addresses
+    /// (such as configuration, limits, and EEPROM locations 1-4) are written
+    /// to registers in digital logic and are not programmed in the EEPROM
+    #[default]
+    Locked = 0,
+    /// EEPROM unlocked for programming: any writes to programmable registers
+    /// program the respective location in the EEPROM
+    Unlocked = 1,
+}
+
+/// The EEPROM unlock register.
+#[device_register(super::TMP117)]
+#[register(address = 0b0100, mode = "rw")]
+#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+pub struct EepromUnlock {
+    /// EEPROM lock mode. Defaults to locked on power-on.
+    #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    pub lock_mode: EepromLockMode,
+    /// This flag is the mirror of the EEPROM busy flag (bit 12) in the configuration register.
+    /// - `false` indicates that the EEPROM is ready, which means that the EEPROM has finished
+    ///   the last transaction and is ready to accept new commands.
+    /// - `true` indicates that the EEPROM is busy, which means that the EEPROM is currently
+    ///    completing a programming operation or performing power-up on reset load
+    pub busy: bool,
+    #[bondrewd(bit_length = 14, reserve)]
+    #[allow(dead_code)]
+    pub reserved: u16,
+}
+
+macro_rules! define_eeprom_register {
+    ($name:ident, $address:expr, $doc:expr) => {
+        #[doc = $doc]
+        #[device_register(super::TMP117)]
+        #[register(address = $address, mode = "rw")]
+        #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+        pub struct $name {
+            /// The data stored in this register
+            pub data: [u8; 2],
+        }
+    };
+}
+
+define_eeprom_register!(
+    Eeprom1,
+    0b0101,
+    r#"
+This is a 16-bit register that be used as a scratch pad by the customer to store general-
+purpose data. This register has a corresponding EEPROM location. Writes to this address when the EEPROM is
+locked write data into the register and not to the EEPROM. Writes to this register when the EEPROM is unlocked
+causes the corresponding EEPROM location to be programmed.
+
+To support NIST traceability do not delete or reprogram the EEPROM1 register.
+"#
+);
+
+define_eeprom_register!(
+    Eeprom2,
+    0b0110,
+    r#"
+This is a 16-bit register that be used as a scratch pad by the customer to store general-
+purpose data. This register has a corresponding EEPROM location. Writes to this address when the EEPROM is
+locked write data into the register and not to the EEPROM. Writes to this register when the EEPROM is unlocked
+causes the corresponding EEPROM location to be programmed.
+
+To support NIST traceability do not delete or reprogram the EEPROM2 register.
+"#
+);
+
+define_eeprom_register!(
+    Eeprom3,
+    0b1000,
+    r#"
+This is a 16-bit register that be used as a scratch pad by the customer to store general-
+purpose data. This register has a corresponding EEPROM location. Writes to this address when the EEPROM is
+locked write data into the register and not to the EEPROM. Writes to this register when the EEPROM is unlocked
+causes the corresponding EEPROM location to be programmed.
+
+To support NIST traceability do not delete or reprogram the EEPROM3 register.
+"#
+);
+
+/// This register may be used as a user-defined temperature offset register during system calibration.
+/// The offset will be added to the temperature result after linearization. It has a same resolution
+/// of 7.8125 m°C/LSB and same range of ±256°C as the temperature result register. If the added result
+/// exceeds value boundaries, then the temperature result will clamp to the maximum or minimum value.
+#[device_register(super::TMP117)]
+#[register(address = 0b0111, mode = "rw")]
+#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+pub struct TemperatureOffset {
+    /// The temperature offset in °C with a resolution of 7.8125m°C/LSB.
+    pub raw_temperature_offset: i16,
+}
+
+impl TemperatureOffset {
+    /// Reads the temperature offset in °C with a resolution of 7.8125m°C/LSB.
+    pub fn read_temperature_offset(&self) -> ThermodynamicTemperature {
+        ThermodynamicTemperature::new::<degree_celsius>(
+            Rational32::new_raw(self.read_raw_temperature_offset().into(), 128).reduced(),
+        )
+    }
+
+    /// Writes the temperature offset in °C with a resolution of 7.8125m°C/LSB.
+    /// The passed temperature will be truncated (rounded down).
+    pub fn write_temperature_offset(
+        &mut self,
+        temperature_offset: ThermodynamicTemperature,
+    ) -> Result<(), core::num::TryFromIntError> {
+        let temp = temperature_offset.get::<degree_celsius>();
+        let temp: i16 = (temp * Rational32::from_integer(128)).to_integer().try_into()?;
+        self.write_raw_temperature_offset(temp);
+        Ok(())
+    }
+}
+
+/// The device-id and revision register.
+#[device_register(super::TMP117)]
+#[register(address = 0b1111, mode = "r")]
+#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
+pub struct DeviceIdRevision {
+    /// Indicates the revision number of the device. 0 indicates the first revision.
+    #[bondrewd(bit_length = 4)]
+    pub device_revision: u8,
+    /// The indentifier of this this device. The factory default is [`DEVICE_ID_VALID`] (`0x117`).
+    #[bondrewd(bit_length = 12)]
+    pub device_id: u16,
+}

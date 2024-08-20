@@ -296,15 +296,15 @@ macro_rules! define_temp_limit_register {
         }
 
         impl $name {
-            /// Reads the ambient temperature in °C with a resolution of 0.25°C/LSB.
+            /// Reads the temperature limit in °C with a resolution of 0.25°C/LSB.
             pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
                 ThermodynamicTemperature::new::<degree_celsius>(
                     Rational32::new_raw(self.read_raw_temperature_limit().into(), 4).reduced(),
                 )
             }
 
-            /// Writes the ambient temperature in °C with a resolution of 0.25°C/LSB.
-            /// The passed temperature will be truncated (ounded down).
+            /// Writes the temperature limit in °C with a resolution of 0.25°C/LSB.
+            /// The passed temperature will be truncated (rounded down).
             pub fn write_temperature_limit(
                 &mut self,
                 temperature_limit: ThermodynamicTemperature,

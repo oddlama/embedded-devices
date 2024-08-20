@@ -36,6 +36,7 @@ Below you will find all supported devices. Please visit their respective documen
 | Bosch | BMP280 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp280/index.html) |
 | Bosch | BMP390 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp390/index.html) |
 | Microchip | MCP9808 | I2C | Digital temperature sensor with ±0.5°C (max.) accuracy | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp9808/index.html) |
+| Texas Instruments | TMP117 | I2C | Temperature sensor with ±0.1°C to ±0.3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp117/index.html) |
 
 ## Architecture
 

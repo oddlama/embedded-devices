@@ -77,7 +77,7 @@ crate::simple_device::i2c!(
     self::address::Address,
     SevenBitAddress,
     MCP9808I2cCodec,
-    init_wanted
+    "init=wanted"
 );
 
 #[device_impl]
