@@ -28,7 +28,7 @@ Add this to your `Cargo.toml`:
 # You will need these to define your own bitfield-capable enums
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
 bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
-embedded-registers = "0.9.6"
+embedded-registers = "0.9.7"
 ```
 
 Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw")]`.
