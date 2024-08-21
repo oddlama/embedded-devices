@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+	"embedded-registers",
+	"embedded-registers-derive",
+]
+
+[workspace.package]
+version = "0.9.6"
+authors = ["oddlama <oddlama@oddlama.org>"]
+description = "Procedural macro for effortless definitions of registers in embedded device drivers"
+homepage = "https://github.com/oddlama/embedded-registers"
+readme = "README.md"
+repository = "https://github.com/oddlama/embedded-registers"
+keywords = ["register", "registers", "bitfield", "derive", "sensor"]
+categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
+license = "MIT OR Apache-2.0"

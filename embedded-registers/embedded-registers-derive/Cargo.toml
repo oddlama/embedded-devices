@@ -1,0 +1,30 @@
+[package]
+name = "embedded-registers-derive"
+edition = "2021"
+documentation = "https://docs.rs/embedded-registers-derive"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+readme.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
+darling = "0.20.10"
+defmt = "0.3.8"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+
+[dev-dependencies]
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-registers = { path = "../embedded-registers" }
