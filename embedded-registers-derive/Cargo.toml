@@ -26,4 +26,4 @@ syn = { version = "2.0", features = ["full"] }
 [dev-dependencies]
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
-embedded-registers = { version = "0.9.7", path = "../embedded-registers" }
+embedded-registers = { path = "../embedded-registers" }
