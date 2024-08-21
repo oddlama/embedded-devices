@@ -1,0 +1,22 @@
+[package]
+name = "embedded-devices-derive"
+edition = "2021"
+description = "Macros required to define devices in embedded-devices"
+documentation = "https://docs.rs/embedded-devices-derive"
+keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.6.0"
+darling = "0.20.3"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }

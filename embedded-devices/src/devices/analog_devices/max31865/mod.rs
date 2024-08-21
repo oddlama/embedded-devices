@@ -14,7 +14,7 @@
 //! # where
 //! #   I: embedded_hal_async::spi::SpiDevice
 //! # {
-//! use embedded_devices::devices::analog_devices::max31865::{MAX31865, registers::AmbientTemperature};
+//! use embedded_devices::devices::analog_devices::max31865::{MAX31865, registers::Resistance};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
@@ -22,14 +22,13 @@
 //! let mut max31865 = MAX31865::new_spi(spi);
 //! max31865.init().await.unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
-//! let temp = max31865
-//!     .read_register::<AmbientTemperature>()
+//! // FIXME: TODO get temperature
+//! // Read the current resistance ratio
+//! let ratio = max31865
+//!     .read_register::<Resistance>()
 //!     .await?
-//!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
-//! println!("Current temperature: {:?}°C", temp);
+//!     .read_resistance_ratio();
+//! println!("Current raw resistance ratio: {:?}", ratio);
 //! # Ok(())
 //! # }
 //! ```

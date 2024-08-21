@@ -1,0 +1,29 @@
+[package]
+name = "embedded-devices"
+edition = "2021"
+description = "Device driver implementations for many embedded sensors and devices"
+documentation = "https://docs.rs/embedded-devices"
+keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[dependencies]
+bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
+defmt = "0.3.8"
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-devices-derive = { path = "../embedded-devices-derive" }
+embedded-registers = { version = "0.9.7", path = "../embedded-registers" }
+maybe-async-cfg = "0.2.4"
+paste = "1.0.15"
+uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
+
+[features]
+async = []
+default = ["async", "embedded-registers/async"]
+std = []

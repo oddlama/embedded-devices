@@ -1,7 +1,7 @@
 [![Crate](https://img.shields.io/crates/v/embedded-devices.svg)](https://crates.io/crates/embedded-devices)
 [![API](https://docs.rs/embedded-devices/badge.svg)](https://docs.rs/embedded-devices)
 
-# Embedded-devices
+# embedded-devices
 
 **WARNING: This crate is currently in experimental state, so anything may change at any time.**
 
@@ -21,7 +21,7 @@ benefit from having access to more ready-to-use async drivers with frequently up
 For the time being, this crate should serve as a proof-of-concept. It shows how sensor and device drivers
 can benefit from a common framework, allowing new drivers to be added with ease in order to streamline
 future collaborative efforts and solve some of the aforementioned issues.
-The main component of our framework is [embedded-registers](https://github.com/oddlama/embedded-registers)
+The main component of our framework is [embedded-registers](./embedded-registers)
 which provides an ergonomic solution to defining and interfacing with device registers over I2C/SPI.
 
 ## Supported Devices
@@ -51,7 +51,7 @@ the appropriate object from an interface and address.
 
 ### Register based devices
 
-Our [embedded-registers](https://github.com/oddlama/embedded-registers) crate provides a generic way to define registers, and an interface implementation
+The [embedded-registers](./embedded-registers) crate provides a generic way to define registers, and an interface implementation
 to allow reading and writing those registers via I2C or SPI.
 
 A register usually refers to a specific memory address (or consecutive memory region) on the device by

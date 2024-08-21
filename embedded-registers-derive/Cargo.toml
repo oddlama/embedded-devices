@@ -1,14 +1,14 @@
 [package]
 name = "embedded-registers-derive"
 edition = "2021"
+description = "Procedural macro for effortless definitions of registers in embedded device drivers"
 documentation = "https://docs.rs/embedded-registers-derive"
+readme = "README.md"
+keywords = ["register", "registers", "bitfield", "derive", "sensor"]
 version.workspace = true
 authors.workspace = true
-description.workspace = true
 homepage.workspace = true
-readme.workspace = true
 repository.workspace = true
-keywords.workspace = true
 categories.workspace = true
 license.workspace = true
 
@@ -27,4 +27,4 @@ syn = { version = "2.0", features = ["full"] }
 [dev-dependencies]
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
-embedded-registers = { path = "../embedded-registers" }
+embedded-registers = { version = "0.9.7", path = "../embedded-registers" }

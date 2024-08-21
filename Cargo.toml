@@ -1,34 +1,16 @@
-[package]
-name = "embedded-devices"
-edition = "2021"
-version = "0.0.1"
+[workspace]
+resolver = "2"
+members = [
+	"embedded-devices",
+	"embedded-devices-derive",
+	"embedded-registers",
+	"embedded-registers-derive",
+]
+
+[workspace.package]
+version = "0.9.7"
 authors = ["oddlama <oddlama@oddlama.org>"]
-description = "Device driver implementations for many embedded sensors and devices"
-documentation = "https://docs.rs/embedded-devices"
 homepage = "https://github.com/oddlama/embedded-devices"
 repository = "https://github.com/oddlama/embedded-devices"
-keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
 categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
 license = "MIT OR Apache-2.0"
-
-[dependencies]
-bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
-bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
-defmt = "0.3.8"
-embedded-hal = "1.0.0"
-embedded-hal-async = "1.0.0"
-embedded-devices-derive = { path = "./derive" }
-# embedded-registers = "0.9.6"
-# TODO for quick iteration in development: embedded-registers = { path = "../embedded-registers/embedded-registers" }
-embedded-registers = { path = "../embedded-registers/embedded-registers" }
-maybe-async-cfg = "0.2.4"
-paste = "1.0.15"
-uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
-
-[patch.crates-io]
-embedded-registers-derive = { path = "../embedded-registers/embedded-registers-derive" }
-
-[features]
-async = []
-default = ["async", "embedded-registers/async"]
-std = []
