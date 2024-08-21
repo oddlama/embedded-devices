@@ -39,6 +39,11 @@
         nci.crates.${projectName} = {};
 
         devShells.default = config.nci.outputs.${projectName}.devShell.overrideAttrs (old: {
+          nativeBuildInputs =
+            (old.nativeBuildInputs or [])
+            ++ [
+              pkgs.cargo-release
+            ];
           shellHook = ''
             ${old.shellHook or ""}
             ${config.pre-commit.installationScript}
