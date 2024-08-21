@@ -44,10 +44,15 @@ Below you will find all supported devices. Please visit their respective documen
 Driver implementations are organized based on the manufacturer name and device name.
 Each driver exposes a struct with the name of the device, for example `BME280`. There are no restrictions on the
 struct's generics, since devices may require different interface combinations, or own extra pins.
+Usually they will expose a `new_i2c` and/or `new_spi` function to construct the appropriate object
+from an interface and address.
 
-The vast majority of devices use a similar "protocol" over I2C or SPI to read and write registers.
-So usually they will have a generic interface and expose a `new_i2c` and/or `new_spi` function to construct
-the appropriate object from an interface and address.
+## Codecs
+
+The vast majority of devices use similar "protocols" on top of I2C or SPI to expose their registers,
+we call these codecs. For both I2C and SPI we provide a simple codec implementation that should already
+be compatible with most of the device types in existence. If a device (or single register) requires a more
+involved codec - for example to verify CRC checksums - it can implement it's own codec for that purpose.
 
 ### Register based devices
 
