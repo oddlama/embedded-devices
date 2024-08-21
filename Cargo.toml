@@ -12,5 +12,5 @@ version = "0.9.7"
 authors = ["oddlama <oddlama@oddlama.org>"]
 homepage = "https://github.com/oddlama/embedded-devices"
 repository = "https://github.com/oddlama/embedded-devices"
-categories = ["embedded", "no-std", "hardware-support", "embedded-hal"]
+categories = ["embedded", "no-std", "hardware-support", "asynchronous"]
 license = "MIT OR Apache-2.0"
