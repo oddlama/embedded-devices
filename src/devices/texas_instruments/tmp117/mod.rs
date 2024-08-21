@@ -24,7 +24,7 @@
 //! ```
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp117::{TMP117, address::Address, registers::Temperature};
@@ -32,7 +32,7 @@
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
-//! let mut tmp117 = TMP117::new_i2c(i2c, Address::Default);
+//! let mut tmp117 = TMP117::new_i2c(i2c, Address::Gnd);
 //! tmp117.init(&mut Delay).await.unwrap();
 //!
 //! // Read the latest temperature conversion in °C and convert it to a float

@@ -32,6 +32,7 @@ Below you will find all supported devices. Please visit their respective documen
 
 | Manufacturer | Device | Interface | Description | Docs |
 |---|---|---|---|---|
+| Analog Devices | MAX31865 | SPI | Precision temperature converter for RTDs, NTCs and PTCs | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/analog_devices/max31865/index.html) |
 | Bosch | BME280 | I2C/SPI | Temperature, pressure and humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bme280/index.html) |
 | Bosch | BMP280 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp280/index.html) |
 | Bosch | BMP390 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp390/index.html) |

@@ -251,6 +251,16 @@ macro_rules! define_temp_limit_register {
                 self.write_raw_temperature_limit(temp);
                 Ok(())
             }
+
+            /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
+            /// The passed temperature will be truncated (rounded down).
+            pub fn with_temperature_limit(
+                mut self,
+                temperature_limit: ThermodynamicTemperature,
+            ) -> Result<Self, core::num::TryFromIntError> {
+                self.write_temperature_limit(temperature_limit)?;
+                Ok(self)
+            }
         }
     };
 }

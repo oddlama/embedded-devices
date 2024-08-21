@@ -4,6 +4,30 @@
 //! module is housed in an extremely compact 10-pin metal-lid LGA package with a footprint of only 2.0 × 2.0 mm² and max 0.8
 //! mm package height. Its small dimensions and its low power consumption of 3.2 μA @1Hz allow the implementation in battery
 //! driven devices such as mobile phones, GPS modules or watches.
+//!
+//! ## Usage
+//!
+//! ```
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::Error<I::Error>>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::bosch::bmp390::{BMP390, address::Address};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut bmp390 = BMP390::new_i2c(i2c, Address::Primary);
+//! bmp390.init(&mut Delay).await.unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let measurements = bmp390.measure(&mut Delay).await?;
+//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
 
 use embedded_devices_derive::{device, device_impl};
 use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
