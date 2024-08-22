@@ -37,6 +37,7 @@
                 p:
                   with p; [
                     torchWithCuda
+                    scipy
                     numpy
                     matplotlib
                   ]
