@@ -12,7 +12,7 @@ pub(crate) mod simple_device;
 mod tests {
     use crate::devices::bosch::{
         bme280::registers::{Reset, ResetBitfield, ResetMagic},
-        bmp390::registers::{Error, ErrorBitfield, FifoLength, FifoLengthBitfield, Pressure, PressureBitfield},
+        bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield},
     };
 
     #[test]

@@ -34,7 +34,7 @@ fn example_register() {
     });
 
     let bitfield = reg.read_all();
-    let mut reg2 = reg.clone();
+    let mut reg2 = reg;
     reg2.write_all(bitfield);
     assert_eq!(reg, reg2);
 }
