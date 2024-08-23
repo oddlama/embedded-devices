@@ -27,7 +27,7 @@ const LOOKUP_TABLE_R100_PARAMS: [[f32; 5]; 6] = [
 
 /// Inverse Callendar-Van Dusen equation for R0=100Ω,
 /// based on piecewise reconstruction with 4th order polynomials.
-/// The maximum error is ±1e-5°C over the whole temperature range [-200°C, 900°C] with f64, and ±1e-4°C for f32.
+/// The maximum error is ±1e-4°C over the whole temperature range [-200°C, 900°C].
 /// but degrades rapidly beyond that range. Inputs that correspond to values outside
 /// of this range will yield unpredictable outcomes.
 pub fn resistance_to_temperature_r100(r: f32) -> f32 {

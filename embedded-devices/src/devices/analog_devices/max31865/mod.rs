@@ -85,7 +85,7 @@ where
 
 #[device_impl]
 impl<I: RegisterInterface> MAX31865<I> {
-    /// TODO: a
+    /// TODO: run selftest
     pub async fn init(&mut self) -> Result<(), I::Error> {
         Ok(())
     }
@@ -109,21 +109,24 @@ impl<I: RegisterInterface> MAX31865<I> {
         }
     }
 
-    /// Read the current resistance from the device register and convert
-    /// it to °C by using the internal Callendar-Van Dusen lookup table.
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
-        let ratio = Rational32::new_raw(
-            self.read_register::<registers::Resistance>()
-                .await?
-                .read_resistance_ratio()
-                .into(),
-            1 << 15,
-        );
-
-        // We always calculate with a 100Ω lookup table.
-        let resistance = (ratio * self.reference_resistor_ratio) * 100;
-        let resistance = *resistance.numer() as f32 / *resistance.denom() as f32;
+    /// Converts a raw resistance ratio into a temperature by
+    /// utilizing a builtin inverse Callendar-Van Dusen lookup table.
+    pub fn raw_resistance_ratio_to_temperature(&mut self, raw_resistance: u16) -> ThermodynamicTemperature {
+        // We always calculate with a 100Ω lookup table, because the equation
+        // can be scaled to other temperature ranges
+        let resistance = (100.0 * raw_resistance as f32 * *self.reference_resistor_ratio.numer() as f32)
+            / ((1 << 15) as f32 * *self.reference_resistor_ratio.denom() as f32);
         let temperature = callendar_van_dusen::resistance_to_temperature_r100(resistance);
-        Ok(ThermodynamicTemperature::new::<degree_celsius>(temperature))
+        ThermodynamicTemperature::new::<degree_celsius>(temperature)
+    }
+
+    /// Read the current resistance from the device register and convert
+    /// it to a temperature by using the internal Callendar-Van Dusen lookup table.
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
+        let raw_resistance_ratio = self
+            .read_register::<registers::Resistance>()
+            .await?
+            .read_resistance_ratio();
+        Ok(self.raw_resistance_ratio_to_temperature(raw_resistance_ratio))
     }
 }

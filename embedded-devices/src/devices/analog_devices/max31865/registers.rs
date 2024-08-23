@@ -122,37 +122,6 @@ macro_rules! define_fault_threshold_register {
             #[allow(dead_code)]
             pub reserved: u8,
         }
-
-        impl $name {
-            // /// Reads the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            // pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-            //     ThermodynamicTemperature::new::<degree_celsius>(
-            //         Rational32::new_raw(self.read_raw_temperature_limit().into(), 128).reduced(),
-            //     )
-            // }
-            //
-            // /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            // /// The passed temperature will be truncated (rounded down).
-            // pub fn write_temperature_limit(
-            //     &mut self,
-            //     temperature_limit: ThermodynamicTemperature,
-            // ) -> Result<(), core::num::TryFromIntError> {
-            //     let temp = temperature_limit.get::<degree_celsius>();
-            //     let temp: i16 = (temp * Rational32::from_integer(128)).to_integer().try_into()?;
-            //     self.write_raw_temperature_limit(temp);
-            //     Ok(())
-            // }
-            //
-            // /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            // /// The passed temperature will be truncated (rounded down).
-            // pub fn with_temperature_limit(
-            //     mut self,
-            //     temperature_limit: ThermodynamicTemperature,
-            // ) -> Result<Self, core::num::TryFromIntError> {
-            //     self.write_temperature_limit(temperature_limit)?;
-            //     Ok(self)
-            // }
-        }
     };
 }
 
