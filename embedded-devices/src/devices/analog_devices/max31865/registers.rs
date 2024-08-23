@@ -1,9 +1,6 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::Rational32;
-use uom::si::rational32::ThermodynamicTemperature;
-use uom::si::thermodynamic_temperature::degree_celsius;
 
 /// Conversion mode.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]

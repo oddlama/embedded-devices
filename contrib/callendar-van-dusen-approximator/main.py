@@ -7,9 +7,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 
+n_samples = 500_000
+
+# Define parameters for the lookup table generation
+min_temp = -200
+max_temp = 900
+max_err = 0.0001  # Desired maximum error in °C
+
 # Constants for Callendar-Van Dusen equation (Platinum RTD, typical values)
 R0 = 100  # Resistance at 0°C
-A = 3.9083e-3
+A =  3.9083e-3
 B = -5.775e-7
 C = -4.183e-12  # Only valid for temperatures below 0°C
 
@@ -44,12 +51,12 @@ approx_order = 4
 
 print("preparing values")
 # Generate equidistant temperature positions
-n_samples = 500_000
-temperatures = np.linspace(-200, 900, n_samples, dtype=np.float32)
+temperatures = np.linspace(min_temp, max_temp, n_samples, dtype=np.float32)
 
 # Calculate resistances for the generated temperatures
 vresistance = np.vectorize(resistance)
 resistances = vresistance(temperatures)
+resistances = np.float32(resistances)
 print("done preparing values")
 
 # Function to generate lookup table
@@ -102,27 +109,41 @@ def generate_lookup_table(min_temp, max_temp, desired_max_err):
 
     return lookup_table
 
-# Define parameters for the lookup table generation
-min_temp = -200
-max_temp = 900
-max_err = 0.00001  # Desired maximum error in °C
-
 # Generate the lookup table
 lookup_table = generate_lookup_table(min_temp, max_temp, max_err)
+
+# t_low = np.linspace(min_temp - 5, min_temp, 500, dtype=np.float32)
+# t_high = np.linspace(max_temp, max_temp + 5, 500, dtype=np.float32)
+# r_low = vresistance(t_low)
+# r_high = vresistance(t_high)
+# Ts = np.concatenate([t_low, temperatures, t_high], axis=0)
+# Rs = np.concatenate([r_low, resistances, r_high], axis=0)
+Ts = temperatures
+Rs = resistances
+
 if approx_order in Frange:
     F = Fs[approx_order - 2]
     approx_temps = []
+    # low extend
+    # _,_,_,params = lookup_table[1]
+    # f_approx = np.vectorize(lambda r: F(r, *params))
+    # approx_temps.append(f_approx(r_low))
+    # valid range
     for k,(li,lr,lt,_) in enumerate(lookup_table[0:-1]):
         ri,rr,rt,params = lookup_table[k+1]
         f_approx = np.vectorize(lambda r: F(r, *params))
         approx_temps.append(f_approx(resistances[li:ri]))
+    # high extend
+    # _,_,_,params = lookup_table[-1]
+    # f_approx = np.vectorize(lambda r: F(r, *params))
+    # approx_temps.append(f_approx(r_high))
+    # concat
     approx_temps = np.concatenate(approx_temps, axis=0)
 elif approx_order == 1:
-    approx_temps = np.interp(resistances, [x[1] for x in lookup_table], [x[2] for x in lookup_table])
+    approx_temps = np.interp(Rs, [x[1] for x in lookup_table], [x[2] for x in lookup_table])
 
-error = approx_temps - temperatures
-# abs_error = np.abs(approx_temps - temperatures)
-max_error = np.max(np.abs(approx_temps - temperatures))
+error = approx_temps - Ts
+max_error = np.max(np.abs(error))
 print(f"Table calculation done!")
 print(f"Entries:       ", len(lookup_table))
 print(f"Maximum Error: {max_error:.4f}", )
@@ -130,12 +151,47 @@ print(f"Mean Error:    {error.mean():.4f}")
 for i,r,t,params in lookup_table:
     print(f"{i:20},{r:20},{t:20},{params}")
 
+print(f"""
+// 4th order piecewise approximation table, requires {len(lookup_table) - 1}*6*4 = {(len(lookup_table) - 1)*6*4} bytes.
+// - Values for R0={R0}Ω
+// - maximum error: +- {max_err}°C
+// - valid range: [{min_temp}°C, {max_temp}°C]
+// - no need for binary search
+#[rustfmt::skip]
+const LOOKUP_TABLE_R{R0}_RESISTANCES: [f32; {len(lookup_table) - 1}] = [
+    // maximum valid resistance for the params at the same index
+{"\n".join(f"    {r}," for _,r,_,_ in lookup_table[1:])}
+];
+
+#[rustfmt::skip]
+const LOOKUP_TABLE_R{R0}_PARAMS: [[f32; 5]; {len(lookup_table) - 1}] = [
+    // polynomial params [a, b, c, d, e])
+{"\n".join("    [" + ", ".join(f"{str(x):25}" for x in params) + " ]," for _,_,_,params in lookup_table[1:])}
+];
+"""
+)
+
+print(f"""
+#[cfg(test)]
+mod test {{
+    #[test]
+    fn test_lookup_table_r{R0}() {{""")
+N = 100
+for i in range(N):
+    idx = len(resistances) * i // (N + 1)
+    r = resistances[idx]
+    t = temperatures[idx]
+    print(f"        assert_abs_diff_eq!(resistance_to_temperature_r{R0}({r}), {t}, epsilon = {max_err});")
+print("""    }
+}
+""")
+
 # Create the plot
 fig, ax1 = plt.subplots(figsize=(10, 6))
 
 # Plot predicted and real temperatures
-ax1.plot(resistances, approx_temps, label="Predicted Temperature", color='tab:blue')
-ax1.plot(resistances, temperatures, label="Real Temperature", linestyle="--", color='tab:orange')
+ax1.plot(Rs, approx_temps, label="Predicted Temperature", color='tab:blue')
+ax1.plot(Rs, Ts, label="Real Temperature", linestyle="--", color='tab:orange')
 ax1.set_xlabel("Resistance (Ω)")
 ax1.set_ylabel("Temperature (°C)")
 ax1.set_title("Piecewise Linear Approximation of Callendar-Van Dusen Equation")
@@ -144,7 +200,7 @@ ax1.legend(loc='upper left')
 
 # Create a second y-axis for the error
 ax2 = ax1.twinx()
-ax2.plot(resistances, error, label="Error", color='tab:red')
+ax2.plot(Rs, error, label="Error", color='tab:red')
 ax2.set_ylabel("Error")
 
 # Combine legends from both y-axes

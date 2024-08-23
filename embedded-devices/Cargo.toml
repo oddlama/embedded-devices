@@ -12,6 +12,7 @@ categories.workspace = true
 license.workspace = true
 
 [dependencies]
+approx = { version = "0.5.1", default-features = false }
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
 bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 defmt = "0.3.8"
