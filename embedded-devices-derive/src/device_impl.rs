@@ -32,8 +32,14 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
     last_segment.ident = format_ident!("{}Register", last_segment.ident);
     last_segment.arguments = syn::PathArguments::None;
 
-    let read_register_doc = format!("Reads from the given register. For a list of all available registers, refer to implentors of [`{}`].", register_marker.to_token_stream());
-    let write_register_doc = format!("Writes to the given register. For a list of all available registers, refer to implentors of [`{}`].", register_marker.to_token_stream());
+    let read_register_doc = format!(
+        "Reads from the given register. For a list of all available registers, refer to implentors of [`{}`].",
+        register_marker.to_token_stream()
+    );
+    let write_register_doc = format!(
+        "Writes to the given register. For a list of all available registers, refer to implentors of [`{}`].",
+        register_marker.to_token_stream()
+    );
 
     let additional_items = vec![
         quote! {

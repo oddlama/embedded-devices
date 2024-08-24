@@ -32,8 +32,12 @@
 //! # }
 //! ```
 
+use self::registers::FilterMode;
+use self::registers::WiringMode;
+
 use embedded_devices_derive::{device, device_impl};
 use embedded_registers::{spi::SpiDevice, RegisterInterface};
+use registers::FaultDetectionCycle;
 use uom::num_rational::Rational32;
 use uom::si::f32::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -43,6 +47,26 @@ use crate::utils::callendar_van_dusen;
 pub mod registers;
 
 type MAX31865SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, false, 0>;
+
+/// All possible errors that may occur in fault detection
+#[derive(Debug, defmt::Format)]
+pub enum FaultDetectionError<BusError> {
+    /// Bus error
+    Bus(BusError),
+    /// Timeout (the detection never finished in the allocated time frame)
+    Timeout,
+    /// A fault was detected. Read the FaultStatus register for details.
+    FaultDetected,
+}
+
+/// All possible errors that may occur in temperature reads
+#[derive(Debug, defmt::Format)]
+pub enum ReadTemperatureError<BusError> {
+    /// Bus error
+    Bus(BusError),
+    /// A fault was detected. Read the FaultStatus register for details.
+    FaultDetected,
+}
 
 /// The MAX31865 is an easy-to-use resistance-to-digital converter optimized for platinum
 /// resistance temperature detectors (RTDs).
@@ -85,9 +109,90 @@ where
 
 #[device_impl]
 impl<I: RegisterInterface> MAX31865<I> {
-    /// TODO: run selftest
-    pub async fn init(&mut self) -> Result<(), I::Error> {
-        Ok(())
+    /// Initializes the device by configuring important settings and
+    /// running an initial fault detection cycle.
+    pub async fn init<D: hal::delay::DelayNs>(
+        &mut self,
+        delay: &mut D,
+        wiring_mode: WiringMode,
+        filter_mode: FilterMode,
+    ) -> Result<(), FaultDetectionError<I::Error>> {
+        // Configure the wiring mode and filter mode
+        self.write_register(
+            &self::registers::Configuration::default()
+                .with_wiring_mode(wiring_mode)
+                .with_filter_mode(filter_mode),
+        )
+        .await
+        .map_err(FaultDetectionError::Bus)?;
+
+        self.detect_faults(delay).await
+    }
+
+    /// Runs the automatic fault detection.
+    pub async fn detect_faults<D: hal::delay::DelayNs>(
+        &mut self,
+        delay: &mut D,
+    ) -> Result<(), FaultDetectionError<I::Error>> {
+        let reg_conf = self
+            .read_register::<self::registers::Configuration>()
+            .await
+            .map_err(FaultDetectionError::Bus)?;
+
+        // The automatic fault detection waits 100µs before checking for faults,
+        // which should be plenty of time to charge the RC filter.
+        // Typically a 100nF cap is used which should charge significantly faster.
+        self.write_register(
+            &reg_conf
+                .with_enable_bias_voltage(true)
+                .with_conversion_mode(self::registers::ConversionMode::NormallyOff)
+                .with_clear_fault_status(false)
+                .with_fault_detection_cycle(self::registers::FaultDetectionCycle::Automatic),
+        )
+        .await
+        .map_err(FaultDetectionError::Bus)?;
+
+        // According to the flow diagram in the datasheet, automatic calibration waits
+        // a total of 510µs. We will wait for a bit longer initially and then check
+        // the status in the configuration register up to 5 times with some additional delay.
+        delay.delay_us(550).await;
+        const TRIES: u8 = 5;
+        for _ in 0..TRIES {
+            let cycle = self
+                .read_register::<self::registers::Configuration>()
+                .await
+                .map_err(FaultDetectionError::Bus)?
+                .read_fault_detection_cycle();
+
+            // Check if fault detection is done
+            if cycle == FaultDetectionCycle::Finished {
+                // Disable VBIAS
+                self.write_register(&reg_conf.with_enable_bias_voltage(false))
+                    .await
+                    .map_err(FaultDetectionError::Bus)?;
+
+                let has_fault = self
+                    .read_register::<registers::Resistance>()
+                    .await
+                    .map_err(FaultDetectionError::Bus)?
+                    .read_fault();
+
+                if has_fault {
+                    // Fault detected
+                    return Err(FaultDetectionError::FaultDetected);
+                } else {
+                    // Everything's fine!
+                    return Ok(());
+                }
+            }
+        }
+
+        // Disable VBIAS
+        self.write_register(&reg_conf.with_enable_bias_voltage(false))
+            .await
+            .map_err(FaultDetectionError::Bus)?;
+
+        Err(FaultDetectionError::Timeout)
     }
 
     /// Converts a temperature into a resistance ratio as understood
@@ -120,13 +225,59 @@ impl<I: RegisterInterface> MAX31865<I> {
         ThermodynamicTemperature::new::<degree_celsius>(temperature)
     }
 
-    /// Read the current resistance from the device register and convert
+    /// Read the latest resistance measurement from the device register and convert
     /// it to a temperature by using the internal Callendar-Van Dusen lookup table.
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
-        let raw_resistance_ratio = self
+    ///
+    /// Checks for faults.
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, ReadTemperatureError<I::Error>> {
+        let resistance = self
             .read_register::<registers::Resistance>()
-            .await?
-            .read_resistance_ratio();
-        Ok(self.raw_resistance_ratio_to_temperature(raw_resistance_ratio))
+            .await
+            .map_err(ReadTemperatureError::Bus)?;
+
+        if resistance.read_fault() {
+            return Err(ReadTemperatureError::FaultDetected);
+        }
+
+        Ok(self.raw_resistance_ratio_to_temperature(resistance.read_resistance_ratio()))
+    }
+
+    /// Performs a one-shot measurement.
+    pub async fn oneshot<D: hal::delay::DelayNs>(
+        &mut self,
+        delay: &mut D,
+    ) -> Result<ThermodynamicTemperature, ReadTemperatureError<I::Error>> {
+        let reg_conf = self
+            .read_register::<self::registers::Configuration>()
+            .await
+            .map_err(ReadTemperatureError::Bus)?;
+
+        // Enable VBIAS before initiating one-shot measurement,
+        // 10.5 RC time constants are recommended plus 1ms extra.
+        // So we just wait 2ms which should be plenty of time.
+        self.write_register(&reg_conf.with_enable_bias_voltage(true))
+            .await
+            .map_err(ReadTemperatureError::Bus)?;
+        delay.delay_us(2000).await;
+
+        // Initiate measurement
+        self.write_register(&reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
+            .await
+            .map_err(ReadTemperatureError::Bus)?;
+
+        // Wait until measurement is ready, plus 2ms extra
+        let measurement_time_us = match reg_conf.read_filter_mode() {
+            FilterMode::F_60Hz => 52000,
+            FilterMode::F_50Hz => 62500,
+        };
+        delay.delay_us(2000 + measurement_time_us).await;
+
+        // Revert config (disable VBIAS)
+        self.write_register(&reg_conf)
+            .await
+            .map_err(ReadTemperatureError::Bus)?;
+
+        // Return conversion result
+        self.read_temperature().await
     }
 }
