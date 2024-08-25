@@ -6,7 +6,7 @@
 
 pub mod devices;
 pub(crate) mod simple_device;
-pub(crate) mod utils;
+pub mod utils;
 
 #[cfg(test)]
 mod tests {
