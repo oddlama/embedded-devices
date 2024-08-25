@@ -10,18 +10,19 @@
 //! ## Usage
 //!
 //! ```
-//! # async fn test<I>(mut spi: I) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
 //! # where
-//! #   I: embedded_hal_async::spi::SpiDevice
+//! #   I: embedded_hal_async::spi::SpiDevice,
+//! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::analog_devices::max31865::{MAX31865, registers::Resistance};
+//! use embedded_devices::devices::analog_devices::max31865::{MAX31865, registers::{FilterMode, Resistance, WiringMode}};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //! use uom::num_rational::Rational32;
 //!
 //! // Create and initialize the device
 //! let mut max31865 = MAX31865::new_spi(spi, Rational32::new(43, 10));
-//! max31865.init().await.unwrap();
+//! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
 //! let ratio = max31865
 //!     .read_temperature()
@@ -185,6 +186,8 @@ impl<I: RegisterInterface> MAX31865<I> {
                     return Ok(());
                 }
             }
+
+            delay.delay_us(100).await;
         }
 
         // Disable VBIAS

@@ -1,6 +1,11 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
+use uom::num_rational::Rational32;
+use uom::si::electric_current::ampere;
+use uom::si::power::watt;
+use uom::si::rational32::ElectricCurrent;
+use uom::si::{electric_potential::volt, rational32::ElectricPotential};
 
 /// Valid bus voltage ranges.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
@@ -33,7 +38,7 @@ pub enum PgaGain {
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum AdcResolution {
-    /// 9bit resolution, 1 sample, 84µs conversion time
+    /// 9bit resolution, 1 sample, 84 µs conversion time
     B_9 = 0b0000,
     /// Secondary representation for [`Self::B_9`]
     B_9_a = 0b0100,
@@ -66,6 +71,30 @@ pub enum AdcResolution {
     B_12_X_64 = 0b1110,
     /// 12 bit resolution, 128 sample, 68.10 ms conversion time
     B_12_X_128 = 0b1111,
+}
+
+impl AdcResolution {
+    /// Returns the associated conversion time
+    pub fn conversion_time_us(&self) -> u32 {
+        match self {
+            AdcResolution::B_9 => 84,
+            AdcResolution::B_9_a => 84,
+            AdcResolution::B_10 => 148,
+            AdcResolution::B_10_a => 148,
+            AdcResolution::B_11 => 276,
+            AdcResolution::B_11_a => 276,
+            AdcResolution::B_12 => 532,
+            AdcResolution::B_12_a => 532,
+            AdcResolution::B_12_b => 532,
+            AdcResolution::B_12_X_2 => 1_060,
+            AdcResolution::B_12_X_4 => 2_130,
+            AdcResolution::B_12_X_8 => 4_260,
+            AdcResolution::B_12_X_16 => 8_510,
+            AdcResolution::B_12_X_32 => 17_020,
+            AdcResolution::B_12_X_64 => 34_050,
+            AdcResolution::B_12_X_128 => 68_100,
+        }
+    }
 }
 
 /// Operating mode.
@@ -117,8 +146,15 @@ pub struct Configuration {
 #[register(address = 0b001, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ShuntVoltage {
-    /// The raw voltage measurement with 0.01mV/LSB resolution
+    /// The raw voltage measurement with 10µV/LSB resolution
     pub raw_value: i16,
+}
+
+impl ShuntVoltage {
+    /// Read the shunt voltage
+    pub fn read_voltage(&self) -> ElectricPotential {
+        ElectricPotential::new::<volt>(Rational32::new(self.read_raw_value() as i32, 100_000))
+    }
 }
 
 /// Bus voltage measurement data
@@ -126,7 +162,7 @@ pub struct ShuntVoltage {
 #[register(address = 0b010, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct BusVoltage {
-    /// The raw voltage measurement with 0.04mV/LSB resolution
+    /// The raw voltage measurement with 4mV/LSB resolution
     #[bondrewd(bit_length = 13)]
     pub raw_value: u16,
     #[bondrewd(bit_length = 1, reserve)]
@@ -134,7 +170,7 @@ pub struct BusVoltage {
     pub reserved: u8,
     /// Although the data from the last conversion can be read at any time,
     /// this flag indicates when data from a conversion is available in the
-    /// data output registers. The CNVR bit is set after all conversions,
+    /// data output registers. This flag bit is set after all conversions,
     /// averaging, and multiplications are complete.
     ///
     /// It will auto-clear when reading the [`Power`] register or
@@ -146,16 +182,33 @@ pub struct BusVoltage {
     pub overflow: bool,
 }
 
+impl BusVoltage {
+    /// Read the bus voltage
+    pub fn read_voltage(&self) -> ElectricPotential {
+        ElectricPotential::new::<volt>(Rational32::new(self.read_raw_value() as i32, 250))
+    }
+}
 
 /// Power measurement data
 #[device_register(super::INA219)]
 #[register(address = 0b011, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Power {
-    /// The raw power measurement
-    // FIXME: unclear whether this is signed or not
-    // FIXME: range unclear
+    /// The raw power measurement, W/LSB is determined by calibration register
     pub raw_value: i16,
+}
+
+impl Power {
+    /// Read the power, current_lsb_na is the calibrated amount of nA/LSB
+    /// for the current register which is used to derive the nW/LSB for the power register
+    pub fn read_power(&self, current_lsb_na: u32) -> uom::si::rational32::Power {
+        // nW/LSB = 20 * nA/LSB, we divide by 50 instead to have the result in µW
+        // which fits better in a u32.
+        uom::si::rational32::Power::new::<watt>(Rational32::new(
+            self.read_raw_value() as i32 * current_lsb_na as i32 / 50,
+            1_000_000,
+        ))
+    }
 }
 
 /// Contains the value of the current flowing through the shunt resistor
@@ -163,9 +216,20 @@ pub struct Power {
 #[register(address = 0b100, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Current {
-    /// The raw current measurement
-    // FIXME: range unclear
+    /// The raw current measurement, A/LSB is determined by calibration register
     pub raw_value: i16,
+}
+
+impl Current {
+    /// Read the current, current_lsb_na is the calibrated amount of nA/LSB
+    /// for the current register.
+    pub fn read_current(&self, current_lsb_na: u32) -> ElectricCurrent {
+        // We pre-divide by 1000 to have the result in µA which fits better in a u32.
+        ElectricCurrent::new::<ampere>(Rational32::new(
+            self.read_raw_value() as i32 * current_lsb_na as i32 / 1000,
+            1_000_000,
+        ))
+    }
 }
 
 /// Sets full-scale range and LSB of current and power measurements
@@ -173,7 +237,7 @@ pub struct Current {
 /// the shunt. Full-scale range and the LSB of the current and power measurement
 /// depend on the value entered in this register.
 #[device_register(super::INA219)]
-#[register(address = 0b101, mode = "r")]
+#[register(address = 0b101, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Calibration {
     /// The raw calibration value
