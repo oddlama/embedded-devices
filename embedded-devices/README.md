@@ -24,6 +24,10 @@ future collaborative efforts and solve some of the aforementioned issues.
 The main component of our framework is [embedded-registers](./embedded-registers)
 which provides an ergonomic solution to defining and interfacing with device registers over I2C/SPI.
 
+## Examples
+
+An example project for the esp32 is included at [examples](./examples)
+
 ## Supported Devices
 
 Below you will find all supported devices. Please visit their respective documentation links for more information and usage examples.
