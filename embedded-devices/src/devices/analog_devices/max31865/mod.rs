@@ -77,7 +77,7 @@ pub enum ReadTemperatureError<BusError> {
 pub struct MAX31865<I: RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
-    /// The ratio of the reference resistor compared to the nominal resistance of
+    /// The reference resistor value over to the nominal resistance of
     /// the temperature element at 0°C (100Ω for PT100, 1000Ω for PT1000).
     /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
     /// but your design may vary.
@@ -96,6 +96,11 @@ where
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
+    ///
+    /// The reference resistor ratio is defined as the reference resistor value over the nominal resistance of
+    /// the temperature element at 0°C (100Ω for PT100, 1000Ω for PT1000).
+    /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
+    /// but your design may vary.
     #[inline]
     pub fn new_spi(interface: I, reference_resistor_ratio: Rational32) -> Self {
         Self {
@@ -221,7 +226,8 @@ impl<I: RegisterInterface> MAX31865<I> {
     /// utilizing a builtin inverse Callendar-Van Dusen lookup table.
     pub fn raw_resistance_ratio_to_temperature(&mut self, raw_resistance: u16) -> ThermodynamicTemperature {
         // We always calculate with a 100Ω lookup table, because the equation
-        // can be scaled to other temperature ranges
+        // linearly scales to other temperature ranges. Only the ratio between
+        // reference resistor and PT element is important.
         let resistance = (100.0 * raw_resistance as f32 * *self.reference_resistor_ratio.numer() as f32)
             / ((1 << 15) as f32 * *self.reference_resistor_ratio.denom() as f32);
         let temperature = callendar_van_dusen::resistance_to_temperature_r100(resistance);
