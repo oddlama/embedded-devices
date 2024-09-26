@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-devices"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "approx",
  "bondrewd",
@@ -164,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-devices-derive"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "convert_case",
  "darling",
@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "bondrewd",
  "bytemuck",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-registers-derive"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "bondrewd",
  "bytemuck",

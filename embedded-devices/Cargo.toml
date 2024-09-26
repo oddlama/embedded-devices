@@ -18,8 +18,8 @@ bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 defmt = "0.3.8"
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
-embedded-devices-derive = { version = "0.9.9", path = "../embedded-devices-derive" }
-embedded-registers = { version = "0.9.9", path = "../embedded-registers", default-features = false, features = ["derive"] }
+embedded-devices-derive = { version = "0.9.10", path = "../embedded-devices-derive" }
+embedded-registers = { version = "0.9.10", path = "../embedded-registers", default-features = false, features = ["derive"] }
 maybe-async-cfg = "0.2.4"
 paste = "1.0.15"
 uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }

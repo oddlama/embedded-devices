@@ -11,7 +11,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.9.9"
+version = "0.9.10"
 authors = ["oddlama <oddlama@oddlama.org>"]
 homepage = "https://github.com/oddlama/embedded-devices"
 repository = "https://github.com/oddlama/embedded-devices"
