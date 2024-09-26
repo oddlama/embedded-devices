@@ -132,6 +132,14 @@ impl<I: RegisterInterface> MAX31865<I> {
         .await
         .map_err(FaultDetectionError::Bus)?;
 
+        self.write_register(&self::registers::FaultThresholdLow::default().with_resistance_ratio(0))
+            .await
+            .map_err(FaultDetectionError::Bus)?;
+
+        self.write_register(&self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
+            .await
+            .map_err(FaultDetectionError::Bus)?;
+
         self.detect_faults(delay).await
     }
 

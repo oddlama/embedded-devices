@@ -24,7 +24,7 @@ use bytemuck::Zeroable;
 /// | `HEADER_SIZE`              | `usize` | The size of the command header in bytes |
 /// | `ADDR_MSB`                 | `u8`    | The bit index of the MSB of the register-address (inclusive) |
 /// | `ADDR_LSB`                 | `u8`    | The bit index of the LSB of the register-address (inclusive) |
-/// | `RW_BIT`                   | `u8`    | The bit index of RW bit when interpreting the struct in big-endian |
+/// | `RW_BIT`                   | `u8`    | The bit index of the RW bit when interpreting the struct in big-endian |
 /// | `RW_1_IS_READ`             | `bool`  | whether the setting the RW bit signals read-mode (true) or write-mode (false) |
 /// | `READ_DELAY`               | `usize` | Number of bytes that we have to wait (send additional zeros) after sending the header until data arrives |
 #[derive(Default)]
@@ -56,9 +56,9 @@ impl<
         // Shift the address to the correct place
         let addr_shifted = (R::ADDRESS << ADDR_LSB) & addr_mask;
         // incorporate addess
-        let addr_bytes = addr_shifted.to_be_bytes();
+        let addr_bytes = addr_shifted.to_le_bytes();
         let affected_bytes = ((ADDR_MSB - ADDR_LSB) / 8) as usize;
-        for i in 0..affected_bytes {
+        for i in 0..=affected_bytes {
             header[HEADER_SIZE - 1 - i] |= addr_bytes[i];
         }
     }
@@ -124,6 +124,6 @@ impl<
         // Set RW_BIT if necessary
         data[HEADER_SIZE - 1 - (RW_BIT as usize) / 8] |= ((!RW_1_IS_READ) as u8) << (RW_BIT % 8);
         Self::fill_addr_header::<R>(data);
-        interface.transfer(&mut [], data).await
+        interface.write(data).await
     }
 }
