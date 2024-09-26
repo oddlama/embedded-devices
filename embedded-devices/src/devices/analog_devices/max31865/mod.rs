@@ -97,6 +97,8 @@ where
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
     ///
+    /// The device supports SPI modes 1 and 3.
+    ///
     /// The reference resistor ratio is defined as the reference resistor value over the nominal resistance of
     /// the temperature element at 0°C (100Ω for PT100, 1000Ω for PT1000).
     /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
