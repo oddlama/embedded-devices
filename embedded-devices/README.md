@@ -40,6 +40,8 @@ Below you will find all supported devices. Please visit their respective documen
 | Bosch | BME280 | I2C/SPI | Temperature, pressure and humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bme280/index.html) |
 | Bosch | BMP280 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp280/index.html) |
 | Bosch | BMP390 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp390/index.html) |
+| Microchip | MCP3204 | SPI | 12-bit ADC, 4 single- or 2 differential channels | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp3204/index.html) |
+| Microchip | MCP3208 | SPI | 12-bit ADC, 8 single- or 4 differential channels | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp3208/index.html) |
 | Microchip | MCP9808 | I2C | Digital temperature sensor with ±0.5°C (max.) accuracy | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp9808/index.html) |
 | Texas Instruments | INA219 | I2C | 12-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina219/index.html) |
 | Texas Instruments | TMP117 | I2C | Temperature sensor with ±0.1°C to ±0.3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp117/index.html) |
