@@ -8,8 +8,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = inputs:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
+  outputs =
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         inputs.devshell.flakeModule
       ];
@@ -19,34 +20,33 @@
         "aarch64-linux"
       ];
 
-      perSystem = {
-        pkgs,
-        system,
-        ...
-      }: {
-        _module.args.pkgs = import inputs.nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-          config.enableCuda = true;
-        };
+      perSystem =
+        {
+          pkgs,
+          system,
+          ...
+        }:
+        {
+          _module.args.pkgs = import inputs.nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+            config.enableCuda = true;
+          };
 
-        devshells.default = {
-          packages = [
-            (
-              pkgs.python3.withPackages (
-                p:
-                  with p; [
-                    torchWithCuda
-                    scipy
-                    numpy
-                    matplotlib
-                  ]
-              )
-            )
-          ];
-        };
+          devshells.default = {
+            packages = [
+              (pkgs.python3.withPackages (
+                p: with p; [
+                  torchWithCuda
+                  scipy
+                  numpy
+                  matplotlib
+                ]
+              ))
+            ];
+          };
 
-        formatter = pkgs.nixfmt-rfc-style; # `nix fmt`
-      };
+          formatter = pkgs.nixfmt-rfc-style; # `nix fmt`
+        };
     };
 }

@@ -54,7 +54,6 @@
           };
 
           pre-commit.settings.hooks.treefmt.enable = true;
-
           treefmt = {
             projectRootFile = "flake.nix";
             programs = {
