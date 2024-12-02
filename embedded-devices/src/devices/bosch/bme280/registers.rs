@@ -146,7 +146,6 @@ pub struct Status {
 /// Sensor operating mode
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 pub enum SensorMode {
     /// Sleep mode is entered by default after power on reset. In sleep mode, no measurements are
     /// performed and power consumption is at a minimum. All registers are accessible.
@@ -187,7 +186,6 @@ pub struct ControlMeasurement {
 /// The standby time between measurements in [`SensorMode::Normal`].
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum StandbyTime {
     /// 0.5ms
@@ -218,7 +216,6 @@ pub enum StandbyTime {
 /// respective measured quantity to 20 bits.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 pub enum IIRFilter {
     /// Disables the IIR filter (default).
     /// The resolution of pressure and temperature measurements is dictated by their respective

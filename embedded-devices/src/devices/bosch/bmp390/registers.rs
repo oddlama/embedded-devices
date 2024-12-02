@@ -52,17 +52,6 @@ pub struct Error {
     pub fatal_err: bool,
 }
 
-/// Command decoder status.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum AlertPolarity {
-    /// A command is in progress
-    #[default]
-    Busy = 0,
-    /// The comand decoder is ready to accept a new command
-    Ready = 1,
-}
-
 /// The status flag register
 #[device_register(super::BMP390)]
 #[register(address = 0x03, mode = "r")]
@@ -323,7 +312,6 @@ pub struct InterfaceControl {
 /// Sensor operating mode
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 pub enum SensorMode {
     /// Sleep mode is entered by default after power on reset.
     /// In sleep mode, no measurements are performed and power consumption is at a minimum.
@@ -488,7 +476,6 @@ pub struct DataRateControl {
 /// Lowpass filter settings for pressure and temperature values.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 pub enum IIRFilter {
     /// Disables the IIR filter (default).
     #[default]

@@ -78,7 +78,6 @@ pub enum ConversionCycleTime {
 /// Conversion averaging modes.
 #[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
-#[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum AveragingMode {
     /// Disables averaging.
