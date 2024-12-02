@@ -5,24 +5,30 @@
 
 **WARNING: This crate is currently in experimental state, so anything may change at any time.**
 
-Welcome to the embedded-devices project! Here you'll find a collection of drivers for a variety of different
-embedded sensors and devices, all of which are built with this framework which facilitates building drivers
-for register based devices. These drivers are designed for `async` use but also support synchronous contexts
-via a feature switch. Our goal is to provide feature-complete, up-to-date drivers with an ergonomic interface,
-catering both to high-level device functions and low-level register access. Please refer to the list below
-for supported devices.
+Welcome to the embedded-devices project! Here you'll find a collection of
+drivers for a variety of different embedded sensors and devices, all of which
+are built with this framework which facilitates building drivers for register
+based devices. These drivers are designed for both `async` and synchronous
+contexts via a feature switch. The goal of this library is to provide type-safe
+access to all registers of each device while also providing an ergonomic
+high-level interface for frequent usage scenarios. Please refer to the list
+below for supported devices.
 
 The ecosystem of embedded-rust device drivers seems quite fragmented,
-consisting both of high quality implementations but also of several incomplete or outdated drivers,
-where only a few have first-class async support. This renders them hard (or even impossible) to use
-in embedded frameworks like [embassy](https://github.com/embassy-rs/embassy), which in my opinion would
-benefit from having access to more ready-to-use async drivers with frequently updated dependencies.
+consisting both of high quality implementations but also of several incomplete
+or outdated drivers, where only a few have first-class async support. This
+renders them hard (or even impossible) to use in embedded frameworks like
+[embassy](https://github.com/embassy-rs/embassy), which in my opinion would
+benefit from having access to more ready-to-use async drivers with frequently
+updated dependencies.
 
-For the time being, this crate should serve as a proof-of-concept. It shows how sensor and device drivers
-can benefit from a common framework, allowing new drivers to be added with ease in order to streamline
-future collaborative efforts and solve some of the aforementioned issues.
-The main component of our framework is [embedded-registers](./embedded-registers)
-which provides an ergonomic solution to defining and interfacing with device registers over I2C/SPI.
+For the time being, this crate should serve as a proof-of-concept. It shows how
+sensor and device drivers can benefit from a common framework, allowing new
+drivers to be added with ease in order to streamline future collaborative
+efforts and solve some of the aforementioned issues. The main component of our
+framework is [embedded-registers](./embedded-registers) which provides an
+ergonomic solution to defining and interfacing with device registers over
+I2C/SPI.
 
 ## Examples
 
@@ -44,6 +50,7 @@ Below you will find all supported devices. Please visit their respective documen
 | Microchip | MCP3208 | SPI | 12-bit ADC, 8 single- or 4 differential channels | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp3208/index.html) |
 | Microchip | MCP9808 | I2C | Digital temperature sensor with ±0.5°C (max.) accuracy | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp9808/index.html) |
 | Texas Instruments | INA219 | I2C | 12-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina219/index.html) |
+| Texas Instruments | INA228 | I2C | 85V, 20-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina228/index.html) |
 | Texas Instruments | TMP117 | I2C | Temperature sensor with ±0.1°C to ±0.3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp117/index.html) |
 
 ## Architecture

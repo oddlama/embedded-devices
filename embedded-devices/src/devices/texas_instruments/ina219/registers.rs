@@ -211,7 +211,7 @@ impl Power {
     }
 }
 
-/// Contains the value of the current flowing through the shunt resistor
+/// Contains the amount of current flowing through the shunt resistor
 #[device_register(super::INA219)]
 #[register(address = 0b100, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]

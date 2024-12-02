@@ -105,6 +105,7 @@ impl<I: RegisterInterface> TMP117<I> {
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         use self::registers::DeviceIdRevision;
 
+        // FIXME: issue reset first?
         delay.delay_us(1500).await;
 
         let device_id = self.read_register::<DeviceIdRevision>().await.map_err(InitError::Bus)?;
