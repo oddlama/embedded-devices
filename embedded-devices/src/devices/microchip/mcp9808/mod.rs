@@ -82,7 +82,7 @@ crate::simple_device::i2c!(
 
 #[device_impl]
 impl<I: RegisterInterface> MCP9808<I> {
-    /// Initialize the sensor by verifying its device id and manufacturer id.
+    /// Initializes the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
         use self::registers::DeviceIdRevision;

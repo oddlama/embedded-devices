@@ -49,6 +49,13 @@ mod tests {
         assert_eq!(reg.read_all(), value);
     }
 
+    #[test]
+    fn register_defaults() {
+        use crate::devices::texas_instruments::ina228::registers::AdcConfiguration;
+        let reg = AdcConfiguration::default();
+        assert_eq!(reg.read_enable_temperature(), true);
+    }
+
     // FIXME: once bondrewd #[test]
     // FIXME: once bondrewd fn register_bmp390_fifo_length() {
     // FIXME: once bondrewd     let value = FifoLengthBitfield {
