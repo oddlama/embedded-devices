@@ -196,7 +196,6 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let ident = input.ident;
     let debug_format_str = format!("{} ({{:?}}) => {{:?}}", ident);
     let vis = input.vis;
-    let fields = input.fields.clone();
     let attrs: TokenStream = input.attrs.iter().map(ToTokens::to_token_stream).collect();
     let docattrs: TokenStream = input
         .attrs
@@ -207,7 +206,12 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let bitfield_ident = format_ident!("{}Bitfield", ident);
 
     let mut forward_fns = quote! {};
+    let mut default_arms = Vec::new();
+    let mut filtered_fields = Vec::new();
+
+    let fields = input.fields.clone();
     for field in input.fields {
+        let mut filtered_field = field.clone();
         let type_ident = field.ty;
         let field_name = field
             .ident
@@ -219,6 +223,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             .map(ToTokens::to_token_stream)
             .collect();
 
+        // Generate accessor and mutator methods for fields
         let read_field_name = format_ident!("read_{field_name}");
         let read_comment = format!("Retrieves the value of [`{bitfield_ident}::{field_name}`] from this register:");
         let write_field_name = format_ident!("write_{field_name}");
@@ -255,6 +260,40 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
                 self
             }
         };
+
+        // Look for #[register(default = value)]
+        let default_expr = field.attrs.iter().find_map(|attr| {
+            if attr.path().is_ident("register") {
+                // Parse the attribute arguments
+                attr.parse_args_with(
+                    syn::punctuated::Punctuated::<syn::MetaNameValue, syn::token::Comma>::parse_terminated,
+                )
+                .ok()
+                .and_then(|args| {
+                    args.into_iter().find_map(|meta| {
+                        if meta.path.is_ident("default") {
+                            return Some(meta.value.to_token_stream());
+                        }
+                        None
+                    })
+                })
+            } else {
+                None
+            }
+        });
+
+        // Determine the field's default value
+        let field_default = default_expr.unwrap_or_else(|| {
+            quote! { <#type_ident as ::core::default::Default>::default() }
+        });
+
+        default_arms.push(quote! {
+            #field_name: #field_default,
+        });
+
+        // Filter out #[register(...)] from attributes for re-emission
+        filtered_field.attrs.retain(|attr| !attr.path().is_ident("register"));
+        filtered_fields.push(filtered_field);
     }
 
     let read_all_comment = format!("Unpack all fields and return them as a [`{bitfield_ident}`]. If you don't need all fields, this is more expensive than just using the appropriate `read_*` functions directly.");
@@ -273,10 +312,19 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::i2c::codecs::NoCodec").unwrap());
 
     let mut output = quote! {
-        #[derive(bondrewd::Bitfields, Clone, Default, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
+        #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         #attrs
-        #vis struct #bitfield_ident
-        #fields
+        #vis struct #bitfield_ident {
+            #(#filtered_fields),*
+        }
+
+        impl Default for #bitfield_ident {
+            fn default() -> Self {
+                Self {
+                    #(#default_arms)*
+                }
+            }
+        }
 
         #[derive(Copy, Clone, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
         #[repr(transparent)]
