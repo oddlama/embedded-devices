@@ -320,7 +320,9 @@ impl<I: RegisterInterface> INA228<I> {
         let measurement_time_us = reg_adc_conf.read_bus_conversion_time().us()
             + reg_adc_conf.read_shunt_conversion_time().us()
             + reg_adc_conf.read_temperature_conversion_time().us();
-        delay.delay_us(100 + measurement_time_us).await;
+        delay
+            .delay_us(100 + measurement_time_us * reg_adc_conf.read_average_count().factor() as u32)
+            .await;
 
         // Wait for the conversion ready flag to be set
         const TRIES: u8 = 5;
