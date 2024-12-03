@@ -209,7 +209,6 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
     let mut default_arms = Vec::new();
     let mut filtered_fields = Vec::new();
 
-    let fields = input.fields.clone();
     for field in input.fields {
         let mut filtered_field = field.clone();
         let type_ident = field.ty;
