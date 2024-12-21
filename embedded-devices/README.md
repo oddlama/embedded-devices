@@ -34,6 +34,9 @@ I2C/SPI.
 
 An example project for the esp32 is included at [examples](./examples)
 
+An example project for Linux (using [linux-embedded-hal](https://crates.io/crates/linux-embedded-hal) )
+is also included at [examples](./examples)
+
 ## Supported Devices
 
 Below you will find all supported devices. Please visit their respective documentation links for more information and usage examples.
@@ -51,6 +54,7 @@ Below you will find all supported devices. Please visit their respective documen
 | Microchip | MCP9808 | I2C | Digital temperature sensor with ±0.5°C (max.) accuracy | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp9808/index.html) |
 | Texas Instruments | INA219 | I2C | 12-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina219/index.html) |
 | Texas Instruments | INA228 | I2C | 85V, 20-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina228/index.html) |
+| Texas Instruments | TMP102 | I2C | Temperature sensor with ±0.5°C to ±3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp102/index.html) |
 | Texas Instruments | TMP117 | I2C | Temperature sensor with ±0.1°C to ±0.3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp117/index.html) |
 
 ## Architecture

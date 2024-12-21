@@ -1,14 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-	"embedded-devices",
-	"embedded-devices-derive",
-	"embedded-registers",
-	"embedded-registers-derive",
+    "embedded-devices",
+    "embedded-devices-derive",
+    "embedded-registers",
+    "embedded-registers-derive",
+    "examples/linux/tmp102",
 ]
-exclude = [
-	"examples"
-]
+exclude = ["examples"]
 
 [workspace.package]
 version = "0.9.11"
