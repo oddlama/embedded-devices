@@ -51,7 +51,9 @@ impl<
     where
         R: Register,
     {
-        // create a mask with ADDR_MSB ones.
+        // create a mask with ADDR_MSB + 1 ones (it is inclusive).
+        // It doesn't matter if ADDR_LSB is > 0, since the shift below already guarantees
+        // that there will only ever be zeros.
         let addr_mask = u64::checked_shl(1, ADDR_MSB as u32 + 1).unwrap_or(0).wrapping_sub(1);
         // Shift the address to the correct place
         let addr_shifted = (R::ADDRESS << ADDR_LSB) & addr_mask;
