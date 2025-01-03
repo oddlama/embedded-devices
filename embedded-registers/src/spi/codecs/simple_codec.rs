@@ -52,7 +52,7 @@ impl<
         R: Register,
     {
         // create a mask with ADDR_MSB ones.
-        let addr_mask = u64::checked_shl(1, ADDR_MSB as u32).unwrap_or(0).wrapping_sub(1);
+        let addr_mask = u64::checked_shl(1, ADDR_MSB as u32 + 1).unwrap_or(0).wrapping_sub(1);
         // Shift the address to the correct place
         let addr_shifted = (R::ADDRESS << ADDR_LSB) & addr_mask;
         // incorporate addess
