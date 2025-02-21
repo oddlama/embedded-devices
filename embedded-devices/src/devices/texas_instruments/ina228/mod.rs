@@ -69,7 +69,7 @@ use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
 use uom::si::electrical_resistance::ohm;
 use uom::si::rational32::ThermodynamicTemperature;
-use uom::si::rational64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
+use uom::si::rational64::{ElectricCharge, ElectricCurrent, ElectricPotential, ElectricalResistance, Energy, Power};
 
 pub mod address;
 pub mod registers;
@@ -100,6 +100,10 @@ pub struct Measurements {
     pub current: ElectricCurrent,
     /// Measured power
     pub power: Power,
+    /// Measured energy
+    pub energy: Energy,
+    /// Measured charge
+    pub charge: ElectricCharge,
 }
 
 /// All possible errors that may occur during measurement
@@ -270,6 +274,16 @@ impl<I: RegisterInterface> INA228<I> {
             .await
             .map_err(MeasurementError::Bus)?;
 
+        let energy = self
+            .read_register::<self::registers::Energy>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let charge = self
+            .read_register::<self::registers::Charge>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
         let power = self
             .read_register::<self::registers::Power>()
             .await
@@ -281,6 +295,8 @@ impl<I: RegisterInterface> INA228<I> {
             temperature: temperature.read_temperature(),
             current: current.read_current(self.current_lsb_na),
             power: power.read_power(self.current_lsb_na),
+            energy: energy.read_energy(self.current_lsb_na),
+            charge: charge.read_charge(self.current_lsb_na),
         };
 
         let diag = self
@@ -353,6 +369,16 @@ impl<I: RegisterInterface> INA228<I> {
                     .await
                     .map_err(MeasurementError::Bus)?;
 
+                let energy = self
+                    .read_register::<self::registers::Energy>()
+                    .await
+                    .map_err(MeasurementError::Bus)?;
+
+                let charge = self
+                    .read_register::<self::registers::Charge>()
+                    .await
+                    .map_err(MeasurementError::Bus)?;
+
                 // Reading this register clears the conversion_ready flag
                 let power = self
                     .read_register::<self::registers::Power>()
@@ -365,6 +391,8 @@ impl<I: RegisterInterface> INA228<I> {
                     temperature: temperature.read_temperature(),
                     current: current.read_current(self.current_lsb_na),
                     power: power.read_power(self.current_lsb_na),
+                    energy: energy.read_energy(self.current_lsb_na),
+                    charge: charge.read_charge(self.current_lsb_na),
                 };
 
                 if diag.read_math_overflow() {
