@@ -32,7 +32,7 @@ I2C/SPI.
 
 ## Examples
 
-An example project for the esp32 is included at [examples](./examples)
+An example project for the esp32 is included in the [examples](https://github.com/oddlama/embedded-devices/tree/main/examples).
 
 ## Supported Devices
 
