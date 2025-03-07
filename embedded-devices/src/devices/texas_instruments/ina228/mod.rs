@@ -187,11 +187,11 @@ impl<I: RegisterInterface> INA228<I> {
         // Verify we are talking to the correct device
         let manufacturer_id = self.read_register::<ManufacturerId>().await.map_err(InitError::Bus)?;
         if manufacturer_id.read_id() != ManufacturerId::default().read_id() {
-            return Err(InitError::InvalidDeviceId);
+            return Err(InitError::InvalidManufacturerId);
         }
         let device_id = self.read_register::<DeviceId>().await.map_err(InitError::Bus)?;
         if device_id.read_id() != DeviceId::default().read_id() {
-            return Err(InitError::InvalidManufacturerId);
+            return Err(InitError::InvalidDeviceId);
         }
 
         // Calibrate the device
