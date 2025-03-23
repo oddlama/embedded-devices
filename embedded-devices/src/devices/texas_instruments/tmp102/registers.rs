@@ -16,18 +16,17 @@ pub struct Temperature {
 }
 
 /// Temperature alert flag.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertFlag {
     /// The alert is unset.
-    #[default]
     Cleared = 0,
     /// The associated alert was triggered.
     Set = 1,
 }
 
 /// Conversion cycle time.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum ConversionCycleTime {
@@ -36,7 +35,6 @@ pub enum ConversionCycleTime {
     /// 1s
     T_1000 = 0b01,
     /// 250ms
-    #[default]
     T_0250 = 0b010,
     /// 125ms
     T_0125 = 0b011,
@@ -54,7 +52,7 @@ impl ConversionCycleTime {
 }
 
 /// Therm/Alert mode.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum InterruptThermMode {
     /// In this mode, the device compares the conversion result at the end of every conversion
@@ -69,7 +67,6 @@ pub enum InterruptThermMode {
     /// mode, I2C reads of the configuration register do not affect the status bits. The high alert
     /// status flag is only set or cleared at the end of conversions based on the value of the
     /// temperature result compared to the high and low limits.
-    #[default]
     Therm = 0,
     /// In this mode, the device compares the conversion result at the end of every
     /// conversion with the values in the low limit register and high limit register.
@@ -86,22 +83,20 @@ pub enum InterruptThermMode {
 }
 
 /// Alert pin polarity.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum AlertPinPolarity {
     /// Power-on default.
-    #[default]
     ActiveLow = 0,
     ActiveHigh = 1,
 }
 
 /// Fault Queue
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum FaultQueue {
     /// Alert is triggered at the first event
-    #[default]
     F_1 = 0b00,
     /// Two consecutive events are required to set the Alert
     F_2 = 0b01,
@@ -112,12 +107,11 @@ pub enum FaultQueue {
 }
 
 /// Resolution. The TMP102 only supports 12 bits resolution. Read-only.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum Resolution {
     /// 12 bits resolution
-    #[default]
     R_12 = 0b11,
 }
 
@@ -126,27 +120,37 @@ pub enum Resolution {
 #[register(address = 0b0001, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
+    #[register(default = false)]
     pub oneshot: bool,
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = Resolution::R_12)]
     pub resolution: Resolution,
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = FaultQueue::F_1)]
     pub fault_queue: FaultQueue,
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = AlertPinPolarity::ActiveLow)]
     pub alert_polarity: AlertPinPolarity,
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = InterruptThermMode::Therm)]
     pub alert_mode: InterruptThermMode,
+    #[register(default = false)]
     pub shutdown: bool,
     /// Amount of time to wait between conversions.
     #[bondrewd(enum_primitive = "u8", bit_length = 2, endianness = "little")]
+    #[register(default = ConversionCycleTime::T_0250)]
     pub conversion_cycle_time: ConversionCycleTime,
     /// Set when the conversion result is higher than the high limit.
     /// This flag is cleared on read except in Therm mode, where it is
     /// cleared when the conversion result is lower than the hysteresis.
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = AlertFlag::Cleared)]
     pub alert: AlertFlag,
+    #[register(default = false)]
     pub extended: bool,
     #[bondrewd(bit_length = 4, reserve)]
     #[allow(dead_code)]
+    #[register(default = 0)]
     pub reserved: u8,
 }
 

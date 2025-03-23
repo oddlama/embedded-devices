@@ -100,7 +100,7 @@ impl<I: RegisterInterface> TMP102<I> {
     }
 
     /// Read the last temperature measured
-    pub async fn read_temp(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
         use self::registers::{Configuration, Temperature};
 
         // Read current configuration to determine conversion ratio

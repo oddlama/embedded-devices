@@ -25,7 +25,12 @@ fn main() {
     println!("cfg: {:?}", cfg);
 
     // display the last converted temperature
-    let temp = tmp102.read_temp().unwrap().get::<degree_celsius>().to_f32().unwrap();
+    let temp = tmp102
+        .read_temperature()
+        .unwrap()
+        .get::<degree_celsius>()
+        .to_f32()
+        .unwrap();
     println!("last temp: {:?}°C", temp);
 
     // start a conversion and display the temperature
