@@ -41,12 +41,19 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::bosch::bme280::{BME280, address::Address};
+//! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280::new_i2c(i2c, Address::Primary);
 //! bme280.init(&mut Delay).await.unwrap();
+//! bme280.configure(Configuration {
+//!     temperature_oversampling: Oversampling::X_16,
+//!     pressure_oversampling: Oversampling::X_16,
+//!     humidity_oversampling: Oversampling::X_16,
+//!     iir_filter: IIRFilter::Disabled,
+//! ).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bme280.measure(&mut Delay).await?;
@@ -97,7 +104,7 @@ pub struct Measurements {
     /// Current pressure or None if the sensor reported and invalid value
     pub pressure: Option<Pressure>,
     /// Current relative humidity
-    pub humidity: Ratio,
+    pub humidity: Option<Ratio>,
 }
 
 /// Fine temperature coefficient calculated when compensating temperature
@@ -226,7 +233,7 @@ impl CalibrationData {
             return None;
         }
 
-        let var4: i64 = 1048576i64 - uncompensated as i64;
+        let var4: i64 = 0x100000i64 - uncompensated as i64;
         let var4 = (((var4 << 31) - var2) * 3125) / var1;
         let var1 = (dig_p9 * (var4 >> 13) * (var4 >> 13)) >> 25;
         let var2 = (dig_p8 * var4) >> 19;
@@ -247,17 +254,18 @@ impl CalibrationData {
 
         let var1 = t_fine - 76800i32;
         let uncompensated = (uncompensated as i32) << 14;
-        let var5 = (((uncompensated - (dig_h4 << 20)) - (dig_h5 * var1)) + 16384) >> 15;
+        let var5 = (((uncompensated - (dig_h4 << 20)) - (dig_h5 * var1)) + 0x4000) >> 15;
         let var2 = (var1 * dig_h6) >> 10;
         let var3 = (var1 * dig_h3) >> 11;
-        let var4 = ((var2 * (var3 + 32768)) >> 10) + 2097152;
-        let var2 = ((var4 * dig_h2) + 8192) >> 14;
+        let var4 = ((var2 * (var3 + 0x8000)) >> 10) + 0x200000;
+        let var2 = ((var4 * dig_h2) + 0x2000) >> 14;
         let var3 = var5 * var2;
         let var4 = ((var3 >> 15) * (var3 >> 15)) >> 7;
         let var5 = var3 - ((var4 * dig_h1) >> 4);
-        let var5 = var5.clamp(0, 419430400);
+        let var5 = var5.clamp(0, 0x19000000);
+        let var5 = var5 >> 12;
 
-        let humidity = Rational32::new_raw(var5, 1i32 << 22);
+        let humidity = Rational32::new_raw(var5, 1i32 << 10);
         Ratio::new::<percent>(humidity)
     }
 }
@@ -393,11 +401,12 @@ impl<I: RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure<D: hal::delay::DelayNs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
         self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await
             .map_err(Error::Bus)?;
 
+        // This must happen after ControlHumidity, otherwise the former will not have any effect
         self.write_register(
             &ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
@@ -418,6 +427,10 @@ impl<I: RegisterInterface> BME280Common<I, true> {
     ///
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
+    ///
+    /// All measurements will only be included if they were enabled beforehand by calling
+    /// [`Self::calibrate`]. Pressure and humitidy measurements specifically require temperature
+    /// measurements to be enabled.
     pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
         self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
             .await
@@ -453,8 +466,11 @@ impl<I: RegisterInterface> BME280Common<I, true> {
         };
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
-        let pressure = cal.compensate_pressure(raw_data.pressure.pressure, t_fine);
-        let humidity = cal.compensate_humidity(raw_data.humidity.humidity, t_fine);
+        let pressure = (o_p != Oversampling::Disabled)
+            .then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine))
+            .flatten();
+        let humidity =
+            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.humidity.humidity, t_fine));
 
         Ok(Measurements {
             temperature,
