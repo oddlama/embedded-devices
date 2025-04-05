@@ -10,13 +10,11 @@ pub mod utils;
 
 #[cfg(test)]
 mod tests {
-    use crate::devices::bosch::{
-        bme280::registers::{Reset, ResetBitfield, ResetMagic},
-        bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield},
-    };
 
+    #[cfg(feature = "bosch-bme280")]
     #[test]
     fn register_bme280_reset() {
+        use crate::devices::bosch::bme280::registers::{Reset, ResetBitfield, ResetMagic};
         let value = ResetBitfield {
             magic: ResetMagic::Reset,
         };
@@ -26,8 +24,10 @@ mod tests {
         assert_eq!(reg.read_all(), value);
     }
 
+    #[cfg(feature = "bosch-bmp390")]
     #[test]
     fn register_bmp390_error() {
+        use crate::devices::bosch::bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield};
         let value = ErrorBitfield {
             fatal_err: true,
             cmd_err: false,
@@ -40,8 +40,10 @@ mod tests {
         assert_eq!(reg.read_all(), value);
     }
 
+    #[cfg(feature = "bosch-bmp390")]
     #[test]
     fn register_bmp390_pressure() {
+        use crate::devices::bosch::bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield};
         let value = PressureBitfield { pressure: 0x123456 };
 
         let reg = Pressure::new(value.clone());
@@ -49,6 +51,7 @@ mod tests {
         assert_eq!(reg.read_all(), value);
     }
 
+    #[cfg(feature = "texas_instruments-ina228")]
     #[test]
     fn register_defaults() {
         use crate::devices::texas_instruments::ina228::registers::AdcConfiguration;
