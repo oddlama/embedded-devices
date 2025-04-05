@@ -12,18 +12,13 @@ pub enum Chip {
     Invalid(u8),
 }
 
-impl Default for Chip {
-    fn default() -> Self {
-        Self::Invalid(0)
-    }
-}
-
 /// The chip identification register.
 #[device_register(super::BMP390)]
 #[register(address = 0x00, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ChipId {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
+    #[register(default = Chip::BME390)]
     pub chip: Chip,
 }
 
@@ -32,6 +27,7 @@ pub struct ChipId {
 #[register(address = 0x01, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct RevId {
+    #[register(default = 0x01)]
     pub revision: u8,
 }
 
@@ -45,10 +41,13 @@ pub struct Error {
     pub reserved: u8,
 
     /// Sensor configuration error detected (only working in normal mode). Cleared on read.
+    #[register(default = false)]
     pub conf_err: bool,
     /// Command execution failed. Cleared on read.
+    #[register(default = false)]
     pub cmd_err: bool,
     /// Fatal error
+    #[register(default = false)]
     pub fatal_err: bool,
 }
 
@@ -62,10 +61,13 @@ pub struct Status {
     pub reserved0: u8,
 
     /// Data ready for temperature sensor. It gets reset, when one temperature DATA register is read out.
+    #[register(default = false)]
     pub temperature_data_ready: bool,
     /// Data ready for pressure. It gets reset, when one pressure DATA register is read out.
+    #[register(default = false)]
     pub pressure_data_ready: bool,
     /// CMD decoder status. True if the command decoder is ready to accept a new command.
+    #[register(default = false)]
     pub command_ready: bool,
 
     #[bondrewd(bit_length = 4, reserve)]
@@ -78,8 +80,9 @@ pub struct Status {
 #[register(address = 0x04, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct Pressure {
-    #[bondrewd(bit_length = 24)]
     /// The raw pressure measurement
+    #[bondrewd(bit_length = 24)]
+    #[register(default = 1 << 23)]
     pub pressure: u32,
 }
 
@@ -88,8 +91,9 @@ pub struct Pressure {
 #[register(address = 0x07, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct Temperature {
-    #[bondrewd(bit_length = 24)]
     /// The raw temperature measurement
+    #[bondrewd(bit_length = 24)]
+    #[register(default = 1 << 23)]
     pub temperature: u32,
 }
 
@@ -98,8 +102,9 @@ pub struct Temperature {
 #[register(address = 0x0c, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 3)]
 pub struct SensorTime {
-    #[bondrewd(bit_length = 24)]
     /// The raw sensor time
+    #[bondrewd(bit_length = 24)]
+    #[register(default = 0)]
     pub time: u32,
 }
 
@@ -114,9 +119,11 @@ pub struct Event {
 
     /// Set when a serial interface transaction occurs during a pressure or temperature conversion.
     /// Cleared on read.
+    #[register(default = false)]
     pub measurement_while_transaction: bool,
     /// Set after device powerup or soft reset.
     /// Cleared on read.
+    #[register(default = true)]
     pub power_or_reset: bool,
 }
 
@@ -132,6 +139,7 @@ pub struct InterruptStatus {
 
     /// Set when data is ready.
     /// Cleared on read.
+    #[register(default = false)]
     pub data_ready: bool,
 
     #[bondrewd(bit_length = 1, reserve)]
@@ -140,9 +148,11 @@ pub struct InterruptStatus {
 
     /// Set when the FIFO full interrupt is triggered.
     /// Cleared on read.
+    #[register(default = false)]
     pub fifo_full: bool,
     /// Set when the FIFO watermark interrupt is triggered.
     /// Cleared on read.
+    #[register(default = false)]
     pub fifo_watermark: bool,
 }
 
@@ -156,8 +166,9 @@ pub struct FifoLength {
     #[allow(dead_code)]
     pub reserved: u8,
 
-    #[bondrewd(bit_length = 9)]
     /// The fifo length
+    #[bondrewd(bit_length = 9)]
+    #[register(default = 0)]
     pub length: u16,
 }
 
@@ -167,6 +178,7 @@ pub struct FifoLength {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct FifoData {
     /// The data
+    #[register(default = 0)]
     pub data: u8,
 }
 
@@ -180,8 +192,9 @@ pub struct FifoWatermark {
     #[allow(dead_code)]
     pub reserved: u8,
 
-    #[bondrewd(bit_length = 9)]
     /// The fifo watermark. Defaults to `0x01` after power-on-reset.
+    #[bondrewd(bit_length = 9)]
+    #[register(default = 0x01)]
     pub watermark: u16,
 }
 
@@ -194,23 +207,27 @@ pub struct FifoConfig1 {
     #[allow(dead_code)]
     pub reserved: u8,
     /// Store temperature data in FIFO. Defaults to false.
+    #[register(default = false)]
     pub temperature_enable: bool,
     /// Store pressure data in FIFO. Defaults to false.
+    #[register(default = false)]
     pub pressure_enable: bool,
     /// Store sensortime frame after the last valid data frame. Defaults to false.
+    #[register(default = false)]
     pub time_enable: bool,
     /// Stop writing samples into FIFO when FIFO is full. Defaults to true after power-on-reset.
+    #[register(default = true)]
     pub stop_on_full: bool,
     /// Enables or disables the fifo. Defaults to false.
+    #[register(default = false)]
     pub enable: bool,
 }
 
 /// FIFO data source.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum DataSource {
-    #[default]
     /// Unfiltered data
     Unfiltered = 0b00,
     /// Filtered data
@@ -229,26 +246,26 @@ pub struct FifoConfig2 {
     pub reserved: u8,
     /// The data source
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = DataSource::Unfiltered)]
     pub data_source: DataSource,
-    /// FIFO downsampling selection for pressure and temperature data, factor is $2^{fifo_subsampling}$. Default is 2 TODO verify this.
+    /// FIFO downsampling selection for pressure and temperature data, factor is $2^{fifo_subsampling}$.
     #[bondrewd(bit_length = 3)]
+    #[register(default = 0x02)]
     pub subsampling: u8,
 }
 
 /// The interrupt output mode bit.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum InterruptOutputMode {
-    #[default]
     PushPull = 0,
     OpenDrain = 1,
 }
 
 /// The interrupt output polarity "level" bit.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum InterruptPolarity {
-    #[default]
     ActiveLow = 0,
     ActiveHigh = 1,
 }
@@ -262,29 +279,35 @@ pub struct InterruptControl {
     #[allow(dead_code)]
     pub reserved: u8,
     /// Enable temperature/pressure ready interrupt for INT pin and INT_STATUS register.
+    #[register(default = false)]
     pub data_ready: bool,
     /// Not explained further in datasheet. false = "low", true = "high".
+    #[register(default = false)]
     pub ds: bool,
     /// Enable FIFO full interrupt for INT pin and INT_STATUS register.
+    #[register(default = false)]
     pub full: bool,
     /// Enable FIFO watermark reached interrupt for INT pin and INT_STATUS register.
+    #[register(default = false)]
     pub watermark: bool,
     /// Latching of interrupts for INT pin and INT_STATUS register
+    #[register(default = false)]
     pub latching: bool,
     /// Interrupt output polarity
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = InterruptPolarity::ActiveHigh)]
     pub polarity: InterruptPolarity,
     /// Interrupt output mode
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = InterruptOutputMode::PushPull)]
     pub output: InterruptOutputMode,
 }
 
 /// The interrupt output polarity "level" bit.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum WatchdogTimerPeriod {
-    #[default]
     /// 1.25ms
     T_1_25 = 0,
     /// 40ms
@@ -295,28 +318,30 @@ pub enum WatchdogTimerPeriod {
 #[device_register(super::BMP390)]
 #[register(address = 0x1a, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
-pub struct InterfaceControl {
+pub struct InterfaceConfig {
     #[bondrewd(bit_length = 5, reserve)]
     #[allow(dead_code)]
     pub reserved: u8,
 
     /// The i2c watchdog timer period (backed by NVM).
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = WatchdogTimerPeriod::T_1_25)]
     pub i2c_watchdog_timer_period: WatchdogTimerPeriod,
     /// Whether to enable the i2c watchdog timer (backed by NVM).
+    #[register(default = false)]
     pub i2c_watchdog_timer: bool,
     /// Whether to enable the SPI 3-wire interface.
+    #[register(default = false)]
     pub spi_3wire: bool,
 }
 
 /// Sensor operating mode
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum SensorMode {
     /// Sleep mode is entered by default after power on reset.
     /// In sleep mode, no measurements are performed and power consumption is at a minimum.
     /// All registers are accessible.
-    #[default]
     Sleep = 0b00,
     /// In forced mode, a single measurement is performed in accordance to the selected measurement and
     /// filter options. When the measurement is finished, the sensor returns to sleep mode and the
@@ -341,6 +366,7 @@ pub struct PowerControl {
 
     /// Controls operating mode of the sensor.
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = SensorMode::Sleep)]
     pub sensor_mode: SensorMode,
 
     #[bondrewd(bit_length = 2, reserve)]
@@ -348,19 +374,20 @@ pub struct PowerControl {
     pub reserved1: u8,
 
     /// Whether to enable the temperature sensor.
+    #[register(default = false)]
     pub temperature_enable: bool,
     /// Whether to enable the pressure sensor.
+    #[register(default = false)]
     pub pressure_enable: bool,
 }
 
 /// Oversampling settings for temperature and pressure measurements.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum Oversampling {
     /// Disables oversampling.
-    #[default]
     X_1 = 0b000,
     /// Configures 2x oversampling.
     X_2 = 0b001,
@@ -406,55 +433,56 @@ pub struct OversamplingControl {
 
     /// Controls oversampling of temperature data.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = Oversampling::X_1)]
     pub temperature_oversampling: Oversampling,
     /// Controls oversampling of pressure data.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = Oversampling::X_4)]
     pub pressure_oversampling: Oversampling,
 }
 
 /// Output data rate
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum DataRate {
-    #[default]
     /// prescaler = 1, data rate = 200Hz, sampling period = 5 ms
-    R_200 = 0x00,
+    F_200 = 0x00,
     /// prescaler = 2, data rate = 100Hz, sampling period = 10 ms
-    R_100 = 0x01,
+    F_100 = 0x01,
     /// prescaler = 4, data rate = 50Hz, sampling period = 20 ms
-    R_50 = 0x02,
+    F_50 = 0x02,
     /// prescaler = 8, data rate = 25Hz, sampling period = 40 ms
-    R_25 = 0x03,
+    F_25 = 0x03,
     /// prescaler = 16, data rate = 25/2Hz, sampling period = 80 ms
-    R_12_5 = 0x04,
+    F_12_5 = 0x04,
     /// prescaler = 32, data rate = 25/4Hz, sampling period = 160 ms
-    R_6_25 = 0x05,
+    F_6_25 = 0x05,
     /// prescaler = 64, data rate = 25/8Hz, sampling period = 320 ms
-    R_3_1 = 0x06,
+    F_3_1 = 0x06,
     /// prescaler = 127, data rate = 25/16Hz, sampling period = 640 ms
-    R_1_5 = 0x07,
+    F_1_5 = 0x07,
     /// prescaler = 256, data rate = 25/32Hz, sampling period = 1.280 s
-    R_0_78 = 0x08,
+    F_0_78 = 0x08,
     /// prescaler = 512, data rate = 25/64Hz, sampling period = 2.560 s
-    R_0_39 = 0x09,
+    F_0_39 = 0x09,
     /// prescaler = 1024, data rate = 25/128Hz, sampling period = 5.120 s
-    R_0_2 = 0x0A,
+    F_0_2 = 0x0A,
     /// prescaler = 2048, data rate = 25/256Hz, sampling period = 10.24 s
-    R_0_1 = 0x0B,
+    F_0_1 = 0x0B,
     /// prescaler = 4096, data rate = 25/512Hz, sampling period = 20.48 s
-    R_0_05 = 0x0C,
+    F_0_05 = 0x0C,
     /// prescaler = 8192, data rate = 25/1024Hz, sampling period = 40.96 s
-    R_0_02 = 0x0D,
+    F_0_02 = 0x0D,
     /// prescaler = 16384, data rate = 25/2048Hz, sampling period = 81.92 s
-    R_0_01 = 0x0E,
+    F_0_01 = 0x0E,
     /// prescaler = 32768, data rate = 25/4096Hz, sampling period = 163.84 s
-    R_0_006 = 0x0F,
+    F_0_006 = 0x0F,
     /// prescaler = 65536, data rate = 25/8192Hz, sampling period = 327.68 s
-    R_0_003 = 0x10,
+    F_0_003 = 0x10,
     /// prescaler = 131072, data rate = 25/16384Hz, sampling period = 655.36 s
-    R_0_0015 = 0x11,
+    F_0_0015 = 0x11,
     /// Unknown oversampling setting.
     Invalid(u8),
 }
@@ -470,15 +498,15 @@ pub struct DataRateControl {
 
     /// Controls the output data rate
     #[bondrewd(enum_primitive = "u8", bit_length = 5)]
+    #[register(default = DataRate::F_200)]
     pub data_rate: DataRate,
 }
 
 /// Lowpass filter settings for pressure and temperature values.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum IIRFilter {
     /// Disables the IIR filter (default).
-    #[default]
     Disabled = 0b000,
     /// Sets the IIR filter coefficient to 1.
     Coefficient1 = 0b001,
@@ -507,6 +535,7 @@ pub struct Config {
 
     /// Controls the output data rate
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = IIRFilter::Disabled)]
     pub iir_filter: IIRFilter,
 
     #[bondrewd(bit_length = 1, reserve)]
@@ -536,12 +565,11 @@ pub struct TrimmingCoefficients {
 }
 
 /// Available commands
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum Cmd {
     /// Does nothing.
-    #[default]
     Nop = 0x00,
     /// Clears all data in the FIFO, does not change FIFO_CONFIG registers.
     FlushFifo = 0xb0,
@@ -557,6 +585,7 @@ pub enum Cmd {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Command {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
+    #[register(default = Cmd::Nop)]
     pub command: Cmd,
 }
 

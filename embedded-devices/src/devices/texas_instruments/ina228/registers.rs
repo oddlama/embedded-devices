@@ -468,7 +468,7 @@ pub struct DiagnosticsAndAlert {
 }
 
 macro_rules! define_shunt_voltage_threshold_register {
-    ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $default_value:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
+    ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $value_default:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
         #[doc = $desc]
         #[device_register(super::INA228)]
         #[register(address = $address, mode = "rw")]
@@ -476,7 +476,7 @@ macro_rules! define_shunt_voltage_threshold_register {
         pub struct $name {
             #[doc = "The"]
             #[doc = $value_doc]
-            #[register(default = $default_value)]
+            #[register(default = $value_default)]
             pub raw_value: i16,
         }
 
@@ -551,7 +551,7 @@ Resolution is 5 µV/LSB with `AdcRange::Div4` and 1.25 µV/LSB with `AdcRange::D
 );
 
 macro_rules! define_bus_voltage_threshold_register {
-    ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $default_value:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
+    ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $value_default:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
         #[doc = $desc]
         #[device_register(super::INA228)]
         #[register(address = $address, mode = "rw")]
@@ -563,7 +563,7 @@ macro_rules! define_bus_voltage_threshold_register {
             #[doc = "The"]
             #[doc = $value_doc]
             #[bondrewd(bit_length = 15)]
-            #[register(default = $default_value)]
+            #[register(default = $value_default)]
             pub raw_value: u16,
         }
 

@@ -19,12 +19,6 @@ pub enum Chip {
     Invalid(u8),
 }
 
-impl Default for Chip {
-    fn default() -> Self {
-        Self::Invalid(0)
-    }
-}
-
 /// The chip identification number. This number can
 /// be read as soon as the device finished the power-on-reset.
 #[device_register(super::BME280Common)]
@@ -32,15 +26,15 @@ impl Default for Chip {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Id {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
+    #[register(default = Chip::Invalid(0))]
     pub chip: Chip,
 }
 
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 pub enum ResetMagic {
     /// Magic value to reset the device
-    #[default]
     Reset = 0xb6,
     /// Invalid reset magic
     Invalid(u8),
@@ -54,13 +48,13 @@ pub enum ResetMagic {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Reset {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
+    #[register(default = ResetMagic::Reset)]
     pub magic: ResetMagic,
 }
 
 /// Oversampling settings for temperature, pressure, and humidity measurements.
 /// See sections 3.4ff of the manual for measurement flow and recommended values.
-/// The default is 1x, i.e., no oversampling.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
@@ -70,7 +64,6 @@ pub enum Oversampling {
     /// Disables oversampling.
     /// Without IIR filtering, this sets the resolution of temperature and pressure measurements
     /// to 16 bits.
-    #[default]
     X_1 = 0b001,
     /// Configures 2x oversampling.
     /// This increases the resolution of temperature and pressure measurements to 17 bits without
@@ -118,7 +111,9 @@ pub struct ControlHumidity {
     pub reserved0: u8,
 
     /// Controls oversampling of humidity data.
+    /// The default is 1x, i.e., no oversampling.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = Oversampling::X_1)]
     pub oversampling: Oversampling,
 }
 
@@ -132,25 +127,26 @@ pub struct Status {
     pub reserved0: u8,
 
     /// Automatically set to `1` whenever a conversion is running and back to `0` when the results have been transferred to the data registers.
+    #[register(default = false)]
     pub measuring: bool,
 
     #[bondrewd(bit_length = 2, reserve)]
     #[allow(dead_code)]
     pub reserved1: u8,
 
-    /// Automatically set to `1` when the NVM data are being copied to image registers and back to `0` when the
+    /// Automatically set to `1` when the NVM data is being copied to image registers and back to `0` when the
     /// copying is done. The data are copied at power-on-reset and before every conversion.
+    #[register(default = false)]
     pub update: bool,
 }
 
 /// Sensor operating mode
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum SensorMode {
     /// Sleep mode is entered by default after power on reset. In sleep mode, no measurements are
     /// performed and power consumption is at a minimum. All registers are accessible.
     /// There are no special restrictions on interface timings.
-    #[default]
     Sleep = 0b00,
     /// In forced mode, a single measurement is performed in accordance to the selected measurement and
     /// filter options. When the measurement is finished, the sensor returns to sleep mode and the
@@ -174,22 +170,24 @@ pub enum SensorMode {
 pub struct ControlMeasurement {
     /// Controls oversampling of temperature data.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = Oversampling::Disabled)]
     pub temperature_oversampling: Oversampling,
     /// Controls oversampling of pressure data.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = Oversampling::Disabled)]
     pub pressure_oversampling: Oversampling,
     /// Controls operating mode of the sensor.
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = SensorMode::Sleep)]
     pub sensor_mode: SensorMode,
 }
 
 /// The standby time between measurements in [`SensorMode::Normal`].
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum StandbyTime {
     /// 0.5ms
-    #[default]
     T_0_5 = 0b000,
     /// 62.5ms
     T_62_5 = 0b001,
@@ -214,13 +212,12 @@ pub enum StandbyTime {
 /// Lowpass filter settings for pressure and temperature values.
 /// Enabling any filter option increases the resolution of the
 /// respective measured quantity to 20 bits.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum IIRFilter {
     /// Disables the IIR filter (default).
     /// The resolution of pressure and temperature measurements is dictated by their respective
     /// oversampling settings.
-    #[default]
     Disabled = 0b000,
     /// Sets the IIR filter coefficient to 2.
     Coefficient2 = 0b001,
@@ -241,9 +238,11 @@ pub enum IIRFilter {
 pub struct Config {
     /// Controls inactive duration t_standby in [`SensorMode::Normal`].
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = StandbyTime::T_0_5)]
     pub standby_time: StandbyTime,
     /// Controls the time constant of the IIR filter.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = IIRFilter::Disabled)]
     pub filter: IIRFilter,
     #[bondrewd(reserve)]
     #[allow(dead_code)]
@@ -251,6 +250,7 @@ pub struct Config {
     #[bondrewd(reserve)]
     #[allow(dead_code)]
     /// Whether to enable the SPI 3-wire interface.
+    #[register(default = false)]
     pub spi_3wire: bool,
 }
 
@@ -295,8 +295,9 @@ pub struct TrimmingParameters2 {
 #[register(address = 0xf7, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Pressure {
-    #[bondrewd(bit_length = 20)]
     /// The raw pressure measurement
+    #[bondrewd(bit_length = 20)]
+    #[register(default = 1 << 19)]
     pub pressure: u32,
 
     #[bondrewd(bit_length = 4, reserve)]
@@ -309,8 +310,9 @@ pub struct Pressure {
 #[register(address = 0xfa, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Temperature {
-    #[bondrewd(bit_length = 20)]
     /// The raw temperature measurement
+    #[bondrewd(bit_length = 20)]
+    #[register(default = 1 << 19)]
     pub temperature: u32,
 
     #[bondrewd(bit_length = 4, reserve)]
@@ -324,6 +326,7 @@ pub struct Temperature {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Humidity {
     /// The raw humidity measurement
+    #[register(default = 1 << 15)]
     pub humidity: u16,
 }
 

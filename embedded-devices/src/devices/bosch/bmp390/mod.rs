@@ -140,7 +140,7 @@ pub struct Measurements {
 /// Common configuration values for the BME280 sensor.
 /// The power-on-reset default is to set all oversampling settings to 1X
 /// and use no IIR filter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     /// The oversampling rate for temperature mesurements
     pub temperature_oversampling: Oversampling,
@@ -148,6 +148,16 @@ pub struct Configuration {
     pub pressure_oversampling: Oversampling,
     /// The iir filter to use
     pub iir_filter: IIRFilter,
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            temperature_oversampling: Oversampling::X_1,
+            pressure_oversampling: Oversampling::X_1,
+            iir_filter: IIRFilter::Disabled,
+        }
+    }
 }
 
 #[maybe_async_cfg::maybe(

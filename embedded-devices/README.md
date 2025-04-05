@@ -152,13 +152,12 @@ bondrewd's attribute macros, we can specify exactly which bit corresponds to whi
 
 ```rust
 #[allow(non_camel_case_types)]
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum TemperatureResolution {
     Deg_0_5C = 0b00,
     Deg_0_25C = 0b01,
     Deg_0_125C = 0b10,
-    #[default]
     Deg_0_0625C = 0b11,
 }
 
@@ -171,6 +170,7 @@ pub struct ComplexRegister {
     pub reserved: u8,
 
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = TemperatureResolution::Deg_0_0625C)]
     pub temperature_resolution: TemperatureResolution,
 }
 ```

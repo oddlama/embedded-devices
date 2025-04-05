@@ -69,7 +69,7 @@
 //! # Complex Example
 //!
 //! A more complex example may involve adding your own Bondrewd-capable enums.
-//! We also make sure to annotate the correct fields with `#[default]` to allow
+//! We also make sure to annotate the attributes `#[register(default = ...)]` to allow
 //! reconstructing the power-up defaults easily. Have a look at this excerpt
 //! of the Configuration register from the MCP9808:
 //!
@@ -80,20 +80,18 @@
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
-//! #[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, Format)]
+//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
 //! #[bondrewd_enum(u8)]
 //! pub enum Hysteresis {
-//!     #[default]
 //!     Deg_0_0C = 0b00,
 //!     Deg_1_5C = 0b01,
 //!     Deg_3_0C = 0b10,
 //!     Deg_6_0C = 0b11,
 //! }
 //!
-//! #[derive(BitfieldEnum, Clone, Default, PartialEq, Eq, Debug, Format)]
+//! #[derive(BitfieldEnum, Clone, PartialEq, Eq, Debug, Format)]
 //! #[bondrewd_enum(u8)]
 //! pub enum ShutdownMode {
-//!     #[default]
 //!     Continuous = 0,
 //!     Shutdown = 1,
 //! }
@@ -107,8 +105,10 @@
 //!     reserved: u8,
 //!
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+//!     #[register(default = Hysteresis::Deg_0_0C)]
 //!     pub hysteresis: Hysteresis,
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+//!     #[register(default = ShutdownMode::Continuous)]
 //!     pub shutdown_mode: ShutdownMode,
 //!
 //!     // ... all 16 bits must be filled

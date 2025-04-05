@@ -10,7 +10,6 @@ pub mod utils;
 
 #[cfg(test)]
 mod tests {
-
     #[cfg(feature = "bosch-bme280")]
     #[test]
     fn register_bme280_reset() {
@@ -27,7 +26,7 @@ mod tests {
     #[cfg(feature = "bosch-bmp390")]
     #[test]
     fn register_bmp390_error() {
-        use crate::devices::bosch::bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield};
+        use crate::devices::bosch::bmp390::registers::{Error, ErrorBitfield};
         let value = ErrorBitfield {
             fatal_err: true,
             cmd_err: false,
@@ -43,7 +42,7 @@ mod tests {
     #[cfg(feature = "bosch-bmp390")]
     #[test]
     fn register_bmp390_pressure() {
-        use crate::devices::bosch::bmp390::registers::{Error, ErrorBitfield, Pressure, PressureBitfield};
+        use crate::devices::bosch::bmp390::registers::{Pressure, PressureBitfield};
         let value = PressureBitfield { pressure: 0x123456 };
 
         let reg = Pressure::new(value.clone());
@@ -56,7 +55,7 @@ mod tests {
     fn register_defaults() {
         use crate::devices::texas_instruments::ina228::registers::AdcConfiguration;
         let reg = AdcConfiguration::default();
-        assert_eq!(reg.read_enable_temperature(), true);
+        assert!(reg.read_enable_temperature());
     }
 
     // FIXME: once bondrewd #[test]

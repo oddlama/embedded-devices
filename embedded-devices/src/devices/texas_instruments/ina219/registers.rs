@@ -8,17 +8,16 @@ use uom::si::rational32::ElectricCurrent;
 use uom::si::{electric_potential::volt, rational32::ElectricPotential};
 
 /// Valid bus voltage ranges.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum BusVoltageRange {
     U_16V = 0,
-    #[default]
     U_32V = 1,
 }
 
 /// PGA settings
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum PgaGain {
@@ -29,12 +28,11 @@ pub enum PgaGain {
     /// Gain 1/4, range ±160mV
     DIV_4 = 0b10,
     /// Gain 1/8, range ±320mV
-    #[default]
     DIV_8 = 0b11,
 }
 
 /// Bus/Shunt ADC settings (resolution and averaging)
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 #[allow(non_camel_case_types)]
 pub enum AdcResolution {
@@ -51,7 +49,6 @@ pub enum AdcResolution {
     /// Secondary representation for [`Self::B_11`]
     B_11_a = 0b0110,
     /// 12 bit resolution, 1 sample, 532 μs conversion time
-    #[default]
     B_12 = 0b0011,
     /// Secondary representation for [`Self::B_12`]
     B_12_a = 0b0111,
@@ -98,7 +95,7 @@ impl AdcResolution {
 }
 
 /// Operating mode.
-#[derive(BitfieldEnum, Copy, Clone, Default, PartialEq, Eq, Debug, defmt::Format)]
+#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
 #[bondrewd_enum(u8)]
 pub enum OperatingMode {
     PowerDown = 0b000,
@@ -108,7 +105,6 @@ pub enum OperatingMode {
     AdcDisable = 0b100,
     ShuntContinuous = 0b101,
     BusContinuous = 0b110,
-    #[default]
     ShuntAndBusContinuous = 0b111,
 }
 
@@ -120,24 +116,30 @@ pub struct Configuration {
     /// Setting this flag generates a system reset that is the same
     /// as power-on reset. Resets all registers to default values.
     /// This bit self-clears.
+    #[register(default = false)]
     pub reset: bool,
     #[bondrewd(bit_length = 1, reserve)]
     #[allow(dead_code)]
     pub reserved: u8,
     /// The range for the bus voltage measurement
     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
+    #[register(default = BusVoltageRange::U_32V)]
     pub bus_voltage_range: BusVoltageRange,
     /// Sets PGA gain and range. Note that the PGA defaults to ÷8 (320mV range).
     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
+    #[register(default = PgaGain::DIV_8)]
     pub pga_gain: PgaGain,
     /// Bus ADC Resolution/Averaging setting
     #[bondrewd(enum_primitive = "u8", bit_length = 4)]
+    #[register(default = AdcResolution::B_12)]
     pub bus_adc_resolution: AdcResolution,
     /// Shunt ADC Resolution/Averaging setting
     #[bondrewd(enum_primitive = "u8", bit_length = 4)]
+    #[register(default = AdcResolution::B_12)]
     pub shunt_adc_resolution: AdcResolution,
     /// Selects continuous, triggered, or power-down mode of operation.
     #[bondrewd(enum_primitive = "u8", bit_length = 3)]
+    #[register(default = OperatingMode::ShuntAndBusContinuous)]
     pub operating_mode: OperatingMode,
 }
 
@@ -147,6 +149,7 @@ pub struct Configuration {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ShuntVoltage {
     /// The raw voltage measurement with 10µV/LSB resolution
+    #[register(default = 0)]
     pub raw_value: i16,
 }
 
@@ -164,6 +167,7 @@ impl ShuntVoltage {
 pub struct BusVoltage {
     /// The raw voltage measurement with 4mV/LSB resolution
     #[bondrewd(bit_length = 13)]
+    #[register(default = 0)]
     pub raw_value: u16,
     #[bondrewd(bit_length = 1, reserve)]
     #[allow(dead_code)]
@@ -176,9 +180,11 @@ pub struct BusVoltage {
     /// It will auto-clear when reading the [`Power`] register or
     /// when writing a new mode into the Operating Mode bits in the
     /// [`Configuration`] register (except for PowerDown or Disable).
+    #[register(default = false)]
     pub conversion_ready: bool,
     /// This flag is set when the Power or Current calculations are
     /// out of range. It indicates that current and power data may be meaningless.
+    #[register(default = false)]
     pub overflow: bool,
 }
 
@@ -195,6 +201,7 @@ impl BusVoltage {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Power {
     /// The raw power measurement, W/LSB is determined by calibration register
+    #[register(default = 0)]
     pub raw_value: i16,
 }
 
@@ -217,6 +224,7 @@ impl Power {
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Current {
     /// The raw current measurement, A/LSB is determined by calibration register
+    #[register(default = 0)]
     pub raw_value: i16,
 }
 
@@ -242,6 +250,7 @@ impl Current {
 pub struct Calibration {
     /// The raw calibration value
     #[bondrewd(bit_length = 15)]
+    #[register(default = 0)]
     pub raw_value: u16,
     #[bondrewd(bit_length = 1, reserve)]
     #[allow(dead_code)]
