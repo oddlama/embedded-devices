@@ -40,7 +40,7 @@
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::bosch::bme280::{BME280, address::Address};
+//! use embedded_devices::devices::bosch::bme280::{BME280, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
@@ -53,7 +53,7 @@
 //!     pressure_oversampling: Oversampling::X_16,
 //!     humidity_oversampling: Oversampling::X_16,
 //!     iir_filter: IIRFilter::Disabled,
-//! ).await.unwrap();
+//! }).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bme280.measure(&mut Delay).await?;

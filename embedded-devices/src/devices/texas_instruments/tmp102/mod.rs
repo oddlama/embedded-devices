@@ -21,13 +21,10 @@
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp102 = TMP102::new_i2c(i2c, Address::Gnd);
-//! tmp102.init(&mut Delay).await.unwrap();
 //!
 //! // Read the latest temperature conversion in °C and convert it to a float
 //! let temp = tmp102
-//!     .read_register::<Temperature>()
-//!     .await?
-//!     .read_temperature()
+//!     .read_temperature().await?
 //!     .get::<degree_celsius>()
 //!     .to_f32();
 //! println!("Current temperature: {:?}°C", temp);
