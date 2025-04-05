@@ -325,6 +325,10 @@ where
 impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
+    ///
+    /// Beware that by default, all internal sensors are disabled. Please
+    /// call [`Self::configure`] after initialization to enable the sensors,
+    /// otherwise measurement may return valid-looking but static values.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         // Soft-reset device
         self.reset(delay).await?;
