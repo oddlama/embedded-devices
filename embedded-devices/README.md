@@ -30,13 +30,6 @@ framework is [embedded-registers](./embedded-registers) which provides an
 ergonomic solution to defining and interfacing with device registers over
 I2C/SPI.
 
-## Examples
-
-An example project for the esp32 is included in the [examples](https://github.com/oddlama/embedded-devices/tree/main/examples).
-
-An example project for Linux (using [linux-embedded-hal](https://crates.io/crates/linux-embedded-hal) )
-is also included at [examples](./examples)
-
 ## Supported Devices
 
 Below you will find all supported devices. Please visit their respective documentation links for more information and usage examples.
