@@ -26,5 +26,29 @@ uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", 
 
 [features]
 async = ["embedded-registers/async"]
-default = ["async", "embedded-registers/async"]
+default = ["async"]
 std = []
+
+# Supported Devices
+# analog devices
+analog_devices-max31865 = []
+
+# Bosch
+bosch-bme280 = []
+bosch-bmp280 = ["bosch-bme280"]
+bosch-bmp390 = []
+
+# Microchip
+microchip-mcp9808 = []
+microchip-mcp3204 = []
+microchip-mcp3208 = []
+
+# Texas Instrument
+texas_instruments-ina219 = []
+texas_instruments-ina228 = []
+texas_instruments-tmp102 = []
+texas_instruments-tmp117 = []
+
+[package.metadata.docs.rs]
+
+all-features = true
