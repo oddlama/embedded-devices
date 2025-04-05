@@ -1,6 +1,6 @@
 [package]
 name = "embedded-registers"
-edition = "2021"
+edition = "2024"
 description = "Procedural macro for effortless definitions of registers in embedded device drivers"
 documentation = "https://docs.rs/embedded-registers"
 readme = "README.md"

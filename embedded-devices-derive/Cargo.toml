@@ -1,6 +1,6 @@
 [package]
 name = "embedded-devices-derive"
-edition = "2021"
+edition = "2024"
 description = "Macros required to define devices in embedded-devices"
 documentation = "https://docs.rs/embedded-devices-derive"
 keywords = ["sensor", "embedded", "device", "driver", "peripheral"]

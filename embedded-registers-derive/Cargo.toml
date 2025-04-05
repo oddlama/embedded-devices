@@ -1,6 +1,6 @@
 [package]
 name = "embedded-registers-derive"
-edition = "2021"
+edition = "2024"
 description = "Procedural macro for effortless definitions of registers in embedded device drivers"
 documentation = "https://docs.rs/embedded-registers-derive"
 keywords = ["register", "registers", "bitfield", "derive", "sensor"]

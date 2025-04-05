@@ -1,6 +1,6 @@
 [package]
 name = "embedded-devices"
-edition = "2021"
+edition = "2024"
 description = "Device driver implementations for many embedded sensors and devices"
 documentation = "https://docs.rs/embedded-devices"
 keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
