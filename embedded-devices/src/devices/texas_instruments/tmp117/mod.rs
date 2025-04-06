@@ -19,7 +19,38 @@
 //! The TMP117 units are 100% tested on a production setup that is NIST traceable and verified with
 //! equipment that is calibrated to ISO/IEC 17025 accredited standards.
 //!
-//! ## Usage
+//! ## Usage (sync)
+//!
+//! ```
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::texas_instruments::tmp117::{TMP117Sync, address::Address, registers::Temperature};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device. Default conversion mode is continuous.
+//! let mut tmp117 = TMP117Sync::new_i2c(i2c, Address::Gnd);
+//! tmp117.init(&mut Delay).unwrap();
+//!
+//! // Read the latest temperature conversion in °C and convert it to a float
+//! let temp = tmp117
+//!     .read_register::<Temperature>()?
+//!     .read_temperature()
+//!     .get::<degree_celsius>()
+//!     .to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//!
+//! // Perform a one-shot measurement now and return to sleep afterwards.
+//! let temp = tmp117.oneshot(&mut Delay)?.get::<degree_celsius>().to_f32();
+//! println!("Oneshot temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
 //!
 //! ```
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
@@ -27,12 +58,12 @@
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::texas_instruments::tmp117::{TMP117, address::Address, registers::Temperature};
+//! use embedded_devices::devices::texas_instruments::tmp117::{TMP117Async, address::Address, registers::Temperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
-//! let mut tmp117 = TMP117::new_i2c(i2c, Address::Gnd);
+//! let mut tmp117 = TMP117Async::new_i2c(i2c, Address::Gnd);
 //! tmp117.init(&mut Delay).await.unwrap();
 //!
 //! // Read the latest temperature conversion in °C and convert it to a float
@@ -52,7 +83,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{RegisterInterface, WritableRegister};
+use embedded_registers::WritableRegister;
 use uom::si::rational32::ThermodynamicTemperature;
 
 pub mod address;
@@ -84,7 +115,12 @@ pub enum EepromError<BusError> {
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct TMP117<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct TMP117<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
 }
@@ -98,7 +134,12 @@ crate::simple_device::i2c!(
 );
 
 #[device_impl]
-impl<I: RegisterInterface> TMP117<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     /// Initialize the sensor by waiting for the boot-up period and verifying its device id.
     /// The datasheet specifies a power-on-reset time of 1.5ms.
     /// Calling this function is not mandatory, but recommended to ensure proper operation.

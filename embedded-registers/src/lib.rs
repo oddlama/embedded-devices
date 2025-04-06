@@ -1,16 +1,17 @@
-//! Defined Traits for embedded-registers-derive.
+//! Defines traits for embedded-registers-derive.
 //! For Derive Docs see [embedded-registers-derive](https://docs.rs/embedded-registers-derive/latest/embedded_registers_derive/).
 //!
 //! This crate provides a procedural macro for effortless definitions of registers
 //! in embedded device drivers. This is automatically generates functions to read/write
 //! the register over I2C and SPI, although it isn't limited to those buses. The
-//! resulting struct may trivially be extended to work with any other similar communication bus.
+//! resulting struct may be trivially extended to work with any other similar communication bus.
 //!
 //! - Allows defintion of read-only, write-only and read-write registers
 //! - Generates I2C and SPI read/write functions
 //! - Registers are defined as bitfields via [bondrewd](https://github.com/Devlyn-Nelson/Bondrewd).
 //! - Only the accessed bitfield members are decoded, conserving memory and saving on CPU time.
-//! - Supports both async and blocking operation modes
+//! - Supports both async and blocking operation modes simultaneously by generating two versions of
+//!   each driver using [maybe_async_cfg](https://docs.rs/maybe-async-cfg/latest/maybe_async_cfg)
 //!
 //! This crate was made primarily for [embedded-devices](https://github.com/oddlama/embedded-devices),
 //! which is a collection of drivers for a variety of different embedded sensors and devices.
@@ -18,8 +19,8 @@
 //! ## Defining a register
 //!
 //! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw")]`.
-//! The necessary derive attribute is added automatically.
-//! Take for example this 2-byte read-write register at device address `0x42,0x43`, which contains two `u8` values:
+//! The necessary derive attribute for Bondrewd is added automatically.
+//! Take for example this 2-byte read-write register at device addresses `0x42,0x43`, which contains two `u8` values:
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
@@ -47,24 +48,22 @@
 //! > the unpacked data. Since we usually deal with the packed data, and want to allow direct read/write
 //! > operations on the packed data for performance, the naming gets confusing quite quickly.
 //!
-//! ### Accessing a register
+//! ### Accessing a register (async)
 //!
-//! To access such a register, you need to obtain an interface that implements the `RegisterInterface` trait.
-//! This crate already comes with an implementation of that trait for I2C and SPI devices called [`i2c::I2cDevice`] and [`spi::SpiDevice`] respectively.
-//! You may then read the register simply by calling [`read_register`](RegisterInterface::read_register) or [`write_register`](RegisterInterface::write_register) on that interface.
+//! To access such a register, you need to obtain an interface that implements the `RegisterInterfaceAsync` trait.
+//! This crate already comes with an implementation of that trait for I2C and SPI devices called [`i2c::I2cDeviceAsync`] and [`spi::SpiDeviceAsync`] respectively.
+//! You may then read the register simply by calling [`read_register`](RegisterInterfaceAsync::read_register) or [`write_register`](RegisterInterfaceAsync::write_register) on that interface.
 //!
-//! ```
+//! ```rust, only_if(async)
 //! # #![feature(generic_arg_infer)]
 //! # use embedded_registers::register;
-//!
 //! # #[register(address = 0x42, mode = "rw")]
 //! # #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! # pub struct ValueRegister {
 //! #     pub width: u8,
 //! #     pub height: u8,
 //! # }
-//!
-//! use embedded_registers::{i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface};
+//! use embedded_registers::{i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync};
 //!
 //! async fn init<I>(mut i2c_bus: I) -> Result<(), I::Error>
 //! where
@@ -72,7 +71,7 @@
 //! {
 //!     // Imagine we already have constructed a device using
 //!     // the i2c bus from your controller, a device address and default codec:
-//!     let mut dev = I2cDevice::new(i2c_bus, 0x12, OneByteRegAddrCodec::default());
+//!     let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c_bus, 0x12);
 //!     // We can now retrieve the register
 //!     let mut reg = dev.read_register::<ValueRegister>().await?;
 //!
@@ -124,12 +123,12 @@ pub trait Register: Default + Clone + bytemuck::Pod {
     /// codec is specified by the user. Setting this to `spi::codecs::NoCodec`
     /// will automatically cause accesses to use the device's default codec.
     /// If the device doesn't support SPI communication, this can be ignored.
-    type SpiCodec: spi::Codec;
+    type SpiCodec: spi::CodecSync + spi::CodecAsync;
     /// The I2C codec that should be used for this register when no
     /// codec is specified by the user. Setting this to `i2c::codecs::NoCodec`
     /// will automatically cause accesses to use the device's default codec.
     /// If the device doesn't support I2C communication, this can be ignored.
-    type I2cCodec: i2c::Codec;
+    type I2cCodec: i2c::CodecSync + i2c::CodecAsync;
 
     /// Provides immutable access to the raw data.
     fn data(&self) -> &[u8];
@@ -147,7 +146,7 @@ pub trait WritableRegister: Register {}
 /// devices with registers to share register read/write implementations
 /// independent of the actual interface in use.
 #[allow(async_fn_in_trait)]
-#[maybe_async_cfg::maybe(sync(not(feature = "async")), async(feature = "async"), keep_self)]
+#[maybe_async_cfg::maybe(sync(feature = "sync"), async(feature = "async"))]
 pub trait RegisterInterface {
     type Error;
 

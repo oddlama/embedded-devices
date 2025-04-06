@@ -7,21 +7,46 @@
 //! protected against overvoltage faults as large as ±45V. Programmable detection of RTD
 //! and cable open and short conditions is included.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
 //! # where
-//! #   I: embedded_hal_async::spi::SpiDevice,
-//! #   D: embedded_hal_async::delay::DelayNs
+//! #   I: embedded_hal::spi::SpiDevice,
+//! #   D: embedded_hal::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::analog_devices::max31865::{MAX31865, registers::{FilterMode, Resistance, WiringMode}};
+//! use embedded_devices::devices::analog_devices::max31865::{MAX31865Sync, registers::{FilterMode, Resistance, WiringMode}};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //! use uom::num_rational::Rational32;
 //!
 //! // Create and initialize the device
-//! let mut max31865 = MAX31865::new_spi(spi, Rational32::new(43, 10));
+//! let mut max31865 = MAX31865Sync::new_spi(spi, Rational32::new(43, 10));
+//! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
+//!
+//! let ratio = max31865
+//!     .read_temperature()?
+//!     .get::<degree_celsius>();
+//! println!("Current raw resistance ratio: {:?}", ratio);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
+//! # where
+//! #   I: embedded_hal_async::spi::SpiDevice,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::analog_devices::max31865::{MAX31865Async, registers::{FilterMode, Resistance, WiringMode}};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//! use uom::num_rational::Rational32;
+//!
+//! // Create and initialize the device
+//! let mut max31865 = MAX31865Async::new_spi(spi, Rational32::new(43, 10));
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
 //! let ratio = max31865
@@ -37,7 +62,6 @@ use self::registers::FilterMode;
 use self::registers::WiringMode;
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{spi::SpiDevice, RegisterInterface};
 use registers::FaultDetectionCycle;
 use uom::num_rational::Rational32;
 use uom::si::f32::ThermodynamicTemperature;
@@ -74,7 +98,12 @@ pub enum ReadTemperatureError<BusError> {
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct MAX31865<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct MAX31865<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
     /// The reference resistor value over to the nominal resistance of
@@ -85,14 +114,13 @@ pub struct MAX31865<I: RegisterInterface> {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), SpiDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I> MAX31865<SpiDevice<I, MAX31865SpiCodec>>
+impl<I> MAX31865<embedded_registers::spi::SpiDevice<I, MAX31865SpiCodec>>
 where
-    I: hal::spi::SpiDevice,
+    I: hal::spi::r#SpiDevice,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -106,17 +134,19 @@ where
     #[inline]
     pub fn new_spi(interface: I, reference_resistor_ratio: Rational32) -> Self {
         Self {
-            interface: SpiDevice {
-                interface,
-                default_codec: MAX31865SpiCodec::default(),
-            },
+            interface: embedded_registers::spi::SpiDevice::new(interface),
             reference_resistor_ratio,
         }
     }
 }
 
 #[device_impl]
-impl<I: RegisterInterface> MAX31865<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     /// Initializes the device by configuring important settings and
     /// running an initial fault detection cycle.
     pub async fn init<D: hal::delay::DelayNs>(

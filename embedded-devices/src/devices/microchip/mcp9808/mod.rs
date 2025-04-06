@@ -16,19 +16,45 @@
 //! allowing up to eight or sixteen sensors to be controlled with a single serial bus.
 //! These features make the MCP9808 ideal for sophisticated, multi-zone, temperature-monitoring applications.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! ```rust, only_if(sync)
+//! # fn test<I>(mut i2c: I) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType
 //! # {
-//! use embedded_devices::devices::microchip::mcp9808::{MCP9808, address::Address, registers::AmbientTemperature};
+//! use embedded_devices::devices::microchip::mcp9808::{MCP9808Sync, address::Address, registers::AmbientTemperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
-//! let mut mcp9808 = MCP9808::new_i2c(i2c, Address::Default);
+//! let mut mcp9808 = MCP9808Sync::new_i2c(i2c, Address::Default);
+//! mcp9808.init().unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let temp = mcp9808
+//!     .read_register::<AmbientTemperature>()?
+//!     .read_temperature()
+//!     .get::<degree_celsius>()
+//!     .to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! # {
+//! use embedded_devices::devices::microchip::mcp9808::{MCP9808Async, address::Address, registers::AmbientTemperature};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut mcp9808 = MCP9808Async::new_i2c(i2c, Address::Default);
 //! mcp9808.init().await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
@@ -44,7 +70,6 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::RegisterInterface;
 
 pub mod address;
 pub mod registers;
@@ -67,7 +92,12 @@ pub enum InitError<BusError> {
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct MCP9808<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct MCP9808<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
 }
@@ -81,7 +111,12 @@ crate::simple_device::i2c!(
 );
 
 #[device_impl]
-impl<I: RegisterInterface> MCP9808<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
     /// Initializes the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {

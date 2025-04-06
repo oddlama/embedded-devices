@@ -1,7 +1,7 @@
 //! This crate provides a procedural macro for effortless definitions of registers
 //! in embedded device drivers.
 //!
-//! Currently, embedded-registers requires you to use `#![feature(generic_arg_infer)]`.
+//! Currently, embedded-registers requires the use of `#![feature(generic_arg_infer)]`.
 //!
 //! # Attribute macro
 //!
@@ -26,7 +26,7 @@
 //!   </tr>
 //! </table>
 //!
-//! Adding this attribute to a bondrewd struct `Foo` will result in two types being defined:
+//! Adding this attribute to a struct `Foo` will result in two types being defined:
 //! - `Foo` will become the register, essentially a byte array with the correct size that provides
 //!   getter and setter functions for the individual fields.
 //! - `FooBitfield` will become the underlying bondrewd bitfield, which may be used to construct
@@ -37,14 +37,14 @@
 //!
 //! # Simple Example
 //!
-//! This simple example defines the `DeviceId` register of an MCP9808. It has
-//! the virtual address `0b111 (0x7)`, uses big endian byte order with the first
-//! member of the struct positioned at the most significant bit, is 2 bytes in size
-//! and is read-only:
+//! This simple example defines the `DeviceId` register of an MCP9808. It has the virtual address
+//! `0b111 (0x7)`, uses big endian byte order with the first member of the struct positioned at the
+//! most significant bit, is 2 bytes in size and is read-only. The register definition
+//! automatically work with both sync and async code.
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::{register, i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface, ReadableRegister};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, I2cDeviceSync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, RegisterInterfaceSync, ReadableRegister};
 //!
 //! #[register(address = 0b111, mode = "r")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
@@ -53,30 +53,40 @@
 //!     revision: u8,
 //! }
 //!
-//! // The register may now be read from an I2C bus using sync or async operations:
+//! // sync:
 //! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType
+//! # {
+//! let mut dev = I2cDeviceSync::<_, _, OneByteRegAddrCodec>::new(i2c /* bus */, 0x24 /* i2c addr */);
+//! let reg = dev.read_register::<DeviceId>()?;
+//! # Ok(())
+//! # }
+//!
+//! // async:
+//! # async fn test_async<I>(mut i2c: I) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! // Create new I2cDevice with bus, address, codec
-//! let mut dev = I2cDevice::new(i2c, 0x24, OneByteRegAddrCodec::default());
+//! let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c /* bus */, 0x24 /* i2c addr */);
 //! let reg = dev.read_register::<DeviceId>().await?;
-//! // sync: let reg = DeviceId::read_i2c_blocking(&mut i2c, address);
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! # Complex Example
 //!
-//! A more complex example may involve adding your own Bondrewd-capable enums.
-//! We also make sure to annotate the attributes `#[register(default = ...)]` to allow
-//! reconstructing the power-up defaults easily. Have a look at this excerpt
+//! A real-world application may involve describing registers with more complex layouts involving
+//! different data types or even enumerations. Luckily, all of this is fairly simple with bondrewd.
+//!
+//! We also make sure to annotate all fields with `#[register(default = ...)]` to allow
+//! easy reconstruction of the power-up defaults. Have a look at this excerpt
 //! of the Configuration register from the MCP9808:
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
 //! # use defmt::{info, Format};
-//! use embedded_registers::{register, i2c::{I2cDevice, codecs::OneByteRegAddrCodec}, RegisterInterface, ReadableRegister, WritableRegister};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, ReadableRegister, WritableRegister};
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
@@ -104,9 +114,11 @@
 //!     #[allow(dead_code)]
 //!     reserved: u8,
 //!
+//!     /// Doc strings will also be shown on the respective read/write functions generated from this definition.
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 2)]
 //!     #[register(default = Hysteresis::Deg_0_0C)]
 //!     pub hysteresis: Hysteresis,
+//!     /// All fields should be documented with information from the datasheet
 //!     #[bondrewd(enum_primitive = "u8", bit_length = 1)]
 //!     #[register(default = ShutdownMode::Continuous)]
 //!     pub shutdown_mode: ShutdownMode,
@@ -121,7 +133,7 @@
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! # let mut dev = I2cDevice::new(i2c, 0x24, OneByteRegAddrCodec::default());
+//! # let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c, 0x24);
 //! // This now allows us to read and write the register, while only
 //! // unpacking the fields we require:
 //! let mut reg = dev.read_register::<Config>().await?;

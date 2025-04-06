@@ -14,15 +14,15 @@
 //! a single 3- to 5.5-V supply, drawing a maximum of 1 mA of supply current. The INA219
 //! operates from –40°C to 125°C.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
-//! #   D: embedded_hal_async::delay::DelayNs
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::texas_instruments::ina219::{INA219, address::Address, address::Pin};
+//! use embedded_devices::devices::texas_instruments::ina219::{INA219Sync, address::Address, address::Pin};
 //! use uom::num_rational::Rational32;
 //! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_current::{ampere, milliampere};
@@ -32,7 +32,43 @@
 //! use uom::si::rational32::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
-//! let mut ina219 = INA219::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! let mut ina219 = INA219Sync::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! ina219.init(
+//!   // Most units use a 100mΩ shunt resistor
+//!   ElectricalResistance::new::<ohm>(Rational32::new(1, 10)),
+//!   // Maximum expected current 3A
+//!   ElectricCurrent::new::<ampere>(Rational32::new(3, 1)),
+//! ).unwrap();
+//!
+//! // One-shot read all values
+//! let measurements = ina219.oneshot(&mut Delay).unwrap();
+//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
+//! let current = measurements.current.get::<milliampere>().to_f32();
+//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::texas_instruments::ina219::{INA219Async, address::Address, address::Pin};
+//! use uom::num_rational::Rational32;
+//! use uom::num_traits::ToPrimitive;
+//! use uom::si::electric_current::{ampere, milliampere};
+//! use uom::si::electric_potential::millivolt;
+//! use uom::si::electrical_resistance::ohm;
+//! use uom::si::power::milliwatt;
+//! use uom::si::rational32::{ElectricCurrent, ElectricalResistance};
+//!
+//! // Create and initialize the device
+//! let mut ina219 = INA219Async::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina219.init(
 //!   // Most units use a 100mΩ shunt resistor
 //!   ElectricalResistance::new::<ohm>(Rational32::new(1, 10)),
@@ -53,7 +89,6 @@
 use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{i2c::I2cDevice, RegisterInterface};
 use uom::si::electric_current::ampere;
 use uom::si::electrical_resistance::ohm;
 use uom::si::rational32::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
@@ -94,7 +129,12 @@ pub enum MeasurementError<BusError> {
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct INA219<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct INA219<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
     /// Shunt resistance
@@ -106,12 +146,11 @@ pub struct INA219<I: RegisterInterface> {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I> INA219<I2cDevice<I, hal::i2c::SevenBitAddress, INA219I2cCodec>>
+impl<I> INA219<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, INA219I2cCodec>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -123,7 +162,7 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: Address) -> Self {
         Self {
-            interface: I2cDevice::new(interface, address.into(), INA219I2cCodec::default()),
+            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             shunt_resistance: Default::default(),
             max_expected_current: Default::default(),
             current_lsb_na: 1,
@@ -132,7 +171,12 @@ where
 }
 
 #[device_impl]
-impl<I: RegisterInterface> INA219<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> INA219<I> {
     /// Soft-resets the device, calibrates it with the given shunt resistor
     /// value and maximum expected current.
     ///

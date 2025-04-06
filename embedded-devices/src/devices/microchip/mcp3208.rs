@@ -11,20 +11,46 @@
 //! broad voltage range (2.7V - 5.5V). Low current design permits operation with typical standby
 //! and active currents of only 500 nA and 320 μA, respectively.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I>(mut spi: I) -> Result<(), I::Error>
+//! ```rust, only_if(sync)
+//! # fn test<I>(mut spi: I) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal_async::spi::SpiDevice,
+//! #   I: embedded_hal::spi::SpiDevice,
 //! # {
-//! use embedded_devices::devices::microchip::mcp3208::{MCP3208, InputChannel};
+//! use embedded_devices::devices::microchip::mcp3208::{MCP3208Sync, InputChannel};
 //! use uom::num_rational::Rational32;
 //! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_potential::{volt, millivolt};
 //! use uom::si::rational32::ElectricPotential;
 //!
-//! let mut mcp3208 = MCP3208::new_spi(
+//! let mut mcp3208 = MCP3208Sync::new_spi(
+//!     spi,
+//!     // 2.5V reference
+//!     ElectricPotential::new::<volt>(Rational32::new(5, 2)),
+//! );
+//!
+//! let value = mcp3208.convert(InputChannel::Single0)?;
+//! let voltage = value.get::<millivolt>().to_f32();
+//! println!("V_in at channel 0: {:?}mV", value);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I>(mut spi: I) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::spi::SpiDevice,
+//! # {
+//! use embedded_devices::devices::microchip::mcp3208::{MCP3208Async, InputChannel};
+//! use uom::num_rational::Rational32;
+//! use uom::num_traits::ToPrimitive;
+//! use uom::si::electric_potential::{volt, millivolt};
+//! use uom::si::rational32::ElectricPotential;
+//!
+//! let mut mcp3208 = MCP3208Async::new_spi(
 //!     spi,
 //!     // 2.5V reference
 //!     ElectricPotential::new::<volt>(Rational32::new(5, 2)),
@@ -81,6 +107,7 @@ pub enum InputChannel {
 /// to provide four pseudo-differential input pairs or eight single-ended inputs.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
+#[maybe_async_cfg::maybe(sync(feature = "sync"), async(feature = "async"))]
 pub struct MCP3208<I> {
     /// The interface to communicate with the device
     interface: I,
@@ -90,13 +117,12 @@ pub struct MCP3208<I> {
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
 impl<I> MCP3208<I>
 where
-    I: hal::spi::SpiDevice,
+    I: hal::spi::r#SpiDevice,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -113,11 +139,10 @@ where
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I: hal::spi::SpiDevice> MCP3208<I> {
+impl<I: hal::spi::r#SpiDevice> MCP3208<I> {
     /// Performs a conversion of the given channel and returns the raw value
     pub async fn convert_raw(&mut self, channel: InputChannel) -> Result<u16, I::Error> {
         // Do bitwise-or with the required start bit. We also pad one leading zero so the readout

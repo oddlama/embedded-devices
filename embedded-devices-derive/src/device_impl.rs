@@ -69,12 +69,6 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
     }
 
     let output = quote! {
-        #[maybe_async_cfg::maybe(
-            idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-            sync(not(feature = "async")),
-            async(feature = "async"),
-            keep_self
-        )]
         #item_impl
     };
 

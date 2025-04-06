@@ -5,20 +5,44 @@
 //! mm package height. Its small dimensions and its low power consumption of 3.2 μA @1Hz allow the implementation in battery
 //! driven devices such as mobile phones, GPS modules or watches.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::Error<I::Error>>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::bosch::bmp390::{BMP390Sync, address::Address};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut bmp390 = BMP390Sync::new_i2c(i2c, Address::Primary);
+//! bmp390.init(&mut Delay).unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let measurements = bmp390.measure(&mut Delay)?;
+//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
 //! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::Error<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::bosch::bmp390::{BMP390, address::Address};
+//! use embedded_devices::devices::bosch::bmp390::{BMP390Async, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
-//! let mut bmp390 = BMP390::new_i2c(i2c, Address::Primary);
+//! let mut bmp390 = BMP390Async::new_i2c(i2c, Address::Primary);
 //! bmp390.init(&mut Delay).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
@@ -30,7 +54,6 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
 use uom::si::rational32::{Pressure, ThermodynamicTemperature};
@@ -121,7 +144,12 @@ impl CalibrationData {
 /// mm package height. Its small dimensions and its low power consumption of 3.2 μA @1Hz allow the implementation in battery
 /// driven devices such as mobile phones, GPS modules or watches.
 #[device]
-pub struct BMP390<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct BMP390<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
     /// Calibration data
@@ -161,12 +189,11 @@ impl Default for Configuration {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I> BMP390<I2cDevice<I, hal::i2c::SevenBitAddress, BME390I2cCodec>>
+impl<I> BMP390<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, BME390I2cCodec>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -178,21 +205,20 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: Address) -> Self {
         Self {
-            interface: I2cDevice::new(interface, address.into(), BME390I2cCodec::default()),
+            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             calibration_data: None,
         }
     }
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), SpiDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I> BMP390<SpiDevice<I, BME390SpiCodec>>
+impl<I> BMP390<embedded_registers::spi::SpiDevice<I, BME390SpiCodec>>
 where
-    I: hal::spi::SpiDevice,
+    I: hal::spi::r#SpiDevice,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -202,17 +228,19 @@ where
     #[inline]
     pub fn new_spi(interface: I) -> Self {
         Self {
-            interface: SpiDevice {
-                interface,
-                default_codec: BME390SpiCodec::default(),
-            },
+            interface: embedded_registers::spi::SpiDevice::new(interface),
             calibration_data: None,
         }
     }
 }
 
 #[device_impl]
-impl<I: RegisterInterface> BMP390<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {

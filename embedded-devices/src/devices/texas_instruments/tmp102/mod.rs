@@ -7,20 +7,49 @@
 //! require complex calculations or lookup tables to derive the temperature. The
 //! on-chip 12-bit ADC offers resolutions down to 0.0625°C.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```no_run
+//! ```rust, no_run, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Sync, address::Address, registers::Temperature};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device. Default conversion mode is continuous.
+//! let mut tmp102 = TMP102Sync::new_i2c(i2c, Address::Gnd);
+//!
+//! // Read the latest temperature conversion in °C and convert it to a float
+//! let temp = tmp102
+//!     .read_temperature()?
+//!     .get::<degree_celsius>()
+//!     .to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//!
+//! // Perform a one-shot measurement now and return to sleep afterwards.
+//! let temp = tmp102.oneshot(&mut Delay)?.get::<degree_celsius>().to_f32();
+//! println!("Oneshot temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, no_run, only_if(async)
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::texas_instruments::tmp102::{TMP102, address::Address, registers::Temperature};
+//! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Async, address::Address, registers::Temperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
-//! let mut tmp102 = TMP102::new_i2c(i2c, Address::Gnd);
+//! let mut tmp102 = TMP102Async::new_i2c(i2c, Address::Gnd);
 //!
 //! // Read the latest temperature conversion in °C and convert it to a float
 //! let temp = tmp102
@@ -37,7 +66,6 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::RegisterInterface;
 use uom::num_rational::Rational32;
 use uom::si::rational32::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -53,7 +81,12 @@ type TMP102I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
-pub struct TMP102<I: RegisterInterface> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct TMP102<I: embedded_registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
 }
@@ -61,7 +94,12 @@ pub struct TMP102<I: RegisterInterface> {
 crate::simple_device::i2c!(TMP102, self::address::Address, SevenBitAddress, TMP102I2cCodec);
 
 #[device_impl]
-impl<I: RegisterInterface> TMP102<I> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> TMP102<I> {
     /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].
     /// which will cause the device to perform a single conversion a return to sleep mode afterwards.
     ///

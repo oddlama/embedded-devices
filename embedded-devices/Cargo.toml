@@ -17,7 +17,7 @@ bondrewd = { version = "0.1.14", default-features = false, features = ["derive"]
 bytemuck = { version = "1.16.3", features = ["derive", "min_const_generics"] }
 defmt = "0.3.8"
 embedded-hal = "1.0.0"
-embedded-hal-async = "1.0.0"
+embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-devices-derive = { version = "0.9.11", path = "../embedded-devices-derive" }
 embedded-registers = { version = "0.9.11", path = "../embedded-registers", default-features = false, features = ["derive"] }
 maybe-async-cfg = "0.2.4"
@@ -25,12 +25,15 @@ paste = "1.0.15"
 uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
 
 [features]
-async = ["embedded-registers/async"]
-default = ["async"]
+default = ["sync", "async"]
+
+sync = ["embedded-registers/sync"]
+async = ["dep:embedded-hal-async", "embedded-registers/async"]
 std = []
 
-# Supported Devices
-# analog devices
+# Feature flags to enable supported devices
+
+# Analog Devices
 analog_devices-max31865 = []
 
 # Bosch
@@ -50,5 +53,4 @@ texas_instruments-tmp102 = []
 texas_instruments-tmp117 = []
 
 [package.metadata.docs.rs]
-
 all-features = true

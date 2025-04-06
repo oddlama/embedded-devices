@@ -32,21 +32,52 @@
 //! In order to tailor data rate, noise, response time and current consumption to the needs of the user,
 //! a variety of oversampling modes, filter modes and data rates can be selected.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
-//! #   D: embedded_hal_async::delay::DelayNs
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::bosch::bme280::{BME280, Configuration, address::Address};
+//! use embedded_devices::devices::bosch::bme280::{BME280Sync, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
-//! let mut bme280 = BME280::new_i2c(i2c, Address::Primary);
+//! let mut bme280 = BME280Sync::new_i2c(i2c, Address::Primary);
+//! bme280.init(&mut Delay).unwrap();
+//! bme280.configure(Configuration {
+//!     temperature_oversampling: Oversampling::X_16,
+//!     pressure_oversampling: Oversampling::X_16,
+//!     humidity_oversampling: Oversampling::X_16,
+//!     iir_filter: IIRFilter::Disabled,
+//! }).unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let measurements = bme280.measure(&mut Delay)?;
+//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::bosch::bme280::{BME280Async, Configuration, address::Address};
+//! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
 //! bme280.init(&mut Delay).await.unwrap();
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
@@ -64,7 +95,6 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use embedded_registers::{i2c::I2cDevice, spi::SpiDevice, RegisterInterface};
 use uom::num_rational::Rational32;
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
@@ -115,7 +145,12 @@ pub(super) struct TFine(i32);
 /// The common base for both BME280 and BMP280.
 /// For a full description and usage examples, refer to the for the [BME280](self) and [BMP280](super::bmp280).
 #[device]
-pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct BME280Common<I: embedded_registers::RegisterInterface, const IS_BME: bool> {
     /// The interface to communicate with the device
     interface: I,
     /// Calibration data
@@ -127,7 +162,14 @@ pub struct BME280Common<I: RegisterInterface, const IS_BME: bool> {
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
-pub type BME280<I> = BME280Common<I, true>;
+pub type BME280Sync<I> = BME280CommonSync<I, true>;
+
+/// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
+/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
+/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
+/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
+/// watches.
+pub type BME280Async<I> = BME280CommonAsync<I, true>;
 
 /// Common configuration values for the BME280 sensor.
 #[derive(Debug, Clone)]
@@ -280,12 +322,12 @@ impl CalibrationData {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I, const IS_BME: bool> BME280Common<I2cDevice<I, hal::i2c::SevenBitAddress, BME280I2cCodec>, IS_BME>
+impl<I, const IS_BME: bool>
+    BME280Common<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, BME280I2cCodec>, IS_BME>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -297,21 +339,20 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: Address) -> Self {
         Self {
-            interface: I2cDevice::new(interface, address.into(), BME280I2cCodec::default()),
+            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             calibration_data: None,
         }
     }
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), SpiDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I, const IS_BME: bool> BME280Common<SpiDevice<I, BME280SpiCodec>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<embedded_registers::spi::SpiDevice<I, BME280SpiCodec>, IS_BME>
 where
-    I: hal::spi::SpiDevice,
+    I: hal::spi::r#SpiDevice,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -321,17 +362,19 @@ where
     #[inline]
     pub fn new_spi(interface: I) -> Self {
         Self {
-            interface: SpiDevice {
-                interface,
-                default_codec: BME280SpiCodec::default(),
-            },
+            interface: embedded_registers::spi::SpiDevice::new(interface),
             calibration_data: None,
         }
     }
 }
 
 #[device_impl]
-impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     ///
@@ -405,12 +448,11 @@ impl<I: RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I: RegisterInterface> BME280Common<I, true> {
+impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.

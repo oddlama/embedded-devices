@@ -1,4 +1,4 @@
-use crate::{spi::Codec, ReadableRegister, Register, WritableRegister};
+use crate::{ReadableRegister, Register, WritableRegister};
 use bytemuck::Zeroable;
 
 /// This codec represents the most commonly found codecs for SPI devices.
@@ -27,7 +27,6 @@ use bytemuck::Zeroable;
 /// | `RW_BIT`                   | `u8`    | The bit index of the RW bit when interpreting the struct in big-endian |
 /// | `RW_1_IS_READ`             | `bool`  | whether the setting the RW bit signals read-mode (true) or write-mode (false) |
 /// | `READ_DELAY`               | `usize` | Number of bytes that we have to wait (send additional zeros) after sending the header until data arrives |
-#[derive(Default)]
 pub struct SimpleCodec<
     const HEADER_SIZE: usize,
     const ADDR_MSB: u8,
@@ -67,8 +66,8 @@ impl<
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec),
+    sync(feature = "sync"),
     async(feature = "async"),
     keep_self
 )]
@@ -79,13 +78,13 @@ impl<
         const RW_BIT: u8,
         const RW_1_IS_READ: bool,
         const READ_DELAY: usize,
-    > Codec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
+    > crate::spi::Codec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     #[inline]
-    async fn read_register<R, I>(&mut self, interface: &mut I) -> Result<R, I::Error>
+    async fn read_register<R, I>(interface: &mut I) -> Result<R, I::Error>
     where
         R: ReadableRegister,
-        I: hal::spi::SpiDevice,
+        I: hal::spi::r#SpiDevice,
     {
         #[repr(C, packed(1))]
         #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]
@@ -105,10 +104,10 @@ impl<
     }
 
     #[inline]
-    async fn write_register<R, I>(&mut self, interface: &mut I, register: impl AsRef<R>) -> Result<(), I::Error>
+    async fn write_register<R, I>(interface: &mut I, register: impl AsRef<R>) -> Result<(), I::Error>
     where
         R: WritableRegister,
-        I: hal::spi::SpiDevice,
+        I: hal::spi::r#SpiDevice,
     {
         #[repr(C, packed(1))]
         #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]

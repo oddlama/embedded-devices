@@ -1,7 +1,4 @@
-use crate::{
-    i2c::{Codec, I2cBoundBus},
-    ReadableRegister, WritableRegister,
-};
+use crate::{ReadableRegister, WritableRegister};
 use bytemuck::Zeroable;
 
 /// This codec represents the most commonly found codecs for I2C devices.
@@ -27,14 +24,14 @@ use bytemuck::Zeroable;
 pub struct SimpleCodec<const HEADER_SIZE: usize> {}
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec, I2cBoundBus),
+    sync(feature = "sync"),
     async(feature = "async"),
     keep_self
 )]
-impl<const HEADER_SIZE: usize> Codec for SimpleCodec<HEADER_SIZE> {
+impl<const HEADER_SIZE: usize> crate::i2c::Codec for SimpleCodec<HEADER_SIZE> {
     #[inline]
-    async fn read_register<R, I, A>(&mut self, bound_bus: &mut I2cBoundBus<I, A>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(bound_bus: &mut crate::i2c::I2cBoundBus<I, A>) -> Result<R, I::Error>
     where
         R: ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
@@ -52,8 +49,7 @@ impl<const HEADER_SIZE: usize> Codec for SimpleCodec<HEADER_SIZE> {
 
     #[inline]
     async fn write_register<R, I, A>(
-        &mut self,
-        bound_bus: &mut I2cBoundBus<I, A>,
+        bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
         register: impl AsRef<R>,
     ) -> Result<(), I::Error>
     where

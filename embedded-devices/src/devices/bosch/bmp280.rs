@@ -29,21 +29,46 @@
 //! In order to tailor data rate, noise, response time and current consumption to the needs of the user, a
 //! variety of oversampling modes, filter modes and data rates can be selected.
 //!
-//! ## Usage
+//! ## Usage (sync)
 //!
-//! ```
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
-//! #   D: embedded_hal_async::delay::DelayNs
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
 //! # {
-//! use embedded_devices::devices::bosch::bmp280::BMP280;
+//! use embedded_devices::devices::bosch::bmp280::BMP280Sync;
 //! use embedded_devices::devices::bosch::bme280::address::Address;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
-//! let mut bmp280 = BMP280::new_i2c(i2c, Address::Primary);
+//! let mut bmp280 = BMP280Sync::new_i2c(i2c, Address::Primary);
+//! bmp280.init(&mut Delay).unwrap();
+//!
+//! // Read the current temperature in °C and convert it to a float
+//! let measurements = bmp280.measure(&mut Delay)?;
+//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! println!("Current temperature: {:?}°C", temp);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::bosch::bmp280::BMP280Async;
+//! use embedded_devices::devices::bosch::bme280::address::Address;
+//! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::num_traits::ToPrimitive;
+//!
+//! // Create and initialize the device
+//! let mut bmp280 = BMP280Async::new_i2c(i2c, Address::Primary);
 //! bmp280.init(&mut Delay).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
@@ -54,12 +79,11 @@
 //! # }
 //! ```
 
-use embedded_registers::RegisterInterface;
 use uom::si::rational32::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
     registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
-    BME280Common, Error,
+    BME280CommonAsync, BME280CommonSync, Error,
 };
 
 /// Measurement data
@@ -76,7 +100,14 @@ pub struct Measurements {
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
-pub type BMP280<I> = BME280Common<I, false>;
+pub type BMP280Sync<I> = BME280CommonSync<I, false>;
+
+/// The BMP280 is a combined digital pressure and temperature sensor based on proven
+/// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
+/// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
+/// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
+/// watches.
+pub type BMP280Async<I> = BME280CommonAsync<I, false>;
 
 /// Common configuration values for the BMP280 sensor.
 /// The power-on-reset default is to set all oversampling settings to 1X
@@ -102,12 +133,11 @@ impl Default for Configuration {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-    sync(not(feature = "async")),
-    async(feature = "async"),
-    keep_self
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
 )]
-impl<I: RegisterInterface> BME280Common<I, false> {
+impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.

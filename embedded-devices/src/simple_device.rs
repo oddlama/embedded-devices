@@ -13,10 +13,9 @@ macro_rules! i2c {
     };
     ($device:ident, $AddressType:ty, $AddressMode:ident, $DefaultCodec:ty, $ctor_doc:expr) => {
         #[maybe_async_cfg::maybe(
-            idents(hal(sync = "embedded_hal", async = "embedded_hal_async")),
-            sync(not(feature = "async")),
-            async(feature = "async"),
-            keep_self
+            idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+            sync(feature = "sync"),
+            async(feature = "async")
         )]
         impl<I> $device<embedded_registers::i2c::I2cDevice<I, hal::i2c::$AddressMode, $DefaultCodec>>
         where
@@ -31,8 +30,7 @@ macro_rules! i2c {
                 Self {
                     interface: embedded_registers::i2c::I2cDevice::new(
                         interface,
-                        address.into(),
-                        <$DefaultCodec>::default()
+                        address.into()
                     )
                 }
             }
