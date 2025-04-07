@@ -100,6 +100,7 @@ pub struct Measurements {
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
+#[cfg(feature = "sync")]
 pub type BMP280Sync<I> = BME280CommonSync<I, false>;
 
 /// The BMP280 is a combined digital pressure and temperature sensor based on proven
@@ -107,6 +108,7 @@ pub type BMP280Sync<I> = BME280CommonSync<I, false>;
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
+#[cfg(feature = "async")]
 pub type BMP280Async<I> = BME280CommonAsync<I, false>;
 
 /// Common configuration values for the BMP280 sensor.

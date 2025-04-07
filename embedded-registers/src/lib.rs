@@ -96,6 +96,8 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#[cfg(not(any(feature = "sync", feature = "async")))]
+compile_error!("You must enable at least one of the create features `sync` or `async`");
 
 pub mod i2c;
 pub mod spi;
@@ -123,11 +125,21 @@ pub trait Register: Default + Clone + bytemuck::Pod {
     /// codec is specified by the user. Setting this to `spi::codecs::NoCodec`
     /// will automatically cause accesses to use the device's default codec.
     /// If the device doesn't support SPI communication, this can be ignored.
+    #[cfg(all(feature = "sync", not(feature = "async")))]
+    type SpiCodec: spi::CodecSync;
+    #[cfg(all(not(feature = "sync"), feature = "async"))]
+    type SpiCodec: spi::CodecAsync;
+    #[cfg(all(feature = "sync", feature = "async"))]
     type SpiCodec: spi::CodecSync + spi::CodecAsync;
     /// The I2C codec that should be used for this register when no
     /// codec is specified by the user. Setting this to `i2c::codecs::NoCodec`
     /// will automatically cause accesses to use the device's default codec.
     /// If the device doesn't support I2C communication, this can be ignored.
+    #[cfg(all(feature = "sync", not(feature = "async")))]
+    type I2cCodec: i2c::CodecSync;
+    #[cfg(all(not(feature = "sync"), feature = "async"))]
+    type I2cCodec: i2c::CodecAsync;
+    #[cfg(all(feature = "sync", feature = "async"))]
     type I2cCodec: i2c::CodecSync + i2c::CodecAsync;
 
     /// Provides immutable access to the raw data.
