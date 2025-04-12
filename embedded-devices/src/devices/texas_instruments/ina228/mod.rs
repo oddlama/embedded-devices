@@ -273,9 +273,9 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
         let max_expected_current = max_expected_current.get::<ampere>();
         let max_expected_shunt_voltage = max_expected_shunt_voltage.get::<volt>();
 
-        self.current_lsb_na = ((1_000_000_000 * *max_expected_current.numer() as i64)
-            / (*max_expected_current.denom() as i64 * (1 << 19))) as i64;
-        let shunt_resistance_mohm = (1_000 * *shunt_resistance.numer() as i64) / (*shunt_resistance.denom() as i64);
+        self.current_lsb_na =
+            (1_000_000_000 * { *max_expected_current.numer() }) / ({ *max_expected_current.denom() } * (1 << 19));
+        let shunt_resistance_mohm = (1_000 * { *shunt_resistance.numer() }) / { *shunt_resistance.denom() };
 
         // If the expected shunt voltage exceeds this threshold, we enable the input prescaler
         let div4_threshold = Rational64::new(36, 1000); // 36mV
@@ -287,7 +287,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
 
         // Set adc range
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
-        self.write_register(&reg_conf.with_adc_range(self.adc_range)).await?;
+        self.write_register(reg_conf.with_adc_range(self.adc_range)).await?;
 
         // Calibration Register = 13107.2 x 10^6 x CURRENT_LSB (expected current / 1<<19) x R_SHUNT (in Ω) * 4 / adc_range,
         // we juggle some numbers around to get a higher precision calculation with u32.
@@ -370,7 +370,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
 
         // Initiate measurement
         self.write_register(
-            &reg_adc_conf
+            reg_adc_conf
                 .with_operating_mode(self::registers::OperatingMode::Triggered)
                 .with_enable_temperature(true)
                 .with_enable_shunt(true)

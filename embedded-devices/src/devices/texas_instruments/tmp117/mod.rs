@@ -161,7 +161,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     /// The datasheet specifies a time to reset of 2ms which is
     /// automatically awaited before allowing further communication.
     pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
-        self.write_register(&self::registers::Configuration::default().with_soft_reset(true))
+        self.write_register(self::registers::Configuration::default().with_soft_reset(true))
             .await?;
         delay.delay_ms(2).await;
         Ok(())
@@ -177,7 +177,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
         use self::registers::{EepromLockMode, EepromUnlock};
 
         // Unlock EEPROM
-        self.write_register(&EepromUnlock::default().with_lock_mode(EepromLockMode::Unlocked))
+        self.write_register(EepromUnlock::default().with_lock_mode(EepromLockMode::Unlocked))
             .await
             .map_err(EepromError::Bus)?;
 
@@ -194,7 +194,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
                 .read_busy()
             {
                 // EEPROM write complete, lock eeprom again
-                self.write_register(&EepromUnlock::default().with_lock_mode(EepromLockMode::Locked))
+                self.write_register(EepromUnlock::default().with_lock_mode(EepromLockMode::Locked))
                     .await
                     .map_err(EepromError::Bus)?;
 
@@ -224,7 +224,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
         reg_conf.write_conversion_mode(ConversionMode::Oneshot);
 
         // Initiate measurement
-        self.write_register(&reg_conf).await?;
+        self.write_register(reg_conf).await?;
 
         // Active conversion time is only linearly influenced by the averaging factor.
         // A single-conversion takes 15.5ms.

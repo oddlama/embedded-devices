@@ -26,6 +26,7 @@
 //! - sleep mode
 //! - normal mode
 //! - forced mode
+//!
 //! In order to tailor data rate, noise, response time and current consumption to the needs of the user, a
 //! variety of oversampling modes, filter modes and data rates can be selected.
 //!
@@ -145,7 +146,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// advanced settings, please directly update the respective registers.
     pub async fn configure<D: hal::delay::DelayNs>(&mut self, config: &Configuration) -> Result<(), Error<I::Error>> {
         self.write_register(
-            &ControlMeasurement::default()
+            ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )
@@ -154,7 +155,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
 
         let mut reg_config = self.read_register::<Config>().await.map_err(Error::Bus)?;
         reg_config.write_filter(config.iir_filter);
-        self.write_register(&reg_config).await.map_err(Error::Bus)?;
+        self.write_register(reg_config).await.map_err(Error::Bus)?;
 
         Ok(())
     }
@@ -165,7 +166,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
     pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
-        self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
+        self.write_register(ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
             .await
             .map_err(Error::Bus)?;
 

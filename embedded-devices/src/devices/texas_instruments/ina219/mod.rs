@@ -273,7 +273,7 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
             .map_err(MeasurementError::Bus)?;
 
         // Initiate measurement
-        self.write_register(&reg_conf.with_operating_mode(self::registers::OperatingMode::ShuntAndBusTriggered))
+        self.write_register(reg_conf.with_operating_mode(self::registers::OperatingMode::ShuntAndBusTriggered))
             .await
             .map_err(MeasurementError::Bus)?;
 

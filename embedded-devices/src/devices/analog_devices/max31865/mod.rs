@@ -157,18 +157,18 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     ) -> Result<(), FaultDetectionError<I::Error>> {
         // Configure the wiring mode and filter mode
         self.write_register(
-            &self::registers::Configuration::default()
+            self::registers::Configuration::default()
                 .with_wiring_mode(wiring_mode)
                 .with_filter_mode(filter_mode),
         )
         .await
         .map_err(FaultDetectionError::Bus)?;
 
-        self.write_register(&self::registers::FaultThresholdLow::default().with_resistance_ratio(0))
+        self.write_register(self::registers::FaultThresholdLow::default().with_resistance_ratio(0))
             .await
             .map_err(FaultDetectionError::Bus)?;
 
-        self.write_register(&self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
+        self.write_register(self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
             .await
             .map_err(FaultDetectionError::Bus)?;
 
@@ -189,7 +189,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         // which should be plenty of time to charge the RC filter.
         // Typically a 100nF cap is used which should charge significantly faster.
         self.write_register(
-            &reg_conf
+            reg_conf
                 .with_enable_bias_voltage(true)
                 .with_conversion_mode(self::registers::ConversionMode::NormallyOff)
                 .with_clear_fault_status(false)
@@ -213,7 +213,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
             // Check if fault detection is done
             if cycle == FaultDetectionCycle::Finished {
                 // Disable VBIAS
-                self.write_register(&reg_conf.with_enable_bias_voltage(false))
+                self.write_register(reg_conf.with_enable_bias_voltage(false))
                     .await
                     .map_err(FaultDetectionError::Bus)?;
 
@@ -236,7 +236,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         }
 
         // Disable VBIAS
-        self.write_register(&reg_conf.with_enable_bias_voltage(false))
+        self.write_register(reg_conf.with_enable_bias_voltage(false))
             .await
             .map_err(FaultDetectionError::Bus)?;
 
@@ -304,13 +304,13 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         // Enable VBIAS before initiating one-shot measurement,
         // 10.5 RC time constants are recommended plus 1ms extra.
         // So we just wait 2ms which should be plenty of time.
-        self.write_register(&reg_conf.with_enable_bias_voltage(true))
+        self.write_register(reg_conf.with_enable_bias_voltage(true))
             .await
             .map_err(ReadTemperatureError::Bus)?;
         delay.delay_us(2000).await;
 
         // Initiate measurement
-        self.write_register(&reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
+        self.write_register(reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
             .await
             .map_err(ReadTemperatureError::Bus)?;
 
@@ -322,9 +322,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         delay.delay_us(2000 + measurement_time_us).await;
 
         // Revert config (disable VBIAS)
-        self.write_register(&reg_conf)
-            .await
-            .map_err(ReadTemperatureError::Bus)?;
+        self.write_register(reg_conf).await.map_err(ReadTemperatureError::Bus)?;
 
         // Return conversion result
         self.read_temperature().await

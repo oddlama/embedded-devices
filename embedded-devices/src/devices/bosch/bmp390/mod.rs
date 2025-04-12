@@ -291,7 +291,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     ///
     /// This will check the status register for success, returning an error otherwise.
     pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
-        self.write_register(&self::registers::Command::default().with_command(Cmd::Reset))
+        self.write_register(self::registers::Command::default().with_command(Cmd::Reset))
             .await
             .map_err(Error::Bus)?;
         delay.delay_ms(10).await;

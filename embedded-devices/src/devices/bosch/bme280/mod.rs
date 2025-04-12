@@ -430,7 +430,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     ///
     /// This will check the status register for success, returning an error otherwise.
     pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
-        self.write_register(&self::registers::Reset::default())
+        self.write_register(self::registers::Reset::default())
             .await
             .map_err(Error::Bus)?;
         delay.delay_ms(2).await;
@@ -457,13 +457,13 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
-        self.write_register(&ControlHumidity::default().with_oversampling(config.humidity_oversampling))
+        self.write_register(ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await
             .map_err(Error::Bus)?;
 
         // This must happen after ControlHumidity, otherwise the former will not have any effect
         self.write_register(
-            &ControlMeasurement::default()
+            ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )
@@ -472,7 +472,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
 
         let mut reg_config = self.read_register::<Config>().await.map_err(Error::Bus)?;
         reg_config.write_filter(config.iir_filter);
-        self.write_register(&reg_config).await.map_err(Error::Bus)?;
+        self.write_register(reg_config).await.map_err(Error::Bus)?;
 
         Ok(())
     }
@@ -487,7 +487,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// [`Self::calibrate`]. Pressure and humitidy measurements specifically require temperature
     /// measurements to be enabled.
     pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
-        self.write_register(&ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
+        self.write_register(ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
             .await
             .map_err(Error::Bus)?;
 

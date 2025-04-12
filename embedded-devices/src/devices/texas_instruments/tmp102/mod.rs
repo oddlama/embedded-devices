@@ -116,7 +116,7 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
         reg_conf.write_oneshot(true);
 
         // Initiate measurement
-        self.write_register(&reg_conf).await?;
+        self.write_register(reg_conf).await?;
 
         // Wait for the duration of the conversion
         let active_conversion_time = reg_conf.read_conversion_cycle_time().conversion_time_ms() + 10;
@@ -164,7 +164,7 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
         reg_conf.write_shutdown(false);
 
         // Initiate measurement
-        self.write_register(&reg_conf).await?;
+        self.write_register(reg_conf).await?;
 
         Ok(())
     }
