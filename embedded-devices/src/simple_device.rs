@@ -31,7 +31,7 @@ macro_rules! i2c {
                     interface: embedded_registers::i2c::I2cDevice::new(
                         interface,
                         address.into()
-                    )
+                    ),
                 }
             }
         }

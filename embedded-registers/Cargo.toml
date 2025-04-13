@@ -12,6 +12,7 @@ categories.workspace = true
 license.workspace = true
 
 [dependencies]
+arrayvec = { version = "0.7.6", default-features = false }
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
 bytemuck = { version = "1.22.0", features = ["derive", "min_const_generics"] }
 crc = "3.2.1"
