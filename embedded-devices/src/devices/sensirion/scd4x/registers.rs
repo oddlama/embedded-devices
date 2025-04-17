@@ -86,7 +86,7 @@ pub struct GetSensorAltitude {
 #[register(address = 0xe000, mode = "rw")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AmbientPressure {
-    #[register(default = 101300)]
+    #[register(default = 1013)]
     pub pressure: u16,
 }
 
@@ -165,11 +165,11 @@ pub struct PersistSettings {}
 /// Reading out the serial number can be used to identify the chip and to verify the presence of
 /// the sensor.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3682, mode = "w")]
+#[register(address = 0x3682, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct GetSerialNumber {
     #[bondrewd(bit_length = 48)]
-    pub serial_number: u16,
+    pub serial_number: u64,
 }
 
 /// The perform_self_test command can be used as an end-of-line test to check the sensor
@@ -178,7 +178,10 @@ pub struct GetSerialNumber {
 #[register(address = 0x3639, mode = "r")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct PerformSelfTest {
-    pub status: u16,
+    pub status: u8,
+    #[bondrewd(reserve)]
+    #[allow(dead_code)]
+    pub reserved0: u8,
 }
 
 /// The perform_factory_reset command resets all configuration settings stored in the EEPROM and
