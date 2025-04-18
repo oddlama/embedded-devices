@@ -162,6 +162,7 @@ pub struct BME280Common<I: embedded_registers::RegisterInterface, const IS_BME: 
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
+#[cfg(feature = "sync")]
 pub type BME280Sync<I> = BME280CommonSync<I, true>;
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
@@ -169,16 +170,17 @@ pub type BME280Sync<I> = BME280CommonSync<I, true>;
 /// a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
+#[cfg(feature = "async")]
 pub type BME280Async<I> = BME280CommonAsync<I, true>;
 
 /// Common configuration values for the BME280 sensor.
 #[derive(Debug, Clone)]
 pub struct Configuration {
-    /// The oversampling rate for temperature mesurements
+    /// The oversampling rate for temperature measurements
     pub temperature_oversampling: Oversampling,
-    /// The oversampling rate for pressure mesurements
+    /// The oversampling rate for pressure measurements
     pub pressure_oversampling: Oversampling,
-    /// The oversampling rate for humidity mesurements
+    /// The oversampling rate for humidity measurements
     pub humidity_oversampling: Oversampling,
     /// The iir filter to use
     pub iir_filter: IIRFilter,

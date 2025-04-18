@@ -11,7 +11,7 @@ pub enum Address {
     /// so the resulting address is `0b11{a2}{a1}{a0}`.
     Alternative { a2: bool, a1: bool, a0: bool },
     /// Custom address not directly supported by the device, but may be useful
-    /// when using I2c address translators.
+    /// when using I2C address translators.
     Custom(u8),
 }
 

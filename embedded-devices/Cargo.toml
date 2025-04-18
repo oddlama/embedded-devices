@@ -23,6 +23,7 @@ embedded-registers = { version = "0.9.12", path = "../embedded-registers", defau
 maybe-async-cfg = "0.2.5"
 paste = "1.0.15"
 uom = { version = "0.36.0", features = ["f32", "f64", "si", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "rational32", "rational64"], default-features = false }
+crc = "3.2.1"
 
 [features]
 default = ["sync", "async"]
@@ -51,6 +52,9 @@ texas_instruments-ina219 = []
 texas_instruments-ina228 = []
 texas_instruments-tmp102 = []
 texas_instruments-tmp117 = []
+
+# Sensirion
+sensirion-scd4x = []
 
 [package.metadata.docs.rs]
 all-features = true

@@ -34,7 +34,7 @@ pub enum Address {
     /// Address selection pins A0 and A1 tied to specific pins
     A0A1(Pin, Pin),
     /// Custom address not directly supported by the device, but may be useful
-    /// when using I2c address translators.
+    /// when using I2C address translators.
     Custom(u8),
 }
 

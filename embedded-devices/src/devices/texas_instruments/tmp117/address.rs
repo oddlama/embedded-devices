@@ -16,7 +16,7 @@ pub enum Address {
     /// Address selection pin connected to SCL
     Scl,
     /// Custom address not directly supported by the device, but may be useful
-    /// when using I2c address translators.
+    /// when using I2C address translators.
     Custom(u8),
 }
 
