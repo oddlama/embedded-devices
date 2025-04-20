@@ -5,7 +5,6 @@
   Last time I checked the most popular fixed point library was not available for no_std.
 - reexport uom
 - scd41 panics on crc error, pls fix
-- scd41 does not call reinit, if intended remove use Reinit, if not adjust call
 - (minor) dot (.) at the end of docstrings? I'm being very inconsistent here
 - use thiserr
 - all defmt derives only if defmt feature is enabled

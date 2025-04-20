@@ -207,17 +207,21 @@ impl<I> SCD4x<I>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
-    /// Initialize the sensor by waiting for the boot-up period and verifying its device id. The
-    /// datasheet specifies a power-on-reset time of 30ms. Calling this function is not mandatory,
-    /// but recommended to ensure proper operation.
+    /// Initializes the sensor by first waking the sensor, then stop any ongoing measurement, calls
+    /// reinit and finally verifies its device id. Calling this function is mandatory to ensure
+    /// subsequent function calls know the sensor variant.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
         let _ = self.write_register(WakeUp::default()).await;
         delay.delay_ms(30).await;
+
         self.write_register(StopPeriodicMeasurement::default())
             .await
             .map_err(Error::Bus)?;
         delay.delay_ms(600).await;
-        //self.write_register(Reinit::default()).await.map_err(Error::Bus)?;
+
+        self.write_register(Reinit::default()).await.map_err(Error::Bus)?;
+        delay.delay_ms(30).await;
+
         let device_id = self.read_register::<GetSensorVariant>().await.map_err(Error::Bus)?;
         if (device_id.read_variant() & 0xF000) == self::registers::SENSOR_VARIANT_SCD40 {
             self.variant = SensorVariant::SCD40
