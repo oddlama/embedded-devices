@@ -320,14 +320,6 @@ an address translation unit. The address can be any type that is convertible to
 the underlying `embedded_hal::i2c::AddressMode` of the bus (7-bit or 10-bit
 addressing).
 
-For very simple devices that need no additional functionality there is a
-convenience macro called `simple_device::i2c!` that writes the above implementation
-for you:
-
-```rust
-simple_device::i2c!(MyDevice, MyAddress, SevenBitAddress, OneByteRegAddrCodec);
-```
-
 ### High-level device functions
 
 Now that we have a device and a way to read or write registers, we want to

@@ -125,13 +125,27 @@ pub struct TMP117<I: embedded_registers::RegisterInterface> {
     interface: I,
 }
 
-crate::simple_device::i2c!(
-    TMP117,
-    self::address::Address,
-    SevenBitAddress,
-    TMP117I2cCodec,
-    "init=wanted"
-);
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I> TMP117<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, TMP117I2cCodec>>
+where
+    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+{
+    /// Initializes a new device with the given address on the specified bus.
+    /// This consumes the I2C bus `I`.
+    ///
+    /// Before using this device, you should call the [`Self::init`] method which
+    /// initializes the device and ensures that it is working correctly.
+    #[inline]
+    pub fn new_i2c(interface: I, address: self::address::Address) -> Self {
+        Self {
+            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+        }
+    }
+}
 
 #[device_impl]
 #[maybe_async_cfg::maybe(

@@ -141,7 +141,7 @@ pub enum Error<BusError> {
 pub struct SCD4xCrcCodec {}
 
 impl Crc8Algorithm for SCD4xCrcCodec {
-    fn new() -> &'static Algorithm<u8> {
+    fn instance() -> &'static Algorithm<u8> {
         const CUSTOM_ALG: crc::Algorithm<u8> = CRC_8_NRSC_5;
         &CUSTOM_ALG
     }
@@ -295,7 +295,7 @@ where
         }
     }
     pub async fn perform_self_test<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
-        let crc = crc::Crc::<u8>::new(SCD4xCrcCodec::new());
+        let crc = crc::Crc::<u8>::new(SCD4xCrcCodec::instance());
         let header = &PerformSelfTest::ADDRESS.to_be_bytes()[core::mem::size_of_val(&PerformSelfTest::ADDRESS) - 2..];
 
         let mut array = [0u8; 3];

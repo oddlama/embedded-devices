@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use crate::{ReadableRegister, WritableRegister};
 use arrayvec::ArrayVec;
 use bytemuck::Zeroable;
-use crc::{Algorithm, CRC_8_NRSC_5};
+use crc::Algorithm;
 
 /// This codec implements an I2C codec utilizing crc checksums for data
 /// The main variables are:
@@ -32,7 +32,7 @@ use crc::{Algorithm, CRC_8_NRSC_5};
 /// struct MyCrc {}
 ///
 /// impl Crc8Algorithm for MyCrc {
-///     fn new() -> &'static Algorithm<u8> {
+///     fn instance() -> &'static Algorithm<u8> {
 ///         const CUSTOM_ALG: crc::Algorithm<u8> = CRC_8_NRSC_5;
 ///         &CUSTOM_ALG
 ///     }
@@ -44,7 +44,7 @@ pub struct Crc8Codec<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8A
 
 pub trait Crc8Algorithm: Default {
     /// Return reference to global static CRC Algorithm
-    fn new() -> &'static Algorithm<u8>;
+    fn instance() -> &'static Algorithm<u8>;
 }
 
 #[maybe_async_cfg::maybe(
@@ -63,7 +63,7 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        let crc = crc::Crc::<u8>::new(C::new());
+        let crc = crc::Crc::<u8>::new(C::instance());
         let header = &R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..];
 
         let mut array = ArrayVec::<_, 64>::new();
@@ -107,7 +107,7 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
             header: [u8; HEADER_SIZE],
             register: R,
         }
-        let crc = crc::Crc::<u8>::new(C::new());
+        let crc = crc::Crc::<u8>::new(C::instance());
 
         let mut buffer = Buffer::<{ HEADER_SIZE }, R> {
             header: R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..]

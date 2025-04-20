@@ -5,7 +5,6 @@
 #![feature(generic_arg_infer)]
 
 pub mod devices;
-pub(crate) mod simple_device;
 pub mod utils;
 
 #[cfg(test)]
