@@ -39,7 +39,7 @@ pub struct ReadMeasurement {
 /// air flow. Thus, the SCD4x temperature offset should be determined after integration into the
 /// final device and under its typical operating conditions (including the operation mode to be
 /// used in the application) in thermal equilibrium. By default, the temperature offset is set to 4
-/// °C. To save the setting to the EEPROM, the [`Self::PersistSettings`] command may be issued.
+/// °C. To save the setting to the EEPROM, the [`PersistSettings`] command may be issued.
 ///
 /// Recommended temperature offset values are between 0°C and 20°C.
 #[device_register(super::SCD4x)]

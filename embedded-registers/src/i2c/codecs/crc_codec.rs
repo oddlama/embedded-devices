@@ -28,6 +28,8 @@ use crc::Algorithm;
 /// | `CHUNK_SIZE` | `usize` | The size of a chunk that has a singular crc sum attached in bytes |
 /// | `C` | `Crc8Algorithm` | A static reference to the crc algorithm to be used |
 /// Example implemenation for a basic CRC Algorithm:
+///
+/// ```
 /// #[derive(Default)]
 /// struct MyCrc {}
 ///
@@ -37,6 +39,7 @@ use crc::Algorithm;
 ///         &CUSTOM_ALG
 ///     }
 /// }
+/// ```
 #[derive(Default)]
 pub struct Crc8Codec<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm> {
     _algo: PhantomData<C>,

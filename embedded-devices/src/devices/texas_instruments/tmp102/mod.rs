@@ -102,9 +102,6 @@ where
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
-    ///
-    /// Before using this device, you should call the [`Self::init`] method which
-    /// initializes the device and ensures that it is working correctly.
     #[inline]
     pub fn new_i2c(interface: I, address: self::address::Address) -> Self {
         Self {
