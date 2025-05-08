@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.9.12"
+version = "0.9.13"
 authors = ["oddlama <oddlama@oddlama.org>"]
 homepage = "https://github.com/oddlama/embedded-devices"
 repository = "https://github.com/oddlama/embedded-devices"
