@@ -143,7 +143,7 @@ pub struct Measurements {
 pub(super) struct TFine(i32);
 
 /// The common base for both BME280 and BMP280.
-/// For a full description and usage examples, refer to the for the [BME280](self) and [BMP280](super::bmp280).
+/// For a full description and usage examples, refer to [BME280](self).
 #[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
