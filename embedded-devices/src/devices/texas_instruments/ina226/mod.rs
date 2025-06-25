@@ -1,0 +1,370 @@
+//! # INA226
+//!
+//! The INA226 is a current shunt and power monitor with an I2C- or SMBUS-compatible interface.
+//! The device monitors both a shunt voltage drop and bus supply voltage.
+//! Programmable calibration value, conversion times, and averaging,combined with an
+//! internal multiplier, enable direct readouts of current in amperes and power in watts.
+//!
+//! The INA226 senses current on common-mode bus voltages that can vary from 0V to 36V,
+//! independent of the supply voltage. The device operates from a single 2.7V to 5.5V supply,
+//! drawing a typical of 330μA of supply current. The device is specified over the
+//! operating temperature range between –40°C and 125°C and features
+//! up to 16 programmable addresses on the I2C-compatible interface.
+//!
+//! ## Usage (sync)
+//!
+//! ```rust, only_if(sync)
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::texas_instruments::ina226::{INA226Sync, address::Address, address::Pin};
+//! use uom::num_rational::Rational64;
+//! use uom::num_traits::ToPrimitive;
+//! use uom::si::electric_current::{ampere, milliampere};
+//! use uom::si::electric_potential::millivolt;
+//! use uom::si::electrical_resistance::ohm;
+//! use uom::si::power::milliwatt;
+//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//!
+//! // Create and initialize the device
+//! let mut ina226 = INA226Sync::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! ina226.init(
+//!    &mut Delay,
+//!   // Most units use a 100mΩ shunt resistor
+//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   // Maximum expected current 3A
+//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//! ).unwrap();
+//!
+//! // One-shot read all values
+//! let measurements = ina226.oneshot(&mut Delay).unwrap();
+//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
+//! let current = measurements.current.get::<milliampere>().to_f32();
+//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust, only_if(async)
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::texas_instruments::ina226::{INA226Async, address::Address, address::Pin};
+//! use uom::num_rational::Rational64;
+//! use uom::num_traits::ToPrimitive;
+//! use uom::si::electric_current::{ampere, milliampere};
+//! use uom::si::electric_potential::millivolt;
+//! use uom::si::electrical_resistance::ohm;
+//! use uom::si::power::milliwatt;
+//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//!
+//! // Create and initialize the device
+//! let mut ina226 = INA226Async::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! ina226.init(
+//!    &mut Delay,
+//!   // Most units use a 100mΩ shunt resistor
+//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   // Maximum expected current 3A
+//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//! ).await.unwrap();
+//!
+//! // One-shot read all values
+//! let measurements = ina226.oneshot(&mut Delay).await.unwrap();
+//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
+//! let current = measurements.current.get::<milliampere>().to_f32();
+//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
+//! # Ok(())
+//! # }
+//! ```
+
+use self::address::Address;
+
+use embedded_devices_derive::{device, device_impl};
+use uom::si::electric_current::ampere;
+use uom::si::electrical_resistance::ohm;
+use uom::si::rational64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
+
+pub mod address;
+pub mod registers;
+
+type INA226I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+
+/// All possible errors that may occur in device initialization
+#[derive(Debug, defmt::Format)]
+pub enum InitError<BusError> {
+    /// Bus error
+    Bus(BusError),
+    /// Invalid Die Id was encountered
+    InvalidDieId,
+    /// Invalid Manufacturer Id was encountered
+    InvalidManufacturerId,
+}
+
+/// Measurement data
+#[derive(Debug)]
+pub struct Measurements {
+    /// Measured voltage across the shunt
+    pub shunt_voltage: ElectricPotential,
+    /// Measured voltage on the bus
+    pub bus_voltage: ElectricPotential,
+    /// Measured current
+    pub current: ElectricCurrent,
+    /// Measured power
+    pub power: Power,
+}
+
+/// All possible errors that may occur during measurement
+#[derive(Debug)]
+pub enum MeasurementError<BusError> {
+    /// Bus error
+    Bus(BusError),
+    /// The conversion ready flag was not set within the expected time frame.
+    Timeout,
+    /// Measurements were ready, but an overflow occurred. The power and
+    /// current measurements may be incorrect.
+    Overflow(Measurements),
+}
+
+/// The INA226 is an ultra-precise digital power monitor with a 16-bit delta-sigma ADC
+/// for high- or low-side current-sensing applications. The device can measure a full-scale
+/// differential input of ±81.92 mV across a resistive shunt sense element with bus
+/// voltage support from 0 V to +36 V.
+///
+/// For a full description and usage examples, refer to the [module documentation](self).
+#[device]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+pub struct INA226<I: embedded_registers::RegisterInterface> {
+    /// The interface to communicate with the device
+    interface: I,
+    /// Shunt resistance
+    shunt_resistance: ElectricalResistance,
+    /// Maximum expected current
+    max_expected_current: ElectricCurrent,
+    /// Configured nA/LSB for current readings
+    current_lsb_na: i64,
+}
+
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I> INA226<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, INA226I2cCodec>>
+where
+    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+{
+    /// Initializes a new device with the given address on the specified bus.
+    /// This consumes the I2C bus `I`.
+    ///
+    /// Before using this device, you should call the [`Self::init`] method which
+    /// saves the calibration values to enable current and power output.
+    #[inline]
+    pub fn new_i2c(interface: I, address: Address) -> Self {
+        Self {
+            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            shunt_resistance: Default::default(),
+            max_expected_current: Default::default(),
+            current_lsb_na: 1,
+        }
+    }
+}
+
+#[device_impl]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> INA226<I> {
+    /// Soft-resets the device, calibrates it with the given shunt resistor
+    /// value and maximum expected current.
+    ///
+    /// You can change the values later using [`Self::calibrate`].
+    pub async fn init<D: hal::delay::DelayNs>(
+        &mut self,
+        delay: &mut D,
+        shunt_resistance: ElectricalResistance,
+        max_expected_current: ElectricCurrent,
+    ) -> Result<(), InitError<I::Error>> {
+        use registers::{DieId, ManufacturerId};
+
+        // Reset the device and wait for 0.5ms. The datasheet does not define
+        // a specific startup time so we use a similar value as the INA228.
+        self.reset().await.map_err(InitError::Bus)?;
+        delay.delay_us(500).await;
+
+        // Verify we are talking to the correct device
+        let manufacturer_id = self.read_register::<ManufacturerId>().await.map_err(InitError::Bus)?;
+        if manufacturer_id.read_id() != ManufacturerId::default().read_id() {
+            return Err(InitError::InvalidManufacturerId);
+        }
+        let device_id = self.read_register::<DieId>().await.map_err(InitError::Bus)?;
+        if device_id.read_id() != DieId::default().read_id() {
+            return Err(InitError::InvalidDieId);
+        }
+
+        self.calibrate(shunt_resistance, max_expected_current)
+            .await
+            .map_err(InitError::Bus)?;
+
+        Ok(())
+    }
+
+    /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
+    pub async fn reset(&mut self) -> Result<(), I::Error> {
+        self.write_register(self::registers::Configuration::default().with_reset(true))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Writes the given shunt resistance and maximum expected current into
+    /// the device configuration register. This enables power and current output.
+    pub async fn calibrate(
+        &mut self,
+        shunt_resistance: ElectricalResistance,
+        max_expected_current: ElectricCurrent,
+    ) -> Result<(), I::Error> {
+        self.shunt_resistance = shunt_resistance;
+        self.max_expected_current = max_expected_current;
+
+        let shunt_resistance = shunt_resistance.get::<ohm>();
+        let max_expected_current = max_expected_current.get::<ampere>();
+
+        self.current_lsb_na =
+            (1_000_000_000 * *max_expected_current.numer()) / (*max_expected_current.denom() * (1 << 15));
+        let shunt_resistance_mohm = (1_000 * *shunt_resistance.numer()) / (*shunt_resistance.denom());
+
+        // Calibration Register = 0.00512 / (current_lsb (A) * shunt_resistance (Ω))
+        let cal = 5_120_000_000 / (self.current_lsb_na * shunt_resistance_mohm);
+        self.write_register(self::registers::Calibration::default().with_raw_value(cal as u16))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Returns the currently stored measurement values without triggering a new measurement.
+    /// A timeout error cannot occur here.
+    pub async fn read_measurements(&mut self) -> Result<Measurements, MeasurementError<I::Error>> {
+        let bus_voltage = self
+            .read_register::<self::registers::BusVoltage>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let shunt_voltage = self
+            .read_register::<self::registers::ShuntVoltage>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let current = self
+            .read_register::<self::registers::Current>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let power = self
+            .read_register::<self::registers::Power>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let flags = self
+            .read_register::<self::registers::MaskEnable>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        let measurements = Measurements {
+            shunt_voltage: shunt_voltage.read_voltage(),
+            bus_voltage: bus_voltage.read_voltage(),
+            current: current.read_current(self.current_lsb_na),
+            power: power.read_power(self.current_lsb_na),
+        };
+
+        if flags.read_math_overflow_flag() {
+            Err(MeasurementError::Overflow(measurements))
+        } else {
+            Ok(measurements)
+        }
+    }
+
+    /// Performs a one-shot measurement of all values.
+    pub async fn oneshot<D: hal::delay::DelayNs>(
+        &mut self,
+        delay: &mut D,
+    ) -> Result<Measurements, MeasurementError<I::Error>> {
+        let reg_conf = self
+            .read_register::<self::registers::Configuration>()
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        // Initiate measurement
+        self.write_register(reg_conf.with_operating_mode(self::registers::OperatingMode::ShuntAndBusTriggered))
+            .await
+            .map_err(MeasurementError::Bus)?;
+
+        // Wait until measurement is ready, plus 10% and 1ms extra
+        let mut measurement_time_us = reg_conf.total_conversion_time_us();
+        measurement_time_us += measurement_time_us / 10; // 10% extra (data sheet conversion times state ~10% higher maximum times)
+        delay.delay_us(1000 + measurement_time_us).await;
+
+        // Wait for the conversion ready flag to be set
+        const TRIES: u8 = 5;
+        for _ in 0..TRIES {
+            let flags = self
+                .read_register::<self::registers::MaskEnable>()
+                .await
+                .map_err(MeasurementError::Bus)?;
+
+            if !flags.read_conversion_ready_flag() {
+                delay.delay_us(1000).await;
+                continue;
+            }
+
+            let bus_voltage = self
+                .read_register::<self::registers::BusVoltage>()
+                .await
+                .map_err(MeasurementError::Bus)?;
+
+            let shunt_voltage = self
+                .read_register::<self::registers::ShuntVoltage>()
+                .await
+                .map_err(MeasurementError::Bus)?;
+
+            let current = self
+                .read_register::<self::registers::Current>()
+                .await
+                .map_err(MeasurementError::Bus)?;
+
+            // Reading this register clears the conversion_ready flag
+            let power = self
+                .read_register::<self::registers::Power>()
+                .await
+                .map_err(MeasurementError::Bus)?;
+
+            let measurements = Measurements {
+                shunt_voltage: shunt_voltage.read_voltage(),
+                bus_voltage: bus_voltage.read_voltage(),
+                current: current.read_current(self.current_lsb_na),
+                power: power.read_power(self.current_lsb_na),
+            };
+
+            if flags.read_math_overflow_flag() {
+                return Err(MeasurementError::Overflow(measurements));
+            } else {
+                return Ok(measurements);
+            }
+        }
+
+        Err(MeasurementError::Timeout)
+    }
+}
