@@ -16,7 +16,7 @@ you get:
 - 🧵 **Supports both sync and async** usage for each driver - simultaneously if needed
 - 🧩 **Consistent interaction** with all devices following the same principles
 - 🧪 **Physical quantities** and their units like °C/°F or Ω
-  are associated to each value to prevent mix-ups and to allow automatic conversions
+  are associated to each value to prevent mix-ups and to allow automatic unit conversions
 
 Please refer to the list below for supported devices. For driver developers,
 this framework aims to make it a lot easier to write consistent and

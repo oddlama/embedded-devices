@@ -25,7 +25,7 @@
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
 //!
 //! let ratio = max31865
-//!     .read_temperature()?
+//!     .measure(&mut Delay)?
 //!     .get::<degree_celsius>();
 //! println!("Current raw resistance ratio: {:?}", ratio);
 //! # Ok(())
@@ -50,7 +50,7 @@
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
 //! let ratio = max31865
-//!     .read_temperature()
+//!     .measure(&mut Delay)
 //!     .await?
 //!     .get::<degree_celsius>();
 //! println!("Current raw resistance ratio: {:?}", ratio);
@@ -292,7 +292,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     }
 
     /// Performs a one-shot measurement.
-    pub async fn oneshot<D: hal::delay::DelayNs>(
+    pub async fn measure<D: hal::delay::DelayNs>(
         &mut self,
         delay: &mut D,
     ) -> Result<ThermodynamicTemperature, ReadTemperatureError<I::Error>> {

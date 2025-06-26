@@ -39,7 +39,7 @@
 //! ).unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina226.oneshot(&mut Delay).unwrap();
+//! let measurements = ina226.measure(&mut Delay).unwrap();
 //! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
 //! let current = measurements.current.get::<milliampere>().to_f32();
 //! let power = measurements.power.get::<milliwatt>().to_f32();
@@ -76,7 +76,7 @@
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina226.oneshot(&mut Delay).await.unwrap();
+//! let measurements = ina226.measure(&mut Delay).await.unwrap();
 //! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
 //! let current = measurements.current.get::<milliampere>().to_f32();
 //! let power = measurements.power.get::<milliwatt>().to_f32();
@@ -298,7 +298,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
     }
 
     /// Performs a one-shot measurement of all values.
-    pub async fn oneshot<D: hal::delay::DelayNs>(
+    pub async fn measure<D: hal::delay::DelayNs>(
         &mut self,
         delay: &mut D,
     ) -> Result<Measurements, MeasurementError<I::Error>> {

@@ -44,7 +44,7 @@
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.oneshot(&mut Delay)?.get::<degree_celsius>().to_f32();
+//! let temp = tmp117.measure(&mut Delay)?.get::<degree_celsius>().to_f32();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -76,7 +76,7 @@
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.oneshot(&mut Delay).await?.get::<degree_celsius>().to_f32();
+//! let temp = tmp117.measure(&mut Delay).await?.get::<degree_celsius>().to_f32();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -227,7 +227,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     ///
     /// This function will initialize the measurement, wait until the data is acquired and return
     /// the temperature.
-    pub async fn oneshot<D: hal::delay::DelayNs>(
+    pub async fn measure<D: hal::delay::DelayNs>(
         &mut self,
         delay: &mut D,
     ) -> Result<ThermodynamicTemperature, I::Error> {
