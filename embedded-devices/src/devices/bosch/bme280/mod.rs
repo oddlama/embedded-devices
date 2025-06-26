@@ -489,15 +489,14 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// [`Self::calibrate`]. Pressure and humitidy measurements specifically require temperature
     /// measurements to be enabled.
     pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
-        self.write_register(ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
             .await
             .map_err(Error::Bus)?;
 
-        // Read current oversampling config to determine required measurement delay
+        // Use current oversampling config to determine required measurement delay
         let reg_ctrl_h = self.read_register::<ControlHumidity>().await.map_err(Error::Bus)?;
         let o_h = reg_ctrl_h.read_oversampling();
-
-        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
         let o_t = reg_ctrl_m.read_temperature_oversampling();
         let o_p = reg_ctrl_m.read_pressure_oversampling();
 

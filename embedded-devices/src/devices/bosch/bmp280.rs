@@ -166,12 +166,12 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
     pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
-        self.write_register(ControlMeasurement::default().with_sensor_mode(SensorMode::Forced))
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
             .await
             .map_err(Error::Bus)?;
 
-        // Read current oversampling config to determine required measurement delay
-        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        // Use current oversampling config to determine required measurement delay
         let o_t = reg_ctrl_m.read_temperature_oversampling();
         let o_p = reg_ctrl_m.read_pressure_oversampling();
 
