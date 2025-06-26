@@ -49,6 +49,7 @@ microchip-mcp3208 = []
 
 # Texas Instrument
 texas_instruments-ina219 = []
+texas_instruments-ina226 = []
 texas_instruments-ina228 = []
 texas_instruments-tmp102 = []
 texas_instruments-tmp117 = []

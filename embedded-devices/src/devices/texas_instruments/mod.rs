@@ -1,5 +1,7 @@
 #[cfg(feature = "texas_instruments-ina219")]
 pub mod ina219;
+#[cfg(feature = "texas_instruments-ina226")]
+pub mod ina226;
 #[cfg(feature = "texas_instruments-ina228")]
 pub mod ina228;
 #[cfg(feature = "texas_instruments-tmp102")]
