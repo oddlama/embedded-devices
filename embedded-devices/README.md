@@ -59,6 +59,9 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Texas Instruments | INA228 | I2C | 85V, 20-bit current shunt and power monitor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/ina228/index.html) |
 | Texas Instruments | TMP102 | I2C | Temperature sensor with ±0.5°C to ±3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp102/index.html) |
 | Texas Instruments | TMP117 | I2C | Temperature sensor with ±0.1°C to ±0.3°C accuracy depending on the temperature range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/texas_instruments/tmp117/index.html) |
+| Sensirion | SCD40 | I2C | Photoacoustic NDIR CO₂ sensor (400-2000ppm) ±50ppm ±5.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
+| Sensirion | SCD41 | I2C | Improved photoacoustic NDIR CO₂ sensor (400-5000ppm) ±50ppm ±2.5%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
+| Sensirion | SCD43 | I2C | High accureacy photoacoustic NDIR CO₂ sensor (400-5000ppm) ±30ppm ±3.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
 
 ## Example usage
 
