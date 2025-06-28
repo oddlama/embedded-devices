@@ -223,6 +223,17 @@ pub enum TemperatureResolution {
     Deg_0_0625C = 0b11,
 }
 
+impl TemperatureResolution {
+    pub fn conversion_time_us(&self) -> u32 {
+        match self {
+            TemperatureResolution::Deg_0_5C => 30_000,
+            TemperatureResolution::Deg_0_25C => 65_000,
+            TemperatureResolution::Deg_0_125C => 130_000,
+            TemperatureResolution::Deg_0_0625C => 250_000,
+        }
+    }
+}
+
 /// The device resolution register.
 ///
 /// This register allows the user to change the sensor resolution.

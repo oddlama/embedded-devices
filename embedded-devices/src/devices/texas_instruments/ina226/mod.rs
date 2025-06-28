@@ -20,6 +20,7 @@
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Sync, address::Address, address::Pin};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -38,9 +39,9 @@
 //!
 //! // One-shot read all values
 //! let measurement = ina226.measure(&mut Delay).unwrap();
-//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
-//! let current = measurement.current.get::<milliampere>();();
-//! let power = measurement.power.get::<milliwatt>();();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
+//! let current = measurement.current.get::<milliampere>();
+//! let power = measurement.power.get::<milliwatt>();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -55,6 +56,7 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Async, address::Address, address::Pin};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -73,9 +75,9 @@
 //!
 //! // One-shot read all values
 //! let measurement = ina226.measure(&mut Delay).await.unwrap();
-//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
-//! let current = measurement.current.get::<milliampere>();();
-//! let power = measurement.power.get::<milliwatt>();();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
+//! let current = measurement.current.get::<milliampere>();
+//! let power = measurement.power.get::<milliwatt>();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -83,7 +85,7 @@
 
 use self::address::Address;
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use uom::si::electric_current::ampere;
 use uom::si::electrical_resistance::ohm;
 use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
@@ -105,15 +107,18 @@ pub enum InitError<BusError> {
 }
 
 /// Measurement data
-#[derive(Debug)]
+#[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
     /// Measured voltage across the shunt
     pub shunt_voltage: ElectricPotential,
     /// Measured voltage on the bus
+    #[measurement(Voltage)]
     pub bus_voltage: ElectricPotential,
     /// Measured current
+    #[measurement(Current)]
     pub current: ElectricCurrent,
     /// Measured power
+    #[measurement(Power)]
     pub power: Power,
 }
 
@@ -291,12 +296,22 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
             Ok(measurement)
         }
     }
+}
 
-    /// Performs a one-shot measurement of all values.
-    pub async fn measure<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<Measurement, MeasurementError<I::Error>> {
+#[sensor(Voltage, Current, Power)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA226<I> {
+    type Error = MeasurementError<I::Error>;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will set the operating mode to
+    /// [`self::registers::OperatingMode::ShuntAndBusTriggered´] and enable all conversion outputs causing the
+    /// device to perform a single conversion a return to sleep afterwards.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self
             .read_register::<self::registers::Configuration>()
             .await

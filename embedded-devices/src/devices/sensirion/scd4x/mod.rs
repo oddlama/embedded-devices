@@ -21,16 +21,20 @@
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::sensirion::scd4x::{SCD4xSync, address::Address};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::si::ratio::{part_per_million, percent};
 //!
 //! // Create and initialize the device
-//! let mut scd = SCD4xSync::new_i2c(i2c, Address::Default);
-//! scd.init(&mut Delay).unwrap();
+//! let mut scd4x = SCD4xSync::new_i2c(i2c, Address::Default);
+//! scd4x.init(&mut Delay).unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
-//! let measurement = scd.measure(&mut Delay)?;
+//! // Read the current temperature in °C
+//! let measurement = scd4x.measure(&mut Delay)?;
+//! let co2 = measurement.co2_concentration.get::<part_per_million>();
 //! let temp = measurement.temperature.get::<degree_celsius>();
-//! println!("Current temperature: {:?}°C", temp);
+//! let humidity = measurement.humidity.get::<percent>();
+//! println!("Current measurement: {:?}ppm CO₂, {:?}°C, {:?}%RH", co2, temp, humidity);
 //! # Ok(())
 //! # }
 //! ```
@@ -44,16 +48,20 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::sensirion::scd4x::{SCD4xAsync, address::Address};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
+//! use uom::si::ratio::{part_per_million, percent};
 //!
 //! // Create and initialize the device
-//! let mut scd = SCD4xAsync::new_i2c(i2c, Address::Default);
-//! scd.init(&mut Delay).await.unwrap();
+//! let mut scd4x = SCD4xAsync::new_i2c(i2c, Address::Default);
+//! scd4x.init(&mut Delay).await.unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
-//! let measurement = scd.measure(&mut Delay).await?;
+//! // Read the current temperature in °C
+//! let measurement = scd4x.measure(&mut Delay).await?;
+//! let co2 = measurement.co2_concentration.get::<part_per_million>();
 //! let temp = measurement.temperature.get::<degree_celsius>();
-//! println!("Current temperature: {:?}°C", temp);
+//! let humidity = measurement.humidity.get::<percent>();
+//! println!("Current measurement: {:?}ppm CO₂, {:?}°C, {:?}%RH", co2, temp, humidity);
 //! # Ok(())
 //! # }
 //! ```
@@ -62,7 +70,7 @@
 /// This is currently not supported as it consists of a write followed by a read 400 ms later
 /// The codec does not allow this as is.
 use crc::{Algorithm, CRC_8_NRSC_5};
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use embedded_registers::i2c::codecs::Crc8Algorithm;
 use registers::{
     AmbientPressure, GetDataReadyStatus, GetSensorVariant, GetSerialNumber, MeasureSingleShot, PowerDown,
@@ -99,12 +107,15 @@ pub enum SensorVariant {
 }
 
 /// Measurement data
-#[derive(Debug)]
+#[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
-    pub co2: Ratio,
+    #[measurement(Co2Concentration)]
+    pub co2_concentration: Ratio,
     /// Current temperature
+    #[measurement(Temperature)]
     pub temperature: ThermodynamicTemperature,
     /// Current relative humidity
+    #[measurement(RelativeHumidity)]
     pub humidity: Ratio,
 }
 
@@ -262,14 +273,14 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
             let ready = self.read_register::<GetDataReadyStatus>().await.map_err(Error::Bus)?;
             if (ready.read_status() & DATA_READY_MASK) != 0 {
                 let measurement = self.read_register::<ReadMeasurement>().await.map_err(Error::Bus)?;
-                let co2 = Ratio::new::<part_per_million>(measurement.read_co2() as f64);
+                let co2_concentration = Ratio::new::<part_per_million>(measurement.read_co2() as f64);
                 let temperature = (175 * measurement.read_temperature() as i32) as f64 / ((1 << 16) - 1) as f64;
                 let temperature = temperature - 45.0;
                 let temperature = ThermodynamicTemperature::new::<degree_celsius>(temperature);
                 let humidity = (100 * measurement.read_humidity() as i32) as f64 / ((1 << 16) - 1) as f64;
                 let humidity = Ratio::new::<percent>(humidity);
                 return Ok(Measurement {
-                    co2,
+                    co2_concentration,
                     temperature,
                     humidity,
                 });
@@ -457,11 +468,22 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
             _ => Ok(()),
         }
     }
+}
+
+#[sensor(Co2Concentration, Temperature, RelativeHumidity)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for SCD4x<I> {
+    type Error = Error<I::Error>;
+    type Measurement = Measurement;
 
     // Performs a one-shot measurement. If the sensor supports single shot measurement, we will
     // utilize this, otherwise a single shot measurement is emulated by starting and stopping
     // periodic measurement.
-    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurement, Error<I::Error>> {
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         match self.state {
             SensorState::Idle => match self.variant {
                 SensorVariant::SCD41 | SensorVariant::SCD43 => {

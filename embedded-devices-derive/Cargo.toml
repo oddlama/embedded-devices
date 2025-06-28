@@ -19,4 +19,5 @@ convert_case = "0.8.0"
 darling = "0.20.11"
 proc-macro2 = "1.0"
 quote = "1.0"
+regex = "1.11.1"
 syn = { version = "2.0", features = ["full"] }

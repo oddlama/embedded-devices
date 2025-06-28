@@ -29,7 +29,7 @@
 //! );
 //!
 //! let value = mcp3208.convert(InputChannel::Single0)?;
-//! let voltage = value.get::<millivolt>();();
+//! let voltage = value.get::<millivolt>();
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
 //! # }
@@ -53,7 +53,7 @@
 //! );
 //!
 //! let value = mcp3208.convert(InputChannel::Single0).await?;
-//! let voltage = value.get::<millivolt>();();
+//! let voltage = value.get::<millivolt>();
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
 //! # }

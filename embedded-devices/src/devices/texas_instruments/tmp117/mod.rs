@@ -36,7 +36,8 @@
 //! tmp117.init(&mut Delay).unwrap();
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.measure(&mut Delay)?.temperature.get::<degree_celsius>();
+//! let temp = tmp117.measure(&mut Delay)?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {}°C", temp);
 //! # Ok(())
 //! # }
@@ -59,13 +60,14 @@
 //! tmp117.init(&mut Delay).await.unwrap();
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.measure(&mut Delay).await?.temperature.get::<degree_celsius>();();
+//! let temp = tmp117.measure(&mut Delay).await?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use embedded_registers::WritableRegister;
 use uom::si::f64::ThermodynamicTemperature;
 
@@ -93,17 +95,11 @@ pub enum EepromError<BusError> {
 }
 
 /// Measurement data
-#[derive(Debug)]
+#[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
     /// Measured temperature
+    #[measurement(Temperature)]
     pub temperature: ThermodynamicTemperature,
-}
-
-impl crate::sensors::Measurement for Measurement {}
-impl crate::sensors::TemperatureMeasurement for Measurement {
-    fn temperature(&self) -> Option<ThermodynamicTemperature> {
-        todo!()
-    }
 }
 
 /// The TMP117 is a high-precision digital temperature sensor. It provides a 16-bit
@@ -220,6 +216,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     }
 }
 
+#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
     sync(feature = "sync"),

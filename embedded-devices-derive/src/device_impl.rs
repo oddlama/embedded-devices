@@ -1,5 +1,3 @@
-//! This crate provides procedural helper macro for embedded-devices
-
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro2::TokenStream;

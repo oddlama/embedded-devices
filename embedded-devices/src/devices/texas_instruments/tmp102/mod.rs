@@ -16,19 +16,21 @@
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Sync, address::Address, registers::Temperature};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp102 = TMP102Sync::new_i2c(i2c, Address::Gnd);
 //!
-//! // Read the latest temperature conversion in °C and convert it to a float
+//! // Read the latest temperature conversion in °C
 //! let temp = tmp102
 //!     .read_temperature()?
 //!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay)?.get::<degree_celsius>();();
+//! let temp = tmp102.measure(&mut Delay)?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -43,25 +45,27 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Async, address::Address, registers::Temperature};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp102 = TMP102Async::new_i2c(i2c, Address::Gnd);
 //!
-//! // Read the latest temperature conversion in °C and convert it to a float
+//! // Read the latest temperature conversion in °C
 //! let temp = tmp102
 //!     .read_temperature().await?
 //!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay).await?.get::<degree_celsius>();();
+//! let temp = tmp102.measure(&mut Delay).await?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
@@ -69,6 +73,14 @@ pub mod address;
 pub mod registers;
 
 type TMP102I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+
+/// Measurement data
+#[derive(Debug, embedded_devices_derive::Measurement)]
+pub struct Measurement {
+    /// Measured temperature
+    #[measurement(Temperature)]
+    pub temperature: ThermodynamicTemperature,
+}
 
 /// The TMP102 is a general purpose digital temperature sensor. It provides a 13-bit
 /// temperature result with a resolution of 0.0625 °C and an accuracy of up to ±3 °C across the
@@ -112,36 +124,6 @@ where
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> TMP102<I> {
-    /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].
-    /// which will cause the device to perform a single conversion a return to sleep mode afterwards.
-    ///
-    /// This function will initialize the measurement, wait until the data is acquired and return
-    /// the temperature.
-    pub async fn measure<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<ThermodynamicTemperature, I::Error> {
-        use self::registers::{Configuration, Temperature};
-
-        // Read current configuration to determine conversion ratio and delay
-        let mut reg_conf = self.read_register::<Configuration>().await?;
-        reg_conf.write_oneshot(true);
-
-        // Initiate measurement
-        self.write_register(reg_conf).await?;
-
-        // Wait for the duration of the conversion
-        let active_conversion_time = reg_conf.read_conversion_cycle_time().conversion_time_ms() + 10;
-        delay.delay_ms(active_conversion_time).await;
-
-        let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
-        if reg_conf.read_extended() {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 128.0))
-        } else {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0))
-        }
-    }
-
     /// Read the last temperature measured
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
         use self::registers::{Configuration, Temperature};
@@ -162,14 +144,54 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
         use self::registers::Configuration;
 
         // Read current configuration and update it for continuous mode
+        let reg_conf = self.read_register::<Configuration>().await?;
+
+        // Initiate measurement
+        self.write_register(reg_conf.with_oneshot(false).with_extended(true).with_shutdown(false))
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[sensor(Temperature)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP102<I> {
+    type Error = I::Error;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].
+    /// which will cause the device to perform a single conversion a return to sleep mode afterwards.
+    ///
+    /// This function will initialize the measurement, wait until the data is acquired and return
+    /// the temperature.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+        use self::registers::{Configuration, Temperature};
+
+        // Read current configuration to determine conversion ratio and delay
         let mut reg_conf = self.read_register::<Configuration>().await?;
-        reg_conf.write_oneshot(false);
-        reg_conf.write_extended(true);
-        reg_conf.write_shutdown(false);
+        reg_conf.write_oneshot(true);
 
         // Initiate measurement
         self.write_register(reg_conf).await?;
 
-        Ok(())
+        // Wait for the duration of the conversion
+        let active_conversion_time = reg_conf.read_conversion_cycle_time().conversion_time_ms() + 10;
+        delay.delay_ms(active_conversion_time).await;
+
+        let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
+        if reg_conf.read_extended() {
+            Ok(Measurement {
+                temperature: ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 128.0),
+            })
+        } else {
+            Ok(Measurement {
+                temperature: ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0),
+            })
+        }
     }
 }

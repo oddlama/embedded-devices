@@ -86,12 +86,12 @@ bme280.configure(Configuration {
 }).await?;
 
 // Measure now
-let measurements = bme280.measure(&mut Delay).await?;
+let measurement = bme280.measure(&mut Delay).await?;
 
 // Convert the returned temperature into an f32 in °C, do the same for pressure (Pa) and humidity (%RH)
-let temp = measurements.temperature.get::<degree_celsius>().to_f32();
-let pres = measurements.pressure.and_then(|x| x.get::<pascal>().to_f32());
-let hum = measurements.humidity.and_then(|x| x.get::<percent>().to_f32());
+let temp = measurement.temperature.get::<degree_celsius>();
+let pres = measurement.pressure.and_then(|x| x.get::<pascal>());
+let hum = measurement.humidity.and_then(|x| x.get::<percent>());
 
 println!("Current temperature: {:?}°C", temp);
 println!("Current pressure: {:?}Pa", pres);

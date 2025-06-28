@@ -19,22 +19,22 @@
 //! ## Usage (sync)
 //!
 //! ```rust, only_if(sync)
-//! # fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Sync, address::Address, registers::AmbientTemperature};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut mcp9808 = MCP9808Sync::new_i2c(i2c, Address::Default);
 //! mcp9808.init().unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
-//! let temp = mcp9808
-//!     .read_register::<AmbientTemperature>()?
-//!     .read_temperature()
-//!     .get::<degree_celsius>();
+//! // Read the current temperature in °C
+//! let temp = mcp9808.measure(&mut Delay)?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -43,29 +43,30 @@
 //! ## Usage (async)
 //!
 //! ```rust, only_if(async)
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
-//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Async, address::Address, registers::AmbientTemperature};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut mcp9808 = MCP9808Async::new_i2c(i2c, Address::Default);
 //! mcp9808.init().await.unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
-//! let temp = mcp9808
-//!     .read_register::<AmbientTemperature>()
-//!     .await?
-//!     .read_temperature()
-//!     .get::<degree_celsius>();
+//! // Read the current temperature in °C
+//! let temp = mcp9808.measure(&mut Delay).await?
+//!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
+use registers::Resolution;
+use uom::si::f64::ThermodynamicTemperature;
 
 pub mod address;
 pub mod registers;
@@ -81,6 +82,14 @@ pub enum InitError<BusError> {
     InvalidDeviceId,
     /// Invalid Manufacturer Id was encountered
     InvalidManufacturerId,
+}
+
+/// Measurement data
+#[derive(Debug, embedded_devices_derive::Measurement)]
+pub struct Measurement {
+    /// Measured temperature
+    #[measurement(Temperature)]
+    pub temperature: ThermodynamicTemperature,
 }
 
 /// Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
@@ -144,5 +153,40 @@ impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
         }
 
         Ok(())
+    }
+}
+
+#[sensor(Temperature)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MCP9808<I> {
+    type Error = I::Error;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will power up the sensor, wait until a conversion is
+    /// ready and return to sleep afterwards.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+        use self::registers::{AmbientTemperature, Configuration, ShutdownMode};
+
+        // Enable conversions
+        let mut reg_conf = self.read_register::<Configuration>().await?;
+        reg_conf.write_shutdown_mode(ShutdownMode::Continuous);
+        self.write_register(reg_conf).await?;
+
+        // Wait until conversion is ready
+        let resolution = self.read_register::<Resolution>().await?;
+        let conversion_time = 1000 + resolution.read_temperature_resolution().conversion_time_us();
+        delay.delay_us(conversion_time).await;
+
+        // Go to sleep
+        reg_conf.write_shutdown_mode(ShutdownMode::Shutdown);
+        self.write_register(reg_conf).await?;
+
+        // Read and return the temperature
+        let temperature = self.read_register::<AmbientTemperature>().await?.read_temperature();
+        Ok(Measurement { temperature })
     }
 }

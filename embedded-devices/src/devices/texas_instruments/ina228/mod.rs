@@ -28,8 +28,8 @@
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
-//! use embedded_devices::sensors::SensorSync;
 //! use embedded_devices::devices::texas_instruments::ina228::{INA228Sync, address::Address, address::Pin};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -49,10 +49,10 @@
 //!
 //! // One-shot read all values
 //! let measurement = ina228.measure(&mut Delay).unwrap();
-//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
-//! let temperature = measurement.temperature.get::<degree_celsius>();();
-//! let current = measurement.current.get::<milliampere>();();
-//! let power = measurement.power.get::<milliwatt>();();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
+//! let temperature = measurement.temperature.get::<degree_celsius>();
+//! let current = measurement.current.get::<milliampere>();
+//! let power = measurement.power.get::<milliwatt>();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW, {:?}°C", bus_voltage, current, power, temperature);
 //! # Ok(())
 //! # }
@@ -66,8 +66,8 @@
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
-//! use embedded_devices::sensors::SensorAsync;
 //! use embedded_devices::devices::texas_instruments::ina228::{INA228Async, address::Address, address::Pin};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -87,10 +87,10 @@
 //!
 //! // One-shot read all values
 //! let measurement = ina228.measure(&mut Delay).await.unwrap();
-//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
-//! let temperature = measurement.temperature.get::<degree_celsius>();();
-//! let current = measurement.current.get::<milliampere>();();
-//! let power = measurement.power.get::<milliwatt>();();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
+//! let temperature = measurement.temperature.get::<degree_celsius>();
+//! let current = measurement.current.get::<milliampere>();
+//! let power = measurement.power.get::<milliwatt>();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW, {:?}°C", bus_voltage, current, power, temperature);
 //! # Ok(())
 //! # }
@@ -98,7 +98,7 @@
 
 use self::address::Address;
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use registers::AdcRange;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
@@ -123,25 +123,29 @@ pub enum InitError<BusError> {
 }
 
 /// Measurement data
-#[derive(Debug)]
+#[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
     /// Measured voltage across the shunt
     pub shunt_voltage: ElectricPotential,
     /// Measured voltage on the bus
+    #[measurement(Voltage)]
     pub bus_voltage: ElectricPotential,
     /// Measured die temperature
+    #[measurement(Temperature)]
     pub temperature: ThermodynamicTemperature,
     /// Measured current
+    #[measurement(Current)]
     pub current: ElectricCurrent,
     /// Measured power
+    #[measurement(Power)]
     pub power: Power,
     /// Measured energy
+    #[measurement(Energy)]
     pub energy: Energy,
     /// Measured charge
+    #[measurement(Charge)]
     pub charge: ElectricCharge,
 }
-
-impl crate::sensors::Measurement for Measurement {}
 
 /// All possible errors that may occur during measurement
 #[derive(Debug)]
@@ -356,6 +360,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
     }
 }
 
+#[sensor(Voltage, Temperature, Current, Power, Energy, Charge)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
     sync(feature = "sync"),

@@ -10,22 +10,22 @@
 //! ## Usage (sync)
 //!
 //! ```rust, only_if(sync)
-//! # fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
+//! # fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal::spi::SpiDevice,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Sync, registers::{FilterMode, Resistance, WiringMode}};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut max31865 = MAX31865Sync::new_spi(spi, 4.3);
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
 //!
-//! let ratio = max31865
-//!     .measure(&mut Delay)?
-//!     .get::<degree_celsius>();
-//! println!("Current raw resistance ratio: {:?}", ratio);
+//! let temp = max31865.measure(&mut Delay)?
+//!     .temperature.get::<degree_celsius>();
+//! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
@@ -33,23 +33,22 @@
 //! ## Usage (async)
 //!
 //! ```rust, only_if(async)
-//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::ReadTemperatureError<I::Error>>
+//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::spi::SpiDevice,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Async, registers::{FilterMode, Resistance, WiringMode}};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut max31865 = MAX31865Async::new_spi(spi, 4.3);
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
-//! let ratio = max31865
-//!     .measure(&mut Delay)
-//!     .await?
-//!     .get::<degree_celsius>();
-//! println!("Current raw resistance ratio: {:?}", ratio);
+//! let temp = max31865.measure(&mut Delay).await?
+//!     .temperature.get::<degree_celsius>();
+//! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
@@ -57,6 +56,7 @@
 use self::registers::FilterMode;
 use self::registers::WiringMode;
 
+use embedded_devices_derive::sensor;
 use embedded_devices_derive::{device, device_impl};
 use registers::FaultDetectionCycle;
 use uom::si::f64::ThermodynamicTemperature;
@@ -81,11 +81,19 @@ pub enum FaultDetectionError<BusError> {
 
 /// All possible errors that may occur in temperature reads
 #[derive(Debug, defmt::Format)]
-pub enum ReadTemperatureError<BusError> {
+pub enum MeasurementError<BusError> {
     /// Bus error
     Bus(BusError),
     /// A fault was detected. Read the FaultStatus register for details.
     FaultDetected,
+}
+
+/// Measurement data
+#[derive(Debug, embedded_devices_derive::Measurement)]
+pub struct Measurement {
+    /// Current temperature
+    #[measurement(Temperature)]
+    pub temperature: ThermodynamicTemperature,
 }
 
 /// The MAX31865 is an easy-to-use resistance-to-digital converter optimized for platinum
@@ -270,41 +278,51 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     /// it to a temperature by using the internal Callendar-Van Dusen lookup table.
     ///
     /// Checks for faults.
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, ReadTemperatureError<I::Error>> {
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, MeasurementError<I::Error>> {
         let resistance = self
             .read_register::<registers::Resistance>()
             .await
-            .map_err(ReadTemperatureError::Bus)?;
+            .map_err(MeasurementError::Bus)?;
 
         if resistance.read_fault() {
-            return Err(ReadTemperatureError::FaultDetected);
+            return Err(MeasurementError::FaultDetected);
         }
 
         Ok(self.raw_resistance_ratio_to_temperature(resistance.read_resistance_ratio()))
     }
+}
 
-    /// Performs a one-shot measurement.
-    pub async fn measure<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<ThermodynamicTemperature, ReadTemperatureError<I::Error>> {
+#[sensor(Temperature)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX31865<I> {
+    type Error = MeasurementError<I::Error>;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will enable bias voltage, transition the device into
+    /// oneshot mode, which will cause it to take a measurement and return to sleep mode
+    /// afterwards.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self
             .read_register::<self::registers::Configuration>()
             .await
-            .map_err(ReadTemperatureError::Bus)?;
+            .map_err(MeasurementError::Bus)?;
 
         // Enable VBIAS before initiating one-shot measurement,
         // 10.5 RC time constants are recommended plus 1ms extra.
         // So we just wait 2ms which should be plenty of time.
         self.write_register(reg_conf.with_enable_bias_voltage(true))
             .await
-            .map_err(ReadTemperatureError::Bus)?;
+            .map_err(MeasurementError::Bus)?;
         delay.delay_us(2000).await;
 
         // Initiate measurement
         self.write_register(reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
             .await
-            .map_err(ReadTemperatureError::Bus)?;
+            .map_err(MeasurementError::Bus)?;
 
         // Wait until measurement is ready, plus 2ms extra
         let measurement_time_us = match reg_conf.read_filter_mode() {
@@ -314,9 +332,11 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         delay.delay_us(2000 + measurement_time_us).await;
 
         // Revert config (disable VBIAS)
-        self.write_register(reg_conf).await.map_err(ReadTemperatureError::Bus)?;
+        self.write_register(reg_conf).await.map_err(MeasurementError::Bus)?;
 
         // Return conversion result
-        self.read_temperature().await
+        Ok(Measurement {
+            temperature: self.read_temperature().await?,
+        })
     }
 }

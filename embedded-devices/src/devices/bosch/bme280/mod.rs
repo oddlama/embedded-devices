@@ -42,11 +42,15 @@
 //! # {
 //! use embedded_devices::devices::bosch::bme280::{BME280Sync, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
+//! use embedded_devices::sensors::SensorSync;
+//! use uom::si::pressure::pascal;
+//! use uom::si::ratio::percent;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Sync::new_i2c(i2c, Address::Primary);
 //! bme280.init(&mut Delay).unwrap();
+//! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
@@ -54,10 +58,12 @@
 //!     iir_filter: IIRFilter::Disabled,
 //! }).unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
+//! // Read measurement
 //! let measurement = bme280.measure(&mut Delay)?;
-//! let temp = measurement.temperature.get::<degree_celsius>();();
-//! println!("Current temperature: {:?}°C", temp);
+//! let temp = measurement.temperature.get::<degree_celsius>();
+//! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
+//! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
+//! println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humidity);
 //! # Ok(())
 //! # }
 //! ```
@@ -72,11 +78,15 @@
 //! # {
 //! use embedded_devices::devices::bosch::bme280::{BME280Async, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
+//! use embedded_devices::sensors::SensorAsync;
+//! use uom::si::pressure::pascal;
+//! use uom::si::ratio::percent;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
 //! bme280.init(&mut Delay).await.unwrap();
+//! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
@@ -84,15 +94,17 @@
 //!     iir_filter: IIRFilter::Disabled,
 //! }).await.unwrap();
 //!
-//! // Read the current temperature in °C and convert it to a float
+//! // Read measurement
 //! let measurement = bme280.measure(&mut Delay).await?;
-//! let temp = measurement.temperature.get::<degree_celsius>();();
-//! println!("Current temperature: {:?}°C", temp);
+//! let temp = measurement.temperature.get::<degree_celsius>();
+//! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
+//! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
+//! println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humidity);
 //! # Ok(())
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl};
+use embedded_devices_derive::{device, device_impl, sensor};
 use uom::si::f64::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
@@ -124,13 +136,16 @@ pub enum Error<BusError> {
 }
 
 /// Measurement data
-#[derive(Debug)]
+#[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
     /// Current temperature
+    #[measurement(Temperature)]
     pub temperature: ThermodynamicTemperature,
     /// Current pressure or None if the sensor reported and invalid value
+    #[measurement(Pressure)]
     pub pressure: Option<Pressure>,
     /// Current relative humidity
+    #[measurement(RelativeHumidity)]
     pub humidity: Option<Ratio>,
 }
 
@@ -377,7 +392,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     ///
-    /// Beware that by default, all internal sensors are disabled. Please
+    /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
@@ -446,15 +461,17 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     }
 }
 
+// BME280 only:
+
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
-    /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
-    /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
-    /// advanced settings, please directly update the respective registers.
+    /// Configures common sensor settings. Sensor must be in sleep mode for this to work. Check
+    /// sensor mode beforehand and call [`Self::reset`] if necessary. To configure advanced
+    /// settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
         self.write_register(ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await
@@ -475,6 +492,17 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
 
         Ok(())
     }
+}
+
+#[sensor(Temperature, Pressure, RelativeHumidity)]
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, true> {
+    type Error = Error<I::Error>;
+    type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
     /// which will cause it to take a measurement and return to sleep mode afterwards.
@@ -483,9 +511,9 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// and compensate the returned raw data using the calibration data.
     ///
     /// Specific measurements will only be included if they were enabled beforehand by calling
-    /// [`Self::calibrate`]. Pressure and humitidy measurements specifically require temperature
-    /// measurements to be enabled.
-    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurement, Error<I::Error>> {
+    /// [`Self::calibrate`]. Pressure and humidity measurement specifically require
+    /// temperature measurements to be enabled.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
         self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
             .await
