@@ -37,10 +37,10 @@
 //! ).unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina226.measure(&mut Delay).unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>();();
-//! let current = measurements.current.get::<milliampere>();();
-//! let power = measurements.power.get::<milliwatt>();();
+//! let measurement = ina226.measure(&mut Delay).unwrap();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
+//! let current = measurement.current.get::<milliampere>();();
+//! let power = measurement.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -72,10 +72,10 @@
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina226.measure(&mut Delay).await.unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>();();
-//! let current = measurements.current.get::<milliampere>();();
-//! let power = measurements.power.get::<milliwatt>();();
+//! let measurement = ina226.measure(&mut Delay).await.unwrap();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
+//! let current = measurement.current.get::<milliampere>();();
+//! let power = measurement.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -106,7 +106,7 @@ pub enum InitError<BusError> {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct Measurements {
+pub struct Measurement {
     /// Measured voltage across the shunt
     pub shunt_voltage: ElectricPotential,
     /// Measured voltage on the bus
@@ -124,9 +124,9 @@ pub enum MeasurementError<BusError> {
     Bus(BusError),
     /// The conversion ready flag was not set within the expected time frame.
     Timeout,
-    /// Measurements were ready, but an overflow occurred. The power and
-    /// current measurements may be incorrect.
-    Overflow(Measurements),
+    /// Measurement was ready, but an overflow occurred. The power and
+    /// current measurement may be incorrect.
+    Overflow(Measurement),
 }
 
 /// The INA226 is an ultra-precise digital power monitor with a 16-bit delta-sigma ADC
@@ -252,7 +252,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
 
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
-    pub async fn read_measurements(&mut self) -> Result<Measurements, MeasurementError<I::Error>> {
+    pub async fn read_measurements(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
         let bus_voltage = self
             .read_register::<self::registers::BusVoltage>()
             .await
@@ -278,7 +278,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
             .await
             .map_err(MeasurementError::Bus)?;
 
-        let measurements = Measurements {
+        let measurement = Measurement {
             shunt_voltage: shunt_voltage.read_voltage(),
             bus_voltage: bus_voltage.read_voltage(),
             current: current.read_current(self.current_lsb_na),
@@ -286,9 +286,9 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
         };
 
         if flags.read_math_overflow_flag() {
-            Err(MeasurementError::Overflow(measurements))
+            Err(MeasurementError::Overflow(measurement))
         } else {
-            Ok(measurements)
+            Ok(measurement)
         }
     }
 
@@ -296,7 +296,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
     pub async fn measure<D: hal::delay::DelayNs>(
         &mut self,
         delay: &mut D,
-    ) -> Result<Measurements, MeasurementError<I::Error>> {
+    ) -> Result<Measurement, MeasurementError<I::Error>> {
         let reg_conf = self
             .read_register::<self::registers::Configuration>()
             .await
@@ -346,7 +346,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
                 .await
                 .map_err(MeasurementError::Bus)?;
 
-            let measurements = Measurements {
+            let measurement = Measurement {
                 shunt_voltage: shunt_voltage.read_voltage(),
                 bus_voltage: bus_voltage.read_voltage(),
                 current: current.read_current(self.current_lsb_na),
@@ -354,9 +354,9 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
             };
 
             if flags.read_math_overflow_flag() {
-                return Err(MeasurementError::Overflow(measurements));
+                return Err(MeasurementError::Overflow(measurement));
             } else {
-                return Ok(measurements);
+                return Ok(measurement);
             }
         }
 

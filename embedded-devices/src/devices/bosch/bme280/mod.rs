@@ -55,8 +55,8 @@
 //! }).unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = bme280.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>();();
+//! let measurement = bme280.measure(&mut Delay)?;
+//! let temp = measurement.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -85,8 +85,8 @@
 //! }).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = bme280.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>();();
+//! let measurement = bme280.measure(&mut Delay).await?;
+//! let temp = measurement.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -125,7 +125,7 @@ pub enum Error<BusError> {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct Measurements {
+pub struct Measurement {
     /// Current temperature
     pub temperature: ThermodynamicTemperature,
     /// Current pressure or None if the sensor reported and invalid value
@@ -482,10 +482,10 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
     ///
-    /// All measurements will only be included if they were enabled beforehand by calling
+    /// Specific measurements will only be included if they were enabled beforehand by calling
     /// [`Self::calibrate`]. Pressure and humitidy measurements specifically require temperature
     /// measurements to be enabled.
-    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
+    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurement, Error<I::Error>> {
         let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
         self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
             .await
@@ -525,7 +525,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
         let humidity =
             (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.humidity.humidity, t_fine));
 
-        Ok(Measurements {
+        Ok(Measurement {
             temperature,
             pressure,
             humidity,

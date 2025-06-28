@@ -21,8 +21,8 @@
 //! bmp390.init(&mut Delay).unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = bmp390.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>();();
+//! let measurement = bmp390.measure(&mut Delay)?;
+//! let temp = measurement.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -44,8 +44,8 @@
 //! bmp390.init(&mut Delay).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = bmp390.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>();();
+//! let measurement = bmp390.measure(&mut Delay).await?;
+//! let temp = measurement.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -152,7 +152,7 @@ pub struct BMP390<I: embedded_registers::RegisterInterface> {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct Measurements {
+pub struct Measurement {
     /// Current temperature
     pub temperature: ThermodynamicTemperature,
     /// Current pressure
@@ -325,7 +325,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     ///
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
-    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
+    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurement, Error<I::Error>> {
         self.write_register(
             PowerControl::default()
                 .with_sensor_mode(SensorMode::Forced)
@@ -357,6 +357,6 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
         let pressure = cal.compensate_pressure(raw_data.pressure.pressure, t_fine);
 
-        Ok(Measurements { temperature, pressure })
+        Ok(Measurement { temperature, pressure })
     }
 }
