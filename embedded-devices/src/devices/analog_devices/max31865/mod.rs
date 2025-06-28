@@ -17,11 +17,9 @@
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Sync, registers::{FilterMode, Resistance, WiringMode}};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
-//! use uom::num_rational::Rational32;
 //!
 //! // Create and initialize the device
-//! let mut max31865 = MAX31865Sync::new_spi(spi, Rational32::new(43, 10));
+//! let mut max31865 = MAX31865Sync::new_spi(spi, 4.3);
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
 //!
 //! let ratio = max31865
@@ -42,11 +40,9 @@
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Async, registers::{FilterMode, Resistance, WiringMode}};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
-//! use uom::num_rational::Rational32;
 //!
 //! // Create and initialize the device
-//! let mut max31865 = MAX31865Async::new_spi(spi, Rational32::new(43, 10));
+//! let mut max31865 = MAX31865Async::new_spi(spi, 4.3);
 //! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
 //! let ratio = max31865
@@ -63,8 +59,7 @@ use self::registers::WiringMode;
 
 use embedded_devices_derive::{device, device_impl};
 use registers::FaultDetectionCycle;
-use uom::num_rational::Rational32;
-use uom::si::f32::ThermodynamicTemperature;
+use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 use crate::utils::callendar_van_dusen;
@@ -110,7 +105,7 @@ pub struct MAX31865<I: embedded_registers::RegisterInterface> {
     /// the temperature element at 0°C (100Ω for PT100, 1000Ω for PT1000).
     /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
     /// but your design may vary.
-    reference_resistor_ratio: Rational32,
+    reference_resistor_ratio: f64,
 }
 
 #[maybe_async_cfg::maybe(
@@ -132,7 +127,7 @@ where
     /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
     /// but your design may vary.
     #[inline]
-    pub fn new_spi(interface: I, reference_resistor_ratio: Rational32) -> Self {
+    pub fn new_spi(interface: I, reference_resistor_ratio: f64) -> Self {
         Self {
             interface: embedded_registers::spi::SpiDevice::new(interface),
             reference_resistor_ratio,
@@ -250,11 +245,9 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     /// If the temperature results in a ratio >= 1.0, the resulting value will be clamped
     /// to the maximum representable ratio (1.0).
     pub fn temperature_to_raw_resistance_ratio(&mut self, temperature: ThermodynamicTemperature) -> u16 {
-        let temperature: f32 = temperature.get::<degree_celsius>();
+        let temperature = temperature.get::<degree_celsius>() as f32;
         let resistance = callendar_van_dusen::temperature_to_resistance_r100(temperature);
-        let inv_reference_resistor_ratio =
-            *self.reference_resistor_ratio.denom() as f32 / *self.reference_resistor_ratio.numer() as f32;
-        let ratio = resistance / 100.0 * inv_reference_resistor_ratio;
+        let ratio = resistance / (100.0 * self.reference_resistor_ratio) as f32;
         if ratio >= 1.0 {
             (1 << 15) - 1
         } else {
@@ -268,10 +261,9 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         // We always calculate with a 100Ω lookup table, because the equation
         // linearly scales to other temperature ranges. Only the ratio between
         // reference resistor and PT element is important.
-        let resistance = (100.0 * raw_resistance as f32 * *self.reference_resistor_ratio.numer() as f32)
-            / ((1 << 15) as f32 * *self.reference_resistor_ratio.denom() as f32);
+        let resistance = (100.0 * raw_resistance as f32 * self.reference_resistor_ratio as f32) / ((1 << 15) as f32);
         let temperature = callendar_van_dusen::resistance_to_temperature_r100(resistance);
-        ThermodynamicTemperature::new::<degree_celsius>(temperature)
+        ThermodynamicTemperature::new::<degree_celsius>(temperature as f64)
     }
 
     /// Read the latest resistance measurement from the device register and convert

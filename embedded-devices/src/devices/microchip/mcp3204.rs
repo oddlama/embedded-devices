@@ -19,19 +19,17 @@
 //! #   I: embedded_hal::spi::SpiDevice,
 //! # {
 //! use embedded_devices::devices::microchip::mcp3204::{MCP3204Sync, InputChannel};
-//! use uom::num_rational::Rational32;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_potential::{volt, millivolt};
-//! use uom::si::rational32::ElectricPotential;
+//! use uom::si::f64::ElectricPotential;
 //!
 //! let mut mcp3204 = MCP3204Sync::new_spi(
 //!     spi,
 //!     // 2.5V reference
-//!     ElectricPotential::new::<volt>(Rational32::new(5, 2)),
+//!     ElectricPotential::new::<volt>(2.5),
 //! );
 //!
 //! let value = mcp3204.convert(InputChannel::Single0)?;
-//! let voltage = value.get::<millivolt>().to_f32();
+//! let voltage = value.get::<millivolt>();();
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
 //! # }
@@ -45,26 +43,23 @@
 //! #   I: embedded_hal_async::spi::SpiDevice,
 //! # {
 //! use embedded_devices::devices::microchip::mcp3204::{MCP3204Async, InputChannel};
-//! use uom::num_rational::Rational32;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_potential::{volt, millivolt};
-//! use uom::si::rational32::ElectricPotential;
+//! use uom::si::f64::ElectricPotential;
 //!
 //! let mut mcp3204 = MCP3204Async::new_spi(
 //!     spi,
 //!     // 2.5V reference
-//!     ElectricPotential::new::<volt>(Rational32::new(5, 2)),
+//!     ElectricPotential::new::<volt>(2.5),
 //! );
 //!
 //! let value = mcp3204.convert(InputChannel::Single0).await?;
-//! let voltage = value.get::<millivolt>().to_f32();
+//! let voltage = value.get::<millivolt>();();
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
 //! # }
 //! ```
 
-use uom::num_rational::Rational32;
-use uom::si::{electric_potential::volt, rational32::ElectricPotential};
+use uom::si::{electric_potential::volt, f64::ElectricPotential};
 
 /// The ADC input channel
 #[derive(Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -141,8 +136,7 @@ impl<I: hal::spi::r#SpiDevice> MCP3204<I> {
     pub async fn convert(&mut self, channel: InputChannel) -> Result<ElectricPotential, I::Error> {
         let raw_value = self.convert_raw(channel).await?;
         let v_ref = self.reference_voltage.get::<volt>();
-        let value =
-            ElectricPotential::new::<volt>(Rational32::new(raw_value as i32 * v_ref.numer(), 4096 * v_ref.denom()));
+        let value = ElectricPotential::new::<volt>(raw_value as f64 * v_ref / 4096.0);
         Ok(value)
     }
 }

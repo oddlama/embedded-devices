@@ -43,7 +43,6 @@
 //! use embedded_devices::devices::bosch::bme280::{BME280Sync, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Sync::new_i2c(i2c, Address::Primary);
@@ -57,7 +56,7 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bme280.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -74,7 +73,6 @@
 //! use embedded_devices::devices::bosch::bme280::{BME280Async, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
@@ -88,17 +86,16 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bme280.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use uom::num_rational::Rational32;
+use uom::si::f64::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
-use uom::si::rational32::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 pub mod address;
@@ -255,7 +252,7 @@ impl CalibrationData {
         let var2 = (uncompensated >> 4) as i32 - dig_t1;
         let var2 = (((var2 * var2) >> 12) * dig_t3) >> 14;
         let t_fine = var1 + var2;
-        let temperature = Rational32::new_raw(t_fine * 5 + 128, 100 * 256);
+        let temperature = (t_fine * 5 + 128) as f64 / (100.0 * 256.0);
 
         (
             ThermodynamicTemperature::new::<degree_celsius>(temperature),
@@ -291,7 +288,7 @@ impl CalibrationData {
         let var1 = (dig_p9 * (var4 >> 13) * (var4 >> 13)) >> 25;
         let var2 = (dig_p8 * var4) >> 19;
         let var4 = ((var4 + var1 + var2) >> 8) + (dig_p7 << 4);
-        let pressure = Rational32::new_raw(var4 as i32, 256);
+        let pressure = (var4 as i32 as f64) / 256.0;
         Some(Pressure::new::<pascal>(pressure))
     }
 
@@ -318,7 +315,7 @@ impl CalibrationData {
         let var5 = var5.clamp(0, 0x19000000);
         let var5 = var5 >> 12;
 
-        let humidity = Rational32::new_raw(var5, 1i32 << 10);
+        let humidity = var5 as f64 / (1i32 << 10) as f64;
         Ratio::new::<percent>(humidity)
     }
 }

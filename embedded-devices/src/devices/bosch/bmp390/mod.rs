@@ -15,7 +15,6 @@
 //! # {
 //! use embedded_devices::devices::bosch::bmp390::{BMP390Sync, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bmp390 = BMP390Sync::new_i2c(i2c, Address::Primary);
@@ -23,7 +22,7 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bmp390.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -39,7 +38,6 @@
 //! # {
 //! use embedded_devices::devices::bosch::bmp390::{BMP390Async, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bmp390 = BMP390Async::new_i2c(i2c, Address::Primary);
@@ -47,16 +45,15 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bmp390.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use uom::num_rational::Rational32;
+use uom::si::f64::{Pressure, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
-use uom::si::rational32::{Pressure, ThermodynamicTemperature};
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 pub mod address;
@@ -100,7 +97,7 @@ impl CalibrationData {
         let v4: i64 = (v3 as i64) * (self.0.par_t3 as i64);
         let v5: i64 = ((v2 as i64) << 18) + v4;
         let t_fine: i32 = (v5 >> 32) as i32;
-        let temperature = Rational32::new_raw(t_fine * 25, 100 << 14);
+        let temperature = (t_fine * 25) as f64 / (100 << 14) as f64;
 
         (
             ThermodynamicTemperature::new::<degree_celsius>(temperature),
@@ -131,10 +128,7 @@ impl CalibrationData {
         let v3 = (v2 * uncompensated as i64) >> 7;
         let v4 = (offset / 4) + v1 + v5 + v3;
         let pressure = ((v4 >> 32) * 25) as i32;
-        // TODO this is wrong ^------------
-        // actually pressure in 0.01° = (v4 * 25) >> 40, but we save some extra precision
-        // by only shifting by 32 and doing / 256 in the denominator
-        let pressure = Rational32::new_raw(pressure, 100 << 8);
+        let pressure = pressure as f64 / (100 << 8) as f64;
         Pressure::new::<pascal>(pressure)
     }
 }

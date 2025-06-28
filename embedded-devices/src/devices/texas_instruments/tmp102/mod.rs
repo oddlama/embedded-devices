@@ -17,7 +17,6 @@
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Sync, address::Address, registers::Temperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp102 = TMP102Sync::new_i2c(i2c, Address::Gnd);
@@ -25,12 +24,11 @@
 //! // Read the latest temperature conversion in °C and convert it to a float
 //! let temp = tmp102
 //!     .read_temperature()?
-//!     .get::<degree_celsius>()
-//!     .to_f32();
+//!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay)?.get::<degree_celsius>().to_f32();
+//! let temp = tmp102.measure(&mut Delay)?.get::<degree_celsius>();();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -46,7 +44,6 @@
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Async, address::Address, registers::Temperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp102 = TMP102Async::new_i2c(i2c, Address::Gnd);
@@ -54,20 +51,18 @@
 //! // Read the latest temperature conversion in °C and convert it to a float
 //! let temp = tmp102
 //!     .read_temperature().await?
-//!     .get::<degree_celsius>()
-//!     .to_f32();
+//!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay).await?.get::<degree_celsius>().to_f32();
+//! let temp = tmp102.measure(&mut Delay).await?.get::<degree_celsius>();();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
 use embedded_devices_derive::{device, device_impl};
-use uom::num_rational::Rational32;
-use uom::si::rational32::ThermodynamicTemperature;
+use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 pub mod address;
@@ -141,13 +136,9 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
 
         let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
         if reg_conf.read_extended() {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(
-                raw_temp, 128,
-            )))
+            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 128.0))
         } else {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(
-                raw_temp, 256,
-            )))
+            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0))
         }
     }
 
@@ -161,13 +152,9 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
         // Read and return the temperature
         let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
         if reg_conf.read_extended() {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(
-                raw_temp, 128,
-            )))
+            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 128.0))
         } else {
-            Ok(ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(
-                raw_temp, 256,
-            )))
+            Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0))
         }
     }
 

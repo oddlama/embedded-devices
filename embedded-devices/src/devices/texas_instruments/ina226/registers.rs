@@ -1,12 +1,11 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::Rational64;
 use uom::si::electric_current::ampere;
+use uom::si::electric_potential::volt;
+use uom::si::f64;
+use uom::si::f64::{ElectricCurrent, ElectricPotential};
 use uom::si::power::watt;
-use uom::si::rational64;
-use uom::si::rational64::ElectricCurrent;
-use uom::si::{electric_potential::volt, rational64::ElectricPotential};
 
 /// Conversion averaging counts
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -161,7 +160,7 @@ impl ShuntVoltage {
     /// Read the shunt voltage
     pub fn read_voltage(&self) -> ElectricPotential {
         // 2.5µV/LSB
-        ElectricPotential::new::<volt>(Rational64::new(self.read_raw_value() as i64, 400_000))
+        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 400_000.0)
     }
 }
 
@@ -179,7 +178,7 @@ impl BusVoltage {
     /// Read the shunt voltage
     pub fn read_voltage(&self) -> ElectricPotential {
         // 1.25mV/LSB
-        ElectricPotential::new::<volt>(Rational64::new(self.read_raw_value() as i64, 800))
+        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 800.0)
     }
 }
 
@@ -196,12 +195,9 @@ pub struct Power {
 impl Power {
     /// Read the power, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register which is used to derive the nW/LSB for the power register
-    pub fn read_power(&self, current_lsb_na: i64) -> rational64::Power {
+    pub fn read_power(&self, current_lsb_na: i64) -> f64::Power {
         // nW/LSB = 25 * nA/LSB
-        rational64::Power::new::<watt>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na * 25,
-            1_000_000_000,
-        ))
+        f64::Power::new::<watt>((self.read_raw_value() as i64 * current_lsb_na * 25) as f64 / 1_000_000_000f64)
     }
 }
 
@@ -219,10 +215,7 @@ impl Current {
     /// Read the current, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register.
     pub fn read_current(&self, current_lsb_na: i64) -> ElectricCurrent {
-        ElectricCurrent::new::<ampere>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na,
-            1_000_000_000,
-        ))
+        ElectricCurrent::new::<ampere>((self.read_raw_value() as i64 * current_lsb_na) as f64 / 1_000_000_000f64)
     }
 }
 

@@ -22,15 +22,14 @@
 //! # {
 //! use embedded_devices::devices::sensirion::scd4x::{SCD4xSync, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut scd = SCD4xSync::new_i2c(i2c, Address::Default);
 //! scd.init(&mut Delay).unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = scd.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let measurement = scd.measure(&mut Delay)?;
+//! let temp = measurement.temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -46,15 +45,14 @@
 //! # {
 //! use embedded_devices::devices::sensirion::scd4x::{SCD4xAsync, address::Address};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut scd = SCD4xAsync::new_i2c(i2c, Address::Default);
 //! scd.init(&mut Delay).await.unwrap();
 //!
 //! // Read the current temperature in °C and convert it to a float
-//! let measurements = scd.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let measurement = scd.measure(&mut Delay).await?;
+//! let temp = measurement.temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -66,22 +64,15 @@
 use crc::{Algorithm, CRC_8_NRSC_5};
 use embedded_devices_derive::{device, device_impl};
 use embedded_registers::i2c::codecs::Crc8Algorithm;
-use embedded_registers::Register;
-#[cfg(feature = "async")]
-use embedded_registers::RegisterInterfaceAsync;
-#[cfg(feature = "sync")]
-use embedded_registers::RegisterInterfaceSync;
 use registers::{
-    AmbientPressure, GetDataReadyStatus, GetSensorVariant, GetSerialNumber, MeasureSingleShot, PerformSelfTest,
-    PowerDown, ReadMeasurement, Reinit, SetSensorAltitude, StartLowPowerPeriodicMeasurement, StartPeriodicMeasurement,
+    AmbientPressure, GetDataReadyStatus, GetSensorVariant, GetSerialNumber, MeasureSingleShot, PowerDown,
+    ReadMeasurement, Reinit, SetSensorAltitude, StartLowPowerPeriodicMeasurement, StartPeriodicMeasurement,
     StopPeriodicMeasurement, WakeUp, DATA_READY_MASK,
 };
-use uom::num_rational::Rational32;
 use uom::si::thermodynamic_temperature::degree_celsius;
 use uom::si::{
+    f64::{Length, Pressure, Ratio, ThermodynamicTemperature},
     ratio::{part_per_million, percent},
-    rational32::{Ratio, ThermodynamicTemperature},
-    u16::{Length, Pressure},
 };
 
 pub mod address;
@@ -109,7 +100,7 @@ pub enum SensorVariant {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct Measurements {
+pub struct Measurement {
     pub co2: Ratio,
     /// Current temperature
     pub temperature: ThermodynamicTemperature,
@@ -146,7 +137,7 @@ impl Crc8Algorithm for SCD4xCrcCodec {
         &CUSTOM_ALG
     }
 }
-type SCD4xCodec = embedded_registers::i2c::codecs::Crc8Codec<2, 2, SCD4xCrcCodec>;
+type SCD4xI2cCodec = embedded_registers::i2c::codecs::Crc8Codec<2, 2, SCD4xCrcCodec>;
 
 /// The SCD4x is Sensirion's second generation series of optical CO2 sensors. Several product variants
 /// exist with accuracy ranges from 400 – 2,000 ppm (SCD40) up to 400 – 5,000 ppm (SCD43).
@@ -162,11 +153,8 @@ type SCD4xCodec = embedded_registers::i2c::codecs::Crc8Codec<2, 2, SCD4xCrcCodec
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct SCD4x<I>
-where
-    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
-{
-    interface: embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, SCD4xCodec>,
+pub struct SCD4x<I: embedded_registers::RegisterInterface> {
+    interface: I,
     pub variant: SensorVariant,
     /// The current state this sensor is in. Please use [`Self::change_state`] to enter a different
     /// state, so the sensor state is known at all times.
@@ -178,7 +166,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> SCD4x<I>
+impl<I> SCD4x<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, SCD4xI2cCodec>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -203,10 +191,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> SCD4x<I>
-where
-    I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
-{
+impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     /// Initializes the sensor by first waking the sensor, then stop any ongoing measurement, calls
     /// reinit and finally verifies its device id. Calling this function is mandatory to ensure
     /// subsequent function calls know the sensor variant.
@@ -234,7 +219,6 @@ where
             return Err(Error::InvalidSensorVariant(device_id.read_variant()));
         }
 
-        //self.perform_self_test(delay).await?;
         Ok(())
     }
 
@@ -246,7 +230,7 @@ where
             return Err(Error::InvalidSensorState(self.state.clone()));
         }
         let height = height.get::<uom::si::length::meter>();
-        self.write_register(SetSensorAltitude::default().with_altitude(height))
+        self.write_register(SetSensorAltitude::default().with_altitude(height as u16))
             .await
             .map_err(Error::Bus)?;
         Ok(())
@@ -260,7 +244,7 @@ where
             return Err(Error::InvalidSensorState(self.state.clone()));
         }
         let pressure = height.get::<uom::si::pressure::hectopascal>();
-        self.write_register(AmbientPressure::default().with_pressure(pressure))
+        self.write_register(AmbientPressure::default().with_pressure(pressure as u16))
             .await
             .map_err(Error::Bus)?;
         Ok(())
@@ -272,20 +256,19 @@ where
         delay: &mut D,
         wait_time: u32,
         max_iterations: u32,
-    ) -> Result<Measurements, Error<I::Error>> {
+    ) -> Result<Measurement, Error<I::Error>> {
         let mut iteration = 0;
         loop {
             let ready = self.read_register::<GetDataReadyStatus>().await.map_err(Error::Bus)?;
             if (ready.read_status() & DATA_READY_MASK) != 0 {
-                let measurements = self.read_register::<ReadMeasurement>().await.map_err(Error::Bus)?;
-                let co2 = Rational32::new_raw(measurements.read_co2() as i32, 1);
-                let co2 = Ratio::new::<part_per_million>(co2);
-                let temperature = Rational32::new_raw(175 * measurements.read_temperature() as i32, (1 << 16) - 1);
-                let temperature = temperature - 45;
+                let measurement = self.read_register::<ReadMeasurement>().await.map_err(Error::Bus)?;
+                let co2 = Ratio::new::<part_per_million>(measurement.read_co2() as f64);
+                let temperature = (175 * measurement.read_temperature() as i32) as f64 / ((1 << 16) - 1) as f64;
+                let temperature = temperature - 45.0;
                 let temperature = ThermodynamicTemperature::new::<degree_celsius>(temperature);
-                let humidity = Rational32::new_raw(100 * measurements.read_humidity() as i32, (1 << 16) - 1);
+                let humidity = (100 * measurement.read_humidity() as i32) as f64 / ((1 << 16) - 1) as f64;
                 let humidity = Ratio::new::<percent>(humidity);
-                return Ok(Measurements {
+                return Ok(Measurement {
                     co2,
                     temperature,
                     humidity,
@@ -298,38 +281,40 @@ where
             }
         }
     }
-    pub async fn perform_self_test<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
-        let crc = crc::Crc::<u8>::new(SCD4xCrcCodec::instance());
-        let header = &PerformSelfTest::ADDRESS.to_be_bytes()[core::mem::size_of_val(&PerformSelfTest::ADDRESS) - 2..];
 
-        let mut array = [0u8; 3];
-
-        self.interface
-            .bound_bus
-            .interface
-            .write(self.interface.bound_bus.address, header)
-            .await
-            .map_err(Error::Bus)?;
-        delay.delay_ms(10000).await;
-
-        self.interface
-            .bound_bus
-            .interface
-            .read(self.interface.bound_bus.address, &mut array)
-            .await
-            .map_err(Error::Bus)?;
-        let value = &array[0..2];
-        let crc_val = crc.checksum(value);
-        let crc_real = array[2];
-        if crc_real != crc_val {
-            panic!("crc failed")
-        }
-        if array[0] != 0 {
-            Err(Error::SelfTestFailed(array[0]))
-        } else {
-            Ok(())
-        }
-    }
+    // /// Performs a device self test and checks the result
+    // pub async fn perform_self_test<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    //     let crc = crc::Crc::<u8>::new(SCD4xCrcCodec::instance());
+    //     let header = &PerformSelfTest::ADDRESS.to_be_bytes()[core::mem::size_of_val(&PerformSelfTest::ADDRESS) - 2..];
+    //
+    //     let mut array = [0u8; 3];
+    //
+    //     self.interface
+    //         .bound_bus
+    //         .interface
+    //         .write(self.interface.bound_bus.address, header)
+    //         .await
+    //         .map_err(Error::Bus)?;
+    //     delay.delay_ms(10000).await;
+    //
+    //     self.interface
+    //         .bound_bus
+    //         .interface
+    //         .read(self.interface.bound_bus.address, &mut array)
+    //         .await
+    //         .map_err(Error::Bus)?;
+    //     let value = &array[0..2];
+    //     let crc_val = crc.checksum(value);
+    //     let crc_real = array[2];
+    //     if crc_real != crc_val {
+    //         panic!("crc failed")
+    //     }
+    //     if array[0] != 0 {
+    //         Err(Error::SelfTestFailed(array[0]))
+    //     } else {
+    //         Ok(())
+    //     }
+    // }
 
     /// Switch sensor state. This function will issue the correct command to switch from the
     /// current sensor state to the desired state. The SCD4x series has no readout for the current
@@ -473,10 +458,10 @@ where
         }
     }
 
-    // Performs a one-shot measurement. If the sensor supports single shot measurements, we will
+    // Performs a one-shot measurement. If the sensor supports single shot measurement, we will
     // utilize this, otherwise a single shot measurement is emulated by starting and stopping
     // periodic measurement.
-    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurements, Error<I::Error>> {
+    pub async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Measurement, Error<I::Error>> {
         match self.state {
             SensorState::Idle => match self.variant {
                 SensorVariant::SCD41 | SensorVariant::SCD43 => {
@@ -498,7 +483,7 @@ where
             SensorState::LowPowerPeriodicMeasurement => self.get_measurement(delay, 2000, (30000 / 2000) * 2).await,
             SensorState::Sleep => {
                 // Sleep is only supported on the SCD41 or SCD43 since both support single shot
-                // measurements we start one without further guards
+                // measurement we start one without further guards
                 self.change_state(delay, SensorState::Idle).await?;
                 self.write_register(MeasureSingleShot::default())
                     .await

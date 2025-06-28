@@ -28,24 +28,16 @@
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp117::{TMP117Sync, address::Address, registers::Temperature};
+//! use embedded_devices::sensors::SensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp117 = TMP117Sync::new_i2c(i2c, Address::Gnd);
 //! tmp117.init(&mut Delay).unwrap();
 //!
-//! // Read the latest temperature conversion in °C and convert it to a float
-//! let temp = tmp117
-//!     .read_register::<Temperature>()?
-//!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
-//! println!("Current temperature: {:?}°C", temp);
-//!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.measure(&mut Delay)?.get::<degree_celsius>().to_f32();
-//! println!("Oneshot temperature: {:?}°C", temp);
+//! let temp = tmp117.measure(&mut Delay)?.temperature.get::<degree_celsius>();
+//! println!("Oneshot temperature: {}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
@@ -59,24 +51,15 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp117::{TMP117Async, address::Address, registers::Temperature};
+//! use embedded_devices::sensors::SensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
 //! let mut tmp117 = TMP117Async::new_i2c(i2c, Address::Gnd);
 //! tmp117.init(&mut Delay).await.unwrap();
 //!
-//! // Read the latest temperature conversion in °C and convert it to a float
-//! let temp = tmp117
-//!     .read_register::<Temperature>()
-//!     .await?
-//!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
-//! println!("Current temperature: {:?}°C", temp);
-//!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp117.measure(&mut Delay).await?.get::<degree_celsius>().to_f32();
+//! let temp = tmp117.measure(&mut Delay).await?.temperature.get::<degree_celsius>();();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -84,7 +67,7 @@
 
 use embedded_devices_derive::{device, device_impl};
 use embedded_registers::WritableRegister;
-use uom::si::rational32::ThermodynamicTemperature;
+use uom::si::f64::ThermodynamicTemperature;
 
 pub mod address;
 pub mod registers;
@@ -107,6 +90,20 @@ pub enum EepromError<BusError> {
     Bus(BusError),
     /// EEPROM is still busy after 13ms
     EepromStillBusy,
+}
+
+/// Measurement data
+#[derive(Debug)]
+pub struct Measurement {
+    /// Measured temperature
+    pub temperature: ThermodynamicTemperature,
+}
+
+impl crate::sensors::Measurement for Measurement {}
+impl crate::sensors::TemperatureMeasurement for Measurement {
+    fn temperature(&self) -> Option<ThermodynamicTemperature> {
+        todo!()
+    }
 }
 
 /// The TMP117 is a high-precision digital temperature sensor. It provides a 16-bit
@@ -155,14 +152,14 @@ where
 )]
 impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     /// Initialize the sensor by waiting for the boot-up period and verifying its device id.
-    /// The datasheet specifies a power-on-reset time of 1.5ms.
     /// Calling this function is not mandatory, but recommended to ensure proper operation.
     pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         use self::registers::DeviceIdRevision;
 
-        // FIXME: issue reset first?
-        delay.delay_us(1500).await;
+        // Soft-reset device
+        self.reset(delay).await.map_err(InitError::Bus)?;
 
+        // Verify device id
         let device_id = self.read_register::<DeviceIdRevision>().await.map_err(InitError::Bus)?;
         if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
             return Err(InitError::InvalidDeviceId);
@@ -221,16 +218,21 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
 
         Err(EepromError::EepromStillBusy)
     }
+}
 
-    /// Performs a one-shot measurement. This will set the conversion mode to [`self::registers::ConversionMode::Oneshot´].
-    /// which will cause the device to perform a single conversion a return to sleep mode afterwards.
-    ///
-    /// This function will initialize the measurement, wait until the data is acquired and return
-    /// the temperature.
-    pub async fn measure<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<ThermodynamicTemperature, I::Error> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP117<I> {
+    type Error = I::Error;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will set the conversion mode to
+    /// [`self::registers::ConversionMode::Oneshot´] causing the device to perform a
+    /// single conversion a return to sleep afterwards.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         use self::registers::{Configuration, ConversionMode, Temperature};
 
         // Read current averaging mode to determine required measurement delay
@@ -246,6 +248,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
         delay.delay_us(active_conversion_time).await;
 
         // Read and return the temperature
-        Ok(self.read_register::<Temperature>().await?.read_temperature())
+        let temperature = self.read_register::<Temperature>().await?.read_temperature();
+        Ok(Measurement { temperature })
     }
 }

@@ -5,7 +5,10 @@
 #![feature(generic_arg_infer)]
 
 pub mod devices;
+pub mod sensors;
 pub mod utils;
+
+pub use uom;
 
 #[cfg(test)]
 mod tests {

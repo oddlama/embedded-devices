@@ -1,8 +1,7 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::Rational32;
-use uom::si::rational32::ThermodynamicTemperature;
+use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 pub const DEVICE_ID_VALID: u8 = 0x04;
@@ -278,7 +277,7 @@ pub struct AmbientTemperature {
 impl AmbientTemperature {
     /// Reads the ambient temperature in °C with a resolution of 0.0625°C/LSB.
     pub fn read_temperature(&self) -> ThermodynamicTemperature {
-        ThermodynamicTemperature::new::<degree_celsius>(Rational32::new_raw(self.read_raw_temperature().into(), 16))
+        ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_temperature() as f64 / 16.0)
     }
 }
 
@@ -306,9 +305,7 @@ macro_rules! define_temp_limit_register {
         impl $name {
             /// Reads the temperature limit in °C with a resolution of 0.25°C/LSB.
             pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-                ThermodynamicTemperature::new::<degree_celsius>(
-                    Rational32::new_raw(self.read_raw_temperature_limit().into(), 4).reduced(),
-                )
+                ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_temperature_limit() as f64 / 4.0)
             }
 
             /// Writes the temperature limit in °C with a resolution of 0.25°C/LSB.
@@ -318,7 +315,7 @@ macro_rules! define_temp_limit_register {
                 temperature_limit: ThermodynamicTemperature,
             ) -> Result<(), core::num::TryFromIntError> {
                 let temp = temperature_limit.get::<degree_celsius>();
-                let temp: i16 = (temp * Rational32::from_integer(4)).to_integer().try_into()?;
+                let temp: i16 = ((temp * 4.0) as i32).try_into()?;
                 self.write_raw_temperature_limit(temp);
                 Ok(())
             }

@@ -30,6 +30,9 @@ use crc::Algorithm;
 /// Example implemenation for a basic CRC Algorithm:
 ///
 /// ```
+/// use embedded_registers::i2c::codecs::Crc8Algorithm;
+/// use crc::{Algorithm, CRC_8_NRSC_5};
+///
 /// #[derive(Default)]
 /// struct MyCrc {}
 ///

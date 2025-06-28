@@ -20,29 +20,27 @@
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Sync, address::Address, address::Pin};
-//! use uom::num_rational::Rational64;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
 //! use uom::si::power::milliwatt;
-//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
 //! let mut ina226 = INA226Sync::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina226.init(
 //!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
-//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
-//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//!   ElectricCurrent::new::<ampere>(3.0),
 //! ).unwrap();
 //!
 //! // One-shot read all values
 //! let measurements = ina226.measure(&mut Delay).unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
-//! let current = measurements.current.get::<milliampere>().to_f32();
-//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! let bus_voltage = measurements.bus_voltage.get::<millivolt>();();
+//! let current = measurements.current.get::<milliampere>();();
+//! let power = measurements.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -57,29 +55,27 @@
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Async, address::Address, address::Pin};
-//! use uom::num_rational::Rational64;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
 //! use uom::si::power::milliwatt;
-//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
 //! let mut ina226 = INA226Async::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina226.init(
 //!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
-//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
-//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//!   ElectricCurrent::new::<ampere>(3.0),
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
 //! let measurements = ina226.measure(&mut Delay).await.unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
-//! let current = measurements.current.get::<milliampere>().to_f32();
-//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! let bus_voltage = measurements.bus_voltage.get::<millivolt>();();
+//! let current = measurements.current.get::<milliampere>();();
+//! let power = measurements.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW", bus_voltage, current, power);
 //! # Ok(())
 //! # }
@@ -90,7 +86,7 @@ use self::address::Address;
 use embedded_devices_derive::{device, device_impl};
 use uom::si::electric_current::ampere;
 use uom::si::electrical_resistance::ohm;
-use uom::si::rational64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
+use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
 
 pub mod address;
 pub mod registers;
@@ -243,9 +239,8 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
         let shunt_resistance = shunt_resistance.get::<ohm>();
         let max_expected_current = max_expected_current.get::<ampere>();
 
-        self.current_lsb_na =
-            (1_000_000_000 * *max_expected_current.numer()) / (*max_expected_current.denom() * (1 << 15));
-        let shunt_resistance_mohm = (1_000 * *shunt_resistance.numer()) / (*shunt_resistance.denom());
+        self.current_lsb_na = ((1_000_000_000f64 / (1 << 15) as f64) * max_expected_current) as i64;
+        let shunt_resistance_mohm = (1_000.0 * shunt_resistance) as i64;
 
         // Calibration Register = 0.00512 / (current_lsb (A) * shunt_resistance (Ω))
         let cal = 5_120_000_000 / (self.current_lsb_na * shunt_resistance_mohm);

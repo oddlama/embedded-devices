@@ -41,7 +41,6 @@
 //! use embedded_devices::devices::bosch::bmp280::BMP280Sync;
 //! use embedded_devices::devices::bosch::bme280::address::Address;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bmp280 = BMP280Sync::new_i2c(i2c, Address::Primary);
@@ -49,7 +48,7 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bmp280.measure(&mut Delay)?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -66,7 +65,6 @@
 //! use embedded_devices::devices::bosch::bmp280::BMP280Async;
 //! use embedded_devices::devices::bosch::bme280::address::Address;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut bmp280 = BMP280Async::new_i2c(i2c, Address::Primary);
@@ -74,13 +72,13 @@
 //!
 //! // Read the current temperature in °C and convert it to a float
 //! let measurements = bmp280.measure(&mut Delay).await?;
-//! let temp = measurements.temperature.get::<degree_celsius>().to_f32();
+//! let temp = measurements.temperature.get::<degree_celsius>();();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
 //! ```
 
-use uom::si::rational32::{Pressure, ThermodynamicTemperature};
+use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
     registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},

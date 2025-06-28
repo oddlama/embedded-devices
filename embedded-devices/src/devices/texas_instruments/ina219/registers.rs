@@ -1,11 +1,10 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::Rational32;
 use uom::si::electric_current::ampere;
+use uom::si::electric_potential::volt;
+use uom::si::f64::{ElectricCurrent, ElectricPotential};
 use uom::si::power::watt;
-use uom::si::rational32::ElectricCurrent;
-use uom::si::{electric_potential::volt, rational32::ElectricPotential};
 
 /// Valid bus voltage ranges.
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -156,7 +155,7 @@ pub struct ShuntVoltage {
 impl ShuntVoltage {
     /// Read the shunt voltage
     pub fn read_voltage(&self) -> ElectricPotential {
-        ElectricPotential::new::<volt>(Rational32::new(self.read_raw_value() as i32, 100_000))
+        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 100_000.0)
     }
 }
 
@@ -191,7 +190,7 @@ pub struct BusVoltage {
 impl BusVoltage {
     /// Read the bus voltage
     pub fn read_voltage(&self) -> ElectricPotential {
-        ElectricPotential::new::<volt>(Rational32::new(self.read_raw_value() as i32, 250))
+        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 250.0)
     }
 }
 
@@ -208,13 +207,12 @@ pub struct Power {
 impl Power {
     /// Read the power, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register which is used to derive the nW/LSB for the power register
-    pub fn read_power(&self, current_lsb_na: u32) -> uom::si::rational32::Power {
+    pub fn read_power(&self, current_lsb_na: u32) -> uom::si::f64::Power {
         // nW/LSB = 20 * nA/LSB, we divide by 50 instead to have the result in µW
         // which fits better in a u32.
-        uom::si::rational32::Power::new::<watt>(Rational32::new(
-            self.read_raw_value() as i32 * current_lsb_na as i32 / 50,
-            1_000_000,
-        ))
+        uom::si::f64::Power::new::<watt>(
+            (self.read_raw_value() as i32 * current_lsb_na as i32 / 50) as f64 / 1_000_000.0,
+        )
     }
 }
 
@@ -233,10 +231,9 @@ impl Current {
     /// for the current register.
     pub fn read_current(&self, current_lsb_na: u32) -> ElectricCurrent {
         // We pre-divide by 1000 to have the result in µA which fits better in a u32.
-        ElectricCurrent::new::<ampere>(Rational32::new(
-            self.read_raw_value() as i32 * current_lsb_na as i32 / 1000,
-            1_000_000,
-        ))
+        ElectricCurrent::new::<ampere>(
+            (self.read_raw_value() as i32 * current_lsb_na as i32 / 1000) as f64 / 1_000_000.0,
+        )
     }
 }
 

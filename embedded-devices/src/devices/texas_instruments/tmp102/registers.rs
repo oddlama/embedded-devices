@@ -1,8 +1,7 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::Rational32;
-use uom::si::rational32::ThermodynamicTemperature;
+use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 /// At the end of every conversion, the device updates the temperature
@@ -168,9 +167,7 @@ macro_rules! define_temp_limit_register {
         impl $name {
             /// Reads the temperature limit in °C with a resolution of 7.8125m°C/LSB.
             pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-                ThermodynamicTemperature::new::<degree_celsius>(
-                    Rational32::new_raw(self.read_raw_temperature_limit().into(), 128).reduced(),
-                )
+                ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_temperature_limit() as f64 / 128.0)
             }
 
             /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
@@ -180,7 +177,7 @@ macro_rules! define_temp_limit_register {
                 temperature_limit: ThermodynamicTemperature,
             ) -> Result<(), core::num::TryFromIntError> {
                 let temp = temperature_limit.get::<degree_celsius>();
-                let temp: i16 = (temp * Rational32::from_integer(128)).to_integer().try_into()?;
+                let temp: i16 = ((temp * 128.0) as i32).try_into()?;
                 self.write_raw_temperature_limit(temp);
                 Ok(())
             }

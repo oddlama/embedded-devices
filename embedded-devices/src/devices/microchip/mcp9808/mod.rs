@@ -25,7 +25,6 @@
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Sync, address::Address, registers::AmbientTemperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut mcp9808 = MCP9808Sync::new_i2c(i2c, Address::Default);
@@ -35,8 +34,7 @@
 //! let temp = mcp9808
 //!     .read_register::<AmbientTemperature>()?
 //!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
+//!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
@@ -51,7 +49,6 @@
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Async, address::Address, registers::AmbientTemperature};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
-//! use uom::num_traits::ToPrimitive;
 //!
 //! // Create and initialize the device
 //! let mut mcp9808 = MCP9808Async::new_i2c(i2c, Address::Default);
@@ -62,8 +59,7 @@
 //!     .read_register::<AmbientTemperature>()
 //!     .await?
 //!     .read_temperature()
-//!     .get::<degree_celsius>()
-//!     .to_f32();
+//!     .get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }

@@ -28,14 +28,13 @@
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
+//! use embedded_devices::sensors::SensorSync;
 //! use embedded_devices::devices::texas_instruments::ina228::{INA228Sync, address::Address, address::Pin};
-//! use uom::num_rational::Rational64;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
 //! use uom::si::power::milliwatt;
-//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
@@ -43,17 +42,17 @@
 //! ina228.init(
 //!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
-//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
-//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//!   ElectricCurrent::new::<ampere>(3.0),
 //! ).unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina228.oneshot(&mut Delay).unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
-//! let temperature = measurements.temperature.get::<degree_celsius>().to_f32();
-//! let current = measurements.current.get::<milliampere>().to_f32();
-//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! let measurement = ina228.measure(&mut Delay).unwrap();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
+//! let temperature = measurement.temperature.get::<degree_celsius>();();
+//! let current = measurement.current.get::<milliampere>();();
+//! let power = measurement.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW, {:?}°C", bus_voltage, current, power, temperature);
 //! # Ok(())
 //! # }
@@ -67,14 +66,13 @@
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
+//! use embedded_devices::sensors::SensorAsync;
 //! use embedded_devices::devices::texas_instruments::ina228::{INA228Async, address::Address, address::Pin};
-//! use uom::num_rational::Rational64;
-//! use uom::num_traits::ToPrimitive;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
 //! use uom::si::power::milliwatt;
-//! use uom::si::rational64::{ElectricCurrent, ElectricalResistance};
+//! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
@@ -82,17 +80,17 @@
 //! ina228.init(
 //!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
-//!   ElectricalResistance::new::<ohm>(Rational64::new(1, 10)),
+//!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
-//!   ElectricCurrent::new::<ampere>(Rational64::new(3, 1)),
+//!   ElectricCurrent::new::<ampere>(3.0),
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
-//! let measurements = ina228.oneshot(&mut Delay).await.unwrap();
-//! let bus_voltage = measurements.bus_voltage.get::<millivolt>().to_f32();
-//! let temperature = measurements.temperature.get::<degree_celsius>().to_f32();
-//! let current = measurements.current.get::<milliampere>().to_f32();
-//! let power = measurements.power.get::<milliwatt>().to_f32();
+//! let measurement = ina228.measure(&mut Delay).await.unwrap();
+//! let bus_voltage = measurement.bus_voltage.get::<millivolt>();();
+//! let temperature = measurement.temperature.get::<degree_celsius>();();
+//! let current = measurement.current.get::<milliampere>();();
+//! let power = measurement.power.get::<milliwatt>();();
 //! println!("Current measurement: {:?}mV, {:?}mA, {:?}mW, {:?}°C", bus_voltage, current, power, temperature);
 //! # Ok(())
 //! # }
@@ -102,12 +100,11 @@ use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl};
 use registers::AdcRange;
-use uom::num_rational::Rational64;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
 use uom::si::electrical_resistance::ohm;
-use uom::si::rational32::ThermodynamicTemperature;
-use uom::si::rational64::{ElectricCharge, ElectricCurrent, ElectricPotential, ElectricalResistance, Energy, Power};
+use uom::si::f64::ThermodynamicTemperature;
+use uom::si::f64::{ElectricCharge, ElectricCurrent, ElectricPotential, ElectricalResistance, Energy, Power};
 
 pub mod address;
 pub mod registers;
@@ -127,7 +124,7 @@ pub enum InitError<BusError> {
 
 /// Measurement data
 #[derive(Debug)]
-pub struct Measurements {
+pub struct Measurement {
     /// Measured voltage across the shunt
     pub shunt_voltage: ElectricPotential,
     /// Measured voltage on the bus
@@ -144,6 +141,8 @@ pub struct Measurements {
     pub charge: ElectricCharge,
 }
 
+impl crate::sensors::Measurement for Measurement {}
+
 /// All possible errors that may occur during measurement
 #[derive(Debug)]
 pub enum MeasurementError<BusError> {
@@ -151,9 +150,9 @@ pub enum MeasurementError<BusError> {
     Bus(BusError),
     /// The conversion ready flag was not set within the expected time frame.
     Timeout,
-    /// Measurements were ready, but an overflow occurred. The power and
-    /// current measurements may be incorrect.
-    Overflow(Measurements),
+    /// Measurement was ready, but an overflow occurred. The power and
+    /// current measurement may be incorrect.
+    Overflow(Measurement),
 }
 
 /// The INA228 is an ultra-precise digital power monitor with a 20-bit delta-sigma ADC specifically
@@ -256,10 +255,9 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
         Ok(())
     }
 
-    /// Writes the given shunt resistance and maximum expected current into
-    /// the device configuration register. Automatically selects the adc range appropriately,
-    /// leaving 10% headroom if possible.
-    /// This required to enable power and current output.
+    /// Writes the given shunt resistance and maximum expected current into the device
+    /// configuration register. Automatically selects the adc range appropriately, leaving 10%
+    /// headroom if possible. This required to enable power and current output.
     pub async fn calibrate(
         &mut self,
         shunt_resistance: ElectricalResistance,
@@ -273,12 +271,11 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
         let max_expected_current = max_expected_current.get::<ampere>();
         let max_expected_shunt_voltage = max_expected_shunt_voltage.get::<volt>();
 
-        self.current_lsb_na =
-            (1_000_000_000 * { *max_expected_current.numer() }) / ({ *max_expected_current.denom() } * (1 << 19));
-        let shunt_resistance_mohm = (1_000 * { *shunt_resistance.numer() }) / { *shunt_resistance.denom() };
+        self.current_lsb_na = ((1_000_000_000f64 / (1 << 19) as f64) * max_expected_current) as i64;
+        let shunt_resistance_mohm = (1_000.0 * shunt_resistance) as i64;
 
         // If the expected shunt voltage exceeds this threshold, we enable the input prescaler
-        let div4_threshold = Rational64::new(36, 1000); // 36mV
+        let div4_threshold = 0.036; // 36mV
         self.adc_range = if max_expected_shunt_voltage > div4_threshold {
             self::registers::AdcRange::Div4
         } else {
@@ -300,7 +297,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
 
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
-    pub async fn read_measurements(&mut self) -> Result<Measurements, MeasurementError<I::Error>> {
+    pub async fn read_measurement(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
         let bus_voltage = self
             .read_register::<self::registers::BusVoltage>()
             .await
@@ -336,7 +333,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
             .await
             .map_err(MeasurementError::Bus)?;
 
-        let measurements = Measurements {
+        let measurement = Measurement {
             shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
             bus_voltage: bus_voltage.read_voltage(),
             temperature: temperature.read_temperature(),
@@ -352,17 +349,26 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
             .map_err(MeasurementError::Bus)?;
 
         if diag.read_math_overflow() {
-            Err(MeasurementError::Overflow(measurements))
+            Err(MeasurementError::Overflow(measurement))
         } else {
-            Ok(measurements)
+            Ok(measurement)
         }
     }
+}
 
-    /// Performs a one-shot measurement of all values.
-    pub async fn oneshot<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<Measurements, MeasurementError<I::Error>> {
+#[maybe_async_cfg::maybe(
+    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228<I> {
+    type Error = MeasurementError<I::Error>;
+    type Measurement = Measurement;
+
+    /// Performs a one-shot measurement. This will set the operating mode to
+    /// [`self::registers::OperatingMode::Triggered´] and enable all conversion outputs causing the
+    /// device to perform a single conversion a return to sleep afterwards.
+    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
         let reg_adc_conf = self
             .read_register::<self::registers::AdcConfiguration>()
             .await
@@ -432,7 +438,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
                     .await
                     .map_err(MeasurementError::Bus)?;
 
-                let measurements = Measurements {
+                let measurement = Measurement {
                     shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
                     bus_voltage: bus_voltage.read_voltage(),
                     temperature: temperature.read_temperature(),
@@ -443,9 +449,9 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
                 };
 
                 if diag.read_math_overflow() {
-                    return Err(MeasurementError::Overflow(measurements));
+                    return Err(MeasurementError::Overflow(measurement));
                 } else {
-                    return Ok(measurements);
+                    return Ok(measurement);
                 }
             }
 

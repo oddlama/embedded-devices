@@ -1,16 +1,14 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
-use uom::num_rational::{Rational32, Rational64};
 use uom::si::electric_charge::coulomb;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
 use uom::si::energy::joule;
+use uom::si::f64;
+use uom::si::f64::ThermodynamicTemperature;
+use uom::si::f64::{ElectricCharge, ElectricCurrent, ElectricPotential};
 use uom::si::power::watt;
-use uom::si::rational32;
-use uom::si::rational32::ThermodynamicTemperature;
-use uom::si::rational64;
-use uom::si::rational64::{ElectricCharge, ElectricCurrent, ElectricPotential};
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 /// Available shunt full-scale ranges
@@ -240,10 +238,7 @@ impl ShuntVoltage {
     /// Read the shunt voltage.
     /// Resolution is 312.5 nV/LSB with `AdcRange::Div4` and 78.125 nV/LSB with `AdcRange::Div1`.
     pub fn read_voltage(&self, adc_range: AdcRange) -> ElectricPotential {
-        ElectricPotential::new::<volt>(Rational64::new(
-            self.read_raw_value() as i64 * adc_range.factor() as i64,
-            12_800_000,
-        ))
+        ElectricPotential::new::<volt>((self.read_raw_value() as i64 * adc_range.factor() as i64) as f64 / 12_800_000.0)
     }
 }
 
@@ -265,7 +260,7 @@ pub struct BusVoltage {
 impl BusVoltage {
     /// Read the bus voltage
     pub fn read_voltage(&self) -> ElectricPotential {
-        ElectricPotential::new::<volt>(Rational64::new(self.read_raw_value() as i64, 5120))
+        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 5120.0)
     }
 }
 
@@ -283,7 +278,7 @@ pub struct Temperature {
 impl Temperature {
     /// Read the die temperature
     pub fn read_temperature(&self) -> ThermodynamicTemperature {
-        ThermodynamicTemperature::new::<degree_celsius>(Rational32::new(self.read_raw_value() as i32, 128))
+        ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_value() as f64 / 128.0)
     }
 }
 
@@ -306,10 +301,7 @@ impl Current {
     /// Read the current, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register.
     pub fn read_current(&self, current_lsb_na: i64) -> ElectricCurrent {
-        ElectricCurrent::new::<ampere>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na,
-            1_000_000_000,
-        ))
+        ElectricCurrent::new::<ampere>((self.read_raw_value() as i64 * current_lsb_na) as f64 / 1_000_000_000.0)
     }
 }
 
@@ -328,11 +320,8 @@ pub struct Power {
 impl Power {
     /// Read the power, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register which is used to derive the nW/LSB for the power register
-    pub fn read_power(&self, current_lsb_na: i64) -> rational64::Power {
-        rational64::Power::new::<watt>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na * 32,
-            1_000_000_000 * 10,
-        ))
+    pub fn read_power(&self, current_lsb_na: i64) -> f64::Power {
+        f64::Power::new::<watt>((self.read_raw_value() as i64 * current_lsb_na * 32) as f64 / (1_000_000_000f64 * 10.0))
     }
 }
 
@@ -351,11 +340,10 @@ pub struct Energy {
 impl Energy {
     /// Read the energy, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register which is used to derive the nW/LSB for the energy register
-    pub fn read_energy(&self, current_lsb_na: i64) -> rational64::Energy {
-        rational64::Energy::new::<joule>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na * 512,
-            1_000_000_000 * 10,
-        ))
+    pub fn read_energy(&self, current_lsb_na: i64) -> f64::Energy {
+        f64::Energy::new::<joule>(
+            (self.read_raw_value() as i64 * current_lsb_na * 512) as f64 / (1_000_000_000f64 * 10.0),
+        )
     }
 }
 
@@ -375,7 +363,7 @@ impl Charge {
     /// Read the charge, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register.
     pub fn read_charge(&self, current_lsb_na: i64) -> ElectricCharge {
-        ElectricCharge::new::<coulomb>(Rational64::new(self.read_raw_value() * current_lsb_na, 1_000_000_000))
+        ElectricCharge::new::<coulomb>((self.read_raw_value() * current_lsb_na) as f64 / 1_000_000_000f64)
     }
 }
 
@@ -483,24 +471,21 @@ macro_rules! define_shunt_voltage_threshold_register {
         impl $name {
             #[doc = "Reads the"]
             #[doc = $value_doc]
-            pub fn read_voltage_threshold(&self, adc_range: AdcRange) -> rational32::ElectricPotential {
-                rational32::ElectricPotential::new::<volt>(Rational32::new(
-                    self.read_raw_value() as i32 * adc_range.factor() as i32,
-                    $resolution_factor,
-                ))
+            pub fn read_voltage_threshold(&self, adc_range: AdcRange) -> ElectricPotential {
+                ElectricPotential::new::<volt>(
+                    (self.read_raw_value() as i32 * adc_range.factor() as i32) as f64 / $resolution_factor,
+                )
             }
 
             #[doc = "Writes the"]
             #[doc = $value_doc]
             pub fn write_voltage_threshold(
                 &mut self,
-                voltage_threshold: rational32::ElectricPotential,
+                voltage_threshold: ElectricPotential,
                 adc_range: AdcRange,
             ) -> Result<(), core::num::TryFromIntError> {
                 let value = voltage_threshold.get::<volt>();
-                let value = (value * Rational32::new_raw($resolution_factor, adc_range.factor() as i32))
-                    .to_integer()
-                    .try_into()?;
+                let value = ((value * $resolution_factor / adc_range.factor() as f64) as i32).try_into()?;
                 self.write_raw_value(value);
                 Ok(())
             }
@@ -509,7 +494,7 @@ macro_rules! define_shunt_voltage_threshold_register {
             #[doc = $value_doc]
             pub fn with_voltage_threshold(
                 mut self,
-                voltage_threshold: rational32::ElectricPotential,
+                voltage_threshold: ElectricPotential,
                 adc_range: AdcRange,
             ) -> Result<Self, core::num::TryFromIntError> {
                 self.write_voltage_threshold(voltage_threshold, adc_range)?;
@@ -524,7 +509,7 @@ define_shunt_voltage_threshold_register!(
     desc = "Shunt Overvoltage Threshold Register",
     address = 0xc,
     value_default = i16::MAX,
-    resolution = 800_000,
+    resolution = 800_000f64,
     value_doc = r#"
 threshold for comparison of the value to detect Shunt Overvoltage (overcurrent
 protection). Two's complement value.
@@ -542,7 +527,7 @@ define_shunt_voltage_threshold_register!(
     desc = "Shunt Undervoltage Threshold Register",
     address = 0xd,
     value_default = i16::MIN,
-    resolution = 800_000,
+    resolution = 800_000f64,
     value_doc = r#"
 threshold for comparison of the value to detect Shunt Undervoltage (undercurrent
 protection). Two's complement value.
@@ -570,23 +555,18 @@ macro_rules! define_bus_voltage_threshold_register {
         impl $name {
             #[doc = "Reads the"]
             #[doc = $value_doc]
-            pub fn read_voltage_threshold(&self) -> rational32::ElectricPotential {
-                rational32::ElectricPotential::new::<volt>(Rational32::new(
-                    self.read_raw_value() as i32,
-                    $resolution_factor,
-                ))
+            pub fn read_voltage_threshold(&self) -> ElectricPotential {
+                ElectricPotential::new::<volt>(self.read_raw_value() as f64 / $resolution_factor)
             }
 
             #[doc = "Writes the"]
             #[doc = $value_doc]
             pub fn write_voltage_threshold(
                 &mut self,
-                voltage_threshold: rational32::ElectricPotential,
+                voltage_threshold: ElectricPotential,
             ) -> Result<(), core::num::TryFromIntError> {
                 let value = voltage_threshold.get::<volt>();
-                let value = (value * Rational32::from_integer($resolution_factor))
-                    .to_integer()
-                    .try_into()?;
+                let value = ((value * $resolution_factor) as i32).try_into()?;
                 self.write_raw_value(value);
                 Ok(())
             }
@@ -595,7 +575,7 @@ macro_rules! define_bus_voltage_threshold_register {
             #[doc = $value_doc]
             pub fn with_voltage_threshold(
                 mut self,
-                voltage_threshold: rational32::ElectricPotential,
+                voltage_threshold: ElectricPotential,
             ) -> Result<Self, core::num::TryFromIntError> {
                 self.write_voltage_threshold(voltage_threshold)?;
                 Ok(self)
@@ -609,7 +589,7 @@ define_bus_voltage_threshold_register!(
     desc = "Bus Overvoltage Threshold Register",
     address = 0xe,
     value_default = u16::MAX,
-    resolution = 320,
+    resolution = 320f64,
     value_doc = r#"
 threshold for comparison of the value to detect Bus Overvoltage (overvoltage
 protection). Unsigned representation, positive value only. Resolution is 3.125 mV/LSB.
@@ -621,7 +601,7 @@ define_bus_voltage_threshold_register!(
     desc = "Bus Undervoltage Threshold Register",
     address = 0xf,
     value_default = 0,
-    resolution = 320,
+    resolution = 320f64,
     value_doc = r#"
 threshold for comparison of the value to detect Bus Undervoltage (undervoltage
 protection). Unsigned representation, positive value only. Resolution is 3.125 mV/LSB.
@@ -644,7 +624,7 @@ pub struct TemperatureOverlimitThreshold {
 impl TemperatureOverlimitThreshold {
     /// Reads the temperature overlimit threshold in °C with a resolution of 7.8125 m°C/LSB.
     pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-        ThermodynamicTemperature::new::<degree_celsius>(Rational32::new(self.read_raw_value().into(), 128))
+        ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_value() as f64 / 128.0)
     }
 
     /// Writes the temperature overlimit threshold in °C with a resolution of 7.8125 m°C/LSB.
@@ -654,7 +634,7 @@ impl TemperatureOverlimitThreshold {
         temperature_limit: ThermodynamicTemperature,
     ) -> Result<(), core::num::TryFromIntError> {
         let value = temperature_limit.get::<degree_celsius>();
-        let value = (value * Rational32::from_integer(128)).to_integer().try_into()?;
+        let value = ((value * 128.0) as i32).try_into()?;
         self.write_raw_value(value);
         Ok(())
     }
@@ -687,11 +667,10 @@ impl PowerOverlimitThreshold {
     /// Reads the power overlimit threshold in Watt with a resolution of 256 * Power LSB.
     /// current_lsb_na is the calibrated amount of nA/LSB for the current register which is used to
     /// derive the nW/LSB for the power register
-    pub fn read_power_limit(&self, current_lsb_na: i64) -> rational64::Power {
-        rational64::Power::new::<watt>(Rational64::new(
-            self.read_raw_value() as i64 * current_lsb_na * 32 * 256,
-            1_000_000_000 * 10,
-        ))
+    pub fn read_power_limit(&self, current_lsb_na: i64) -> f64::Power {
+        f64::Power::new::<watt>(
+            (self.read_raw_value() as i64 * current_lsb_na * 32 * 256) as f64 / (1_000_000_000f64 * 10.0),
+        )
     }
 
     /// Writes the power overlimit threshold in Watt with a resolution of 256 * Power LSB.
@@ -700,13 +679,11 @@ impl PowerOverlimitThreshold {
     /// derive the nW/LSB for the power register
     pub fn write_power_limit(
         &mut self,
-        power_limit: rational64::Power,
+        power_limit: f64::Power,
         current_lsb_na: i64,
     ) -> Result<(), core::num::TryFromIntError> {
         let value = power_limit.get::<watt>();
-        let value = (value * Rational64::new_raw(1_000_000_000 * 10, current_lsb_na * 32 * 256))
-            .to_integer()
-            .try_into()?;
+        let value = ((value * 1_000_000_000f64 * 10.0 / (current_lsb_na * 32 * 256) as f64) as i32).try_into()?;
         self.write_raw_value(value);
         Ok(())
     }
@@ -717,7 +694,7 @@ impl PowerOverlimitThreshold {
     /// derive the nW/LSB for the power register
     pub fn with_power_limit(
         mut self,
-        power_limit: rational64::Power,
+        power_limit: f64::Power,
         current_lsb_na: i64,
     ) -> Result<Self, core::num::TryFromIntError> {
         self.write_power_limit(power_limit, current_lsb_na)?;
