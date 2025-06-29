@@ -72,4 +72,4 @@ define_sensor_measurement!(Pressure, Pressure, "pressure");
 define_sensor_measurement!(RelativeHumidity, Ratio, "relative humidity");
 define_sensor_measurement!(Temperature, ThermodynamicTemperature, "temperature");
 define_sensor_measurement!(Voltage, ElectricPotential, "voltage");
-define_sensor_measurement!(Co2Concentration, Ratio, "co2_concentration");
+define_sensor_measurement!(Co2Concentration, Ratio, "co2 concentration");

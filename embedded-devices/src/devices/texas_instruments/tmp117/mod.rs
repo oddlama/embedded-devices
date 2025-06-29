@@ -77,20 +77,24 @@ pub mod registers;
 type TMP117I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur in device initialization
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// Invalid Device Id was encountered
-    InvalidDeviceId,
+    #[error("invalid device id {0:#04x}")]
+    InvalidDeviceId(u16),
 }
 
 /// All possible errors that may occur in device initialization
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum EepromError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// EEPROM is still busy after 13ms
+    #[error("eeprom still busy")]
     EepromStillBusy,
 }
 
@@ -153,12 +157,12 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
         use self::registers::DeviceIdRevision;
 
         // Soft-reset device
-        self.reset(delay).await.map_err(InitError::Bus)?;
+        self.reset(delay).await?;
 
         // Verify device id
-        let device_id = self.read_register::<DeviceIdRevision>().await.map_err(InitError::Bus)?;
-        if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
-            return Err(InitError::InvalidDeviceId);
+        let device_id = self.read_register::<DeviceIdRevision>().await?.read_device_id();
+        if device_id != self::registers::DEVICE_ID_VALID {
+            return Err(InitError::InvalidDeviceId(device_id));
         }
 
         Ok(())
@@ -185,8 +189,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
 
         // Unlock EEPROM
         self.write_register(EepromUnlock::default().with_lock_mode(EepromLockMode::Unlocked))
-            .await
-            .map_err(EepromError::Bus)?;
+            .await?;
 
         // Wait 7ms for EEPROM write to complete
         delay.delay_ms(7).await;
@@ -194,16 +197,10 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
         // Wait up to 5ms for eeprom busy flag to be reset
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
-            if !self
-                .read_register::<EepromUnlock>()
-                .await
-                .map_err(EepromError::Bus)?
-                .read_busy()
-            {
+            if !self.read_register::<EepromUnlock>().await?.read_busy() {
                 // EEPROM write complete, lock eeprom again
                 self.write_register(EepromUnlock::default().with_lock_mode(EepromLockMode::Locked))
-                    .await
-                    .map_err(EepromError::Bus)?;
+                    .await?;
 
                 return Ok(());
             }

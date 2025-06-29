@@ -112,14 +112,32 @@ pub mod registers;
 type INA228I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur in device initialization
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// Invalid Device Id was encountered
-    InvalidDeviceId,
+    #[error("invalid device id {0:#04x}")]
+    InvalidDeviceId(u16),
     /// Invalid Manufacturer Id was encountered
-    InvalidManufacturerId,
+    #[error("invalid manufacturer id {0:#04x}")]
+    InvalidManufacturerId(u16),
+}
+
+/// All possible errors that may occur during measurement
+#[derive(Debug, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Bus error
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// The conversion ready flag was not set within the expected time frame.
+    #[error("conversion timeout")]
+    Timeout,
+    /// Measurement was ready, but an overflow occurred. The power and
+    /// current measurement may be incorrect.
+    #[error("overflow in measurement")]
+    Overflow(Measurement),
 }
 
 /// Measurement data
@@ -145,18 +163,6 @@ pub struct Measurement {
     /// Measured charge
     #[measurement(Charge)]
     pub charge: ElectricCharge,
-}
-
-/// All possible errors that may occur during measurement
-#[derive(Debug)]
-pub enum MeasurementError<BusError> {
-    /// Bus error
-    Bus(BusError),
-    /// The conversion ready flag was not set within the expected time frame.
-    Timeout,
-    /// Measurement was ready, but an overflow occurred. The power and
-    /// current measurement may be incorrect.
-    Overflow(Measurement),
 }
 
 /// The INA228 is an ultra-precise digital power monitor with a 20-bit delta-sigma ADC specifically
@@ -231,23 +237,21 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
 
         // Reset the device and wait until it is ready. The datasheet specifies
         // 300µs startup time, so we round up to half a millisecond.
-        self.reset().await.map_err(InitError::Bus)?;
+        self.reset().await?;
         delay.delay_us(500).await;
 
         // Verify we are talking to the correct device
-        let manufacturer_id = self.read_register::<ManufacturerId>().await.map_err(InitError::Bus)?;
-        if manufacturer_id.read_id() != ManufacturerId::default().read_id() {
-            return Err(InitError::InvalidManufacturerId);
+        let manufacturer_id = self.read_register::<ManufacturerId>().await?.read_id();
+        if manufacturer_id != ManufacturerId::default().read_id() {
+            return Err(InitError::InvalidManufacturerId(manufacturer_id));
         }
-        let device_id = self.read_register::<DeviceId>().await.map_err(InitError::Bus)?;
-        if device_id.read_id() != DeviceId::default().read_id() {
-            return Err(InitError::InvalidDeviceId);
+        let device_id = self.read_register::<DeviceId>().await?.read_id();
+        if device_id != DeviceId::default().read_id() {
+            return Err(InitError::InvalidDeviceId(device_id));
         }
 
         // Calibrate the device
-        self.calibrate(shunt_resistance, max_expected_current)
-            .await
-            .map_err(InitError::Bus)?;
+        self.calibrate(shunt_resistance, max_expected_current).await?;
         Ok(())
     }
 
@@ -302,40 +306,19 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
     pub async fn read_measurement(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
-        let bus_voltage = self
-            .read_register::<self::registers::BusVoltage>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
 
-        let shunt_voltage = self
-            .read_register::<self::registers::ShuntVoltage>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
 
-        let temperature = self
-            .read_register::<self::registers::Temperature>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let temperature = self.read_register::<self::registers::Temperature>().await?;
 
-        let current = self
-            .read_register::<self::registers::Current>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let current = self.read_register::<self::registers::Current>().await?;
 
-        let energy = self
-            .read_register::<self::registers::Energy>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let energy = self.read_register::<self::registers::Energy>().await?;
 
-        let charge = self
-            .read_register::<self::registers::Charge>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let charge = self.read_register::<self::registers::Charge>().await?;
 
-        let power = self
-            .read_register::<self::registers::Power>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let power = self.read_register::<self::registers::Power>().await?;
 
         let measurement = Measurement {
             shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
@@ -347,10 +330,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
             charge: charge.read_charge(self.current_lsb_na),
         };
 
-        let diag = self
-            .read_register::<self::registers::DiagnosticsAndAlert>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let diag = self.read_register::<self::registers::DiagnosticsAndAlert>().await?;
 
         if diag.read_math_overflow() {
             Err(MeasurementError::Overflow(measurement))
@@ -374,10 +354,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228
     /// [`self::registers::OperatingMode::Triggered´] and enable all conversion outputs causing the
     /// device to perform a single conversion a return to sleep afterwards.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let reg_adc_conf = self
-            .read_register::<self::registers::AdcConfiguration>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let reg_adc_conf = self.read_register::<self::registers::AdcConfiguration>().await?;
 
         // Initiate measurement
         self.write_register(
@@ -387,8 +364,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228
                 .with_enable_shunt(true)
                 .with_enable_bus(true),
         )
-        .await
-        .map_err(MeasurementError::Bus)?;
+        .await?;
 
         // Wait until measurement is ready, plus 100µs extra.
         let measurement_time_us = reg_adc_conf.read_bus_conversion_time().us()
@@ -401,47 +377,23 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228
         // Wait for the conversion ready flag to be set
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
-            let diag = self
-                .read_register::<self::registers::DiagnosticsAndAlert>()
-                .await
-                .map_err(MeasurementError::Bus)?;
+            let diag = self.read_register::<self::registers::DiagnosticsAndAlert>().await?;
 
             if diag.read_conversion_ready() {
-                let bus_voltage = self
-                    .read_register::<self::registers::BusVoltage>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
 
-                let shunt_voltage = self
-                    .read_register::<self::registers::ShuntVoltage>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
 
-                let temperature = self
-                    .read_register::<self::registers::Temperature>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let temperature = self.read_register::<self::registers::Temperature>().await?;
 
-                let current = self
-                    .read_register::<self::registers::Current>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let current = self.read_register::<self::registers::Current>().await?;
 
-                let energy = self
-                    .read_register::<self::registers::Energy>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let energy = self.read_register::<self::registers::Energy>().await?;
 
-                let charge = self
-                    .read_register::<self::registers::Charge>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let charge = self.read_register::<self::registers::Charge>().await?;
 
                 // Reading this register clears the conversion_ready flag
-                let power = self
-                    .read_register::<self::registers::Power>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let power = self.read_register::<self::registers::Power>().await?;
 
                 let measurement = Measurement {
                     shunt_voltage: shunt_voltage.read_voltage(self.adc_range),

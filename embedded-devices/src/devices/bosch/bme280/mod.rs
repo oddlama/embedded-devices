@@ -35,7 +35,7 @@
 //! ## Usage (sync)
 //!
 //! ```rust, only_if(sync)
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -49,17 +49,17 @@
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Sync::new_i2c(i2c, Address::Primary);
-//! bme280.init(&mut Delay).unwrap();
+//! bme280.init(&mut Delay)?;
 //! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
 //!     humidity_oversampling: Oversampling::X_16,
 //!     iir_filter: IIRFilter::Disabled,
-//! }).unwrap();
+//! })?;
 //!
 //! // Read measurement
-//! let measurement = bme280.measure(&mut Delay)?;
+//! let measurement = bme280.measure(&mut Delay).unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
@@ -71,7 +71,7 @@
 //! ## Usage (async)
 //!
 //! ```rust, only_if(async)
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -85,17 +85,17 @@
 //!
 //! // Create and initialize the device
 //! let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
-//! bme280.init(&mut Delay).await.unwrap();
+//! bme280.init(&mut Delay).await?;
 //! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
 //!     humidity_oversampling: Oversampling::X_16,
 //!     iir_filter: IIRFilter::Disabled,
-//! }).await.unwrap();
+//! }).await?;
 //!
 //! // Read measurement
-//! let measurement = bme280.measure(&mut Delay).await?;
+//! let measurement = bme280.measure(&mut Delay).await.unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
@@ -115,24 +115,34 @@ pub mod registers;
 
 use self::address::Address;
 use self::registers::{
-    BurstMeasurementsPTH, Chip, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
+    BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
     TrimmingParameters1, TrimmingParameters2,
 };
 
 type BME280SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 0>;
 type BME280I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
-/// All possible errors that may occur when using this device
-#[derive(Debug, defmt::Format)]
-pub enum Error<BusError> {
+#[derive(Debug, defmt::Format, thiserror::Error)]
+pub enum InitError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// Invalid chip id was encountered in `init`
-    InvalidChip(Chip),
-    /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
-    NotCalibrated,
+    #[error("invalid chip id {0:#02x}")]
+    InvalidChip(u8),
     /// NVM data copy is still in progress.
+    #[error("nvm data copy still in progress")]
     NvmCopyInProgress,
+}
+
+#[derive(Debug, defmt::Format, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Bus error
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
+    #[error("not yet calibrated")]
+    NotCalibrated,
 }
 
 /// Measurement data
@@ -395,18 +405,18 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         // Soft-reset device
         self.reset(delay).await?;
 
         // Verify chip id
-        let chip = self.read_register::<Id>().await.map_err(Error::Bus)?.read_chip();
-        if let self::registers::Chip::Invalid(_) = chip {
-            return Err(Error::InvalidChip(chip));
+        let chip = self.read_register::<Id>().await?.read_chip();
+        if let self::registers::Chip::Invalid(x) = chip {
+            return Err(InitError::InvalidChip(x));
         }
 
         // Read calibration data
-        self.calibrate().await.map_err(Error::Bus)?;
+        self.calibrate().await?;
         Ok(())
     }
 
@@ -426,36 +436,29 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             match self.try_reset(delay).await {
                 Ok(()) => return Ok(()),
-                Err(Error::<I::Error>::NvmCopyInProgress) => continue,
+                Err(InitError::NvmCopyInProgress) => continue,
                 Err(e) => return Err(e),
             }
         }
 
-        Err(Error::<I::Error>::NvmCopyInProgress)
+        Err(InitError::NvmCopyInProgress)
     }
 
     /// Performs a soft-reset of the device. The datasheet specifies a start-up time
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
-        self.write_register(self::registers::Reset::default())
-            .await
-            .map_err(Error::Bus)?;
+    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+        self.write_register(self::registers::Reset::default()).await?;
         delay.delay_ms(2).await;
 
-        if self
-            .read_register::<self::registers::Status>()
-            .await
-            .map_err(Error::Bus)?
-            .read_update()
-        {
-            return Err(Error::NvmCopyInProgress);
+        if self.read_register::<self::registers::Status>().await?.read_update() {
+            return Err(InitError::NvmCopyInProgress);
         }
         Ok(())
     }
@@ -472,10 +475,9 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. Check
     /// sensor mode beforehand and call [`Self::reset`] if necessary. To configure advanced
     /// settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
         self.write_register(ControlHumidity::default().with_oversampling(config.humidity_oversampling))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
 
         // This must happen after ControlHumidity, otherwise the former will not have any effect
         self.write_register(
@@ -483,12 +485,11 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )
-        .await
-        .map_err(Error::Bus)?;
+        .await?;
 
-        let mut reg_config = self.read_register::<Config>().await.map_err(Error::Bus)?;
+        let mut reg_config = self.read_register::<Config>().await?;
         reg_config.write_filter(config.iir_filter);
-        self.write_register(reg_config).await.map_err(Error::Bus)?;
+        self.write_register(reg_config).await?;
 
         Ok(())
     }
@@ -501,7 +502,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, true> {
-    type Error = Error<I::Error>;
+    type Error = MeasurementError<I::Error>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
@@ -514,13 +515,12 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
     /// [`Self::calibrate`]. Pressure and humidity measurement specifically require
     /// temperature measurements to be enabled.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
 
         // Use current oversampling config to determine required measurement delay
-        let reg_ctrl_h = self.read_register::<ControlHumidity>().await.map_err(Error::Bus)?;
+        let reg_ctrl_h = self.read_register::<ControlHumidity>().await?;
         let o_h = reg_ctrl_h.read_oversampling();
         let o_t = reg_ctrl_m.read_temperature_oversampling();
         let o_p = reg_ctrl_m.read_pressure_oversampling();
@@ -537,13 +537,9 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
 
         delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self
-            .read_register::<BurstMeasurementsPTH>()
-            .await
-            .map_err(Error::Bus)?
-            .read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?.read_all();
         let Some(ref cal) = self.calibration_data else {
-            return Err(Error::NotCalibrated);
+            return Err(MeasurementError::NotCalibrated);
         };
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);

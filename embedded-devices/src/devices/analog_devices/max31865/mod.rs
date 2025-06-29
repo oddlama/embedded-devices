@@ -69,22 +69,27 @@ pub mod registers;
 type MAX31865SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, false, 0>;
 
 /// All possible errors that may occur in fault detection
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum FaultDetectionError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// Timeout (the detection never finished in the allocated time frame)
+    #[error("fault detection timeout")]
     Timeout,
     /// A fault was detected. Read the FaultStatus register for details.
+    #[error("fault detected")]
     FaultDetected,
 }
 
 /// All possible errors that may occur in temperature reads
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// A fault was detected. Read the FaultStatus register for details.
+    #[error("fault detected")]
     FaultDetected,
 }
 
@@ -164,16 +169,13 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
                 .with_wiring_mode(wiring_mode)
                 .with_filter_mode(filter_mode),
         )
-        .await
-        .map_err(FaultDetectionError::Bus)?;
+        .await?;
 
         self.write_register(self::registers::FaultThresholdLow::default().with_resistance_ratio(0))
-            .await
-            .map_err(FaultDetectionError::Bus)?;
+            .await?;
 
         self.write_register(self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
-            .await
-            .map_err(FaultDetectionError::Bus)?;
+            .await?;
 
         self.detect_faults(delay).await
     }
@@ -183,10 +185,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         &mut self,
         delay: &mut D,
     ) -> Result<(), FaultDetectionError<I::Error>> {
-        let reg_conf = self
-            .read_register::<self::registers::Configuration>()
-            .await
-            .map_err(FaultDetectionError::Bus)?;
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // The automatic fault detection waits 100µs before checking for faults,
         // which should be plenty of time to charge the RC filter.
@@ -198,8 +197,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
                 .with_clear_fault_status(false)
                 .with_fault_detection_cycle(self::registers::FaultDetectionCycle::Automatic),
         )
-        .await
-        .map_err(FaultDetectionError::Bus)?;
+        .await?;
 
         // According to the flow diagram in the datasheet, automatic calibration waits
         // a total of 510µs. We will wait for a bit longer initially and then check
@@ -209,22 +207,15 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         for _ in 0..TRIES {
             let cycle = self
                 .read_register::<self::registers::Configuration>()
-                .await
-                .map_err(FaultDetectionError::Bus)?
+                .await?
                 .read_fault_detection_cycle();
 
             // Check if fault detection is done
             if cycle == FaultDetectionCycle::Finished {
                 // Disable VBIAS
-                self.write_register(reg_conf.with_enable_bias_voltage(false))
-                    .await
-                    .map_err(FaultDetectionError::Bus)?;
+                self.write_register(reg_conf.with_enable_bias_voltage(false)).await?;
 
-                let has_fault = self
-                    .read_register::<registers::Resistance>()
-                    .await
-                    .map_err(FaultDetectionError::Bus)?
-                    .read_fault();
+                let has_fault = self.read_register::<registers::Resistance>().await?.read_fault();
 
                 if has_fault {
                     // Fault detected
@@ -239,9 +230,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         }
 
         // Disable VBIAS
-        self.write_register(reg_conf.with_enable_bias_voltage(false))
-            .await
-            .map_err(FaultDetectionError::Bus)?;
+        self.write_register(reg_conf.with_enable_bias_voltage(false)).await?;
 
         Err(FaultDetectionError::Timeout)
     }
@@ -279,10 +268,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     ///
     /// Checks for faults.
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, MeasurementError<I::Error>> {
-        let resistance = self
-            .read_register::<registers::Resistance>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let resistance = self.read_register::<registers::Resistance>().await?;
 
         if resistance.read_fault() {
             return Err(MeasurementError::FaultDetected);
@@ -306,23 +292,17 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX318
     /// oneshot mode, which will cause it to take a measurement and return to sleep mode
     /// afterwards.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let reg_conf = self
-            .read_register::<self::registers::Configuration>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // Enable VBIAS before initiating one-shot measurement,
         // 10.5 RC time constants are recommended plus 1ms extra.
         // So we just wait 2ms which should be plenty of time.
-        self.write_register(reg_conf.with_enable_bias_voltage(true))
-            .await
-            .map_err(MeasurementError::Bus)?;
+        self.write_register(reg_conf.with_enable_bias_voltage(true)).await?;
         delay.delay_us(2000).await;
 
         // Initiate measurement
         self.write_register(reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
-            .await
-            .map_err(MeasurementError::Bus)?;
+            .await?;
 
         // Wait until measurement is ready, plus 2ms extra
         let measurement_time_us = match reg_conf.read_filter_mode() {
@@ -332,7 +312,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX318
         delay.delay_us(2000 + measurement_time_us).await;
 
         // Revert config (disable VBIAS)
-        self.write_register(reg_conf).await.map_err(MeasurementError::Bus)?;
+        self.write_register(reg_conf).await?;
 
         // Return conversion result
         Ok(Measurement {

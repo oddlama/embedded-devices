@@ -26,13 +26,14 @@ paste = "1.0.15"
 # uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1e0e5ad5206a326403e79", features = ["f32", "f64", "si", "rational32", "rational64"], default-features = false }
 uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1e0e5ad5206a326403e79", features = ["f64", "si"], default-features = false }
 crc = "3.2.1"
+thiserror = { version = "2.0.12", default-features = false }
 
 [features]
 default = ["sync", "async"]
 
 sync = ["embedded-registers/sync"]
 async = ["dep:embedded-hal-async", "embedded-registers/async"]
-std = []
+std = ["thiserror/std"]
 
 # Feature flags to enable supported devices
 

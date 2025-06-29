@@ -8,7 +8,7 @@
 //! ## Usage (sync)
 //!
 //! ```rust, only_if(sync)
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::Error<I::Error>>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -21,16 +21,16 @@
 //!
 //! // Create and initialize the device
 //! let mut bmp390 = BMP390Sync::new_i2c(i2c, Address::Primary);
-//! bmp390.init(&mut Delay).unwrap();
+//! bmp390.init(&mut Delay)?;
 //! // Enable sensors
 //! bmp390.configure(Configuration {
 //!     temperature_oversampling: Some(Oversampling::X_32),
 //!     pressure_oversampling: Some(Oversampling::X_32),
 //!     iir_filter: IIRFilter::Disabled,
-//! }).unwrap();
+//! })?;
 //!
 //! // Read the current temperature in °C
-//! let measurement = bmp390.measure(&mut Delay)?;
+//! let measurement = bmp390.measure(&mut Delay).unwrap();
 //! let temp = measurement.temperature.expect("should be enabled").get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
@@ -41,7 +41,7 @@
 //! ## Usage (async)
 //!
 //! ```rust, only_if(async)
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::Error<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -54,16 +54,16 @@
 //!
 //! // Create and initialize the device
 //! let mut bmp390 = BMP390Async::new_i2c(i2c, Address::Primary);
-//! bmp390.init(&mut Delay).await.unwrap();
+//! bmp390.init(&mut Delay).await?;
 //! // Enable sensors
 //! bmp390.configure(Configuration {
 //!     temperature_oversampling: Some(Oversampling::X_32),
 //!     pressure_oversampling: Some(Oversampling::X_32),
 //!     iir_filter: IIRFilter::Disabled,
-//! }).await.unwrap();
+//! }).await?;
 //!
 //! // Read the current temperature in °C
-//! let measurement = bmp390.measure(&mut Delay).await?;
+//! let measurement = bmp390.measure(&mut Delay).await.unwrap();
 //! let temp = measurement.temperature.expect("should be enabled").get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
@@ -81,24 +81,34 @@ pub mod registers;
 
 use self::address::Address;
 use self::registers::{
-    BurstMeasurements, Chip, ChipId, Cmd, Config, IIRFilter, Oversampling, OversamplingControl, PowerControl,
-    SensorMode, TrimmingCoefficients, TrimmingCoefficientsBitfield,
+    BurstMeasurements, ChipId, Cmd, Config, IIRFilter, Oversampling, OversamplingControl, PowerControl, SensorMode,
+    TrimmingCoefficients, TrimmingCoefficientsBitfield,
 };
 
 type BME390SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 1>;
 type BME390I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
-/// All possible errors that may occur when using this device
-#[derive(Debug, defmt::Format)]
-pub enum Error<BusError> {
+#[derive(Debug, defmt::Format, thiserror::Error)]
+pub enum InitError<BusError> {
     /// Bus error
-    Bus(BusError),
-    /// Invalid ChipId was encountered in `init`
-    InvalidChip(Chip),
-    /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
-    NotCalibrated,
-    /// NVM data copy is still in progress.
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// Invalid chip id was encountered in `init`
+    #[error("invalid chip id {0:#02x}")]
+    InvalidChip(u8),
+    /// Reset failed
+    #[error("reset failed")]
     ResetFailed,
+}
+
+#[derive(Debug, defmt::Format, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Bus error
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
+    #[error("not yet calibrated")]
+    NotCalibrated,
 }
 
 /// Measurement data
@@ -263,18 +273,18 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         // Soft-reset device
         self.reset(delay).await?;
 
         // Verify chip id
-        let chip = self.read_register::<ChipId>().await.map_err(Error::Bus)?.read_chip();
-        if let self::registers::Chip::Invalid(_) = chip {
-            return Err(Error::InvalidChip(chip));
+        let chip = self.read_register::<ChipId>().await?.read_chip();
+        if let self::registers::Chip::Invalid(x) = chip {
+            return Err(InitError::InvalidChip(x));
         }
 
         // Read calibration data
-        self.calibrate().await.map_err(Error::Bus)?;
+        self.calibrate().await?;
         Ok(())
     }
 
@@ -293,36 +303,30 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// of 10ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             match self.try_reset(delay).await {
                 Ok(()) => return Ok(()),
-                Err(Error::<I::Error>::ResetFailed) => continue,
+                Err(InitError::ResetFailed) => continue,
                 Err(e) => return Err(e),
             }
         }
 
-        Err(Error::<I::Error>::ResetFailed)
+        Err(InitError::ResetFailed)
     }
 
     /// Performs a soft-reset of the device. The datasheet specifies a start-up time
     /// of 10ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
         self.write_register(self::registers::Command::default().with_command(Cmd::Reset))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
         delay.delay_ms(10).await;
 
-        if self
-            .read_register::<self::registers::Error>()
-            .await
-            .map_err(Error::Bus)?
-            .read_cmd_err()
-        {
-            return Err(Error::ResetFailed);
+        if self.read_register::<self::registers::Error>().await?.read_cmd_err() {
+            return Err(InitError::ResetFailed);
         }
         Ok(())
     }
@@ -330,14 +334,13 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
         self.write_register(
             PowerControl::default()
                 .with_temperature_enable(config.temperature_oversampling.is_some())
                 .with_pressure_enable(config.pressure_oversampling.is_some()),
         )
-        .await
-        .map_err(Error::Bus)?;
+        .await?;
 
         let mut oversampling = OversamplingControl::default();
         if let Some(ov) = config.temperature_oversampling {
@@ -346,10 +349,9 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
         if let Some(ov) = config.pressure_oversampling {
             oversampling.write_pressure_oversampling(ov);
         }
-        self.write_register(oversampling).await.map_err(Error::Bus)?;
+        self.write_register(oversampling).await?;
         self.write_register(Config::default().with_iir_filter(config.iir_filter))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
 
         Ok(())
     }
@@ -362,7 +364,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BMP390<I> {
-    type Error = Error<I::Error>;
+    type Error = MeasurementError<I::Error>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
@@ -371,10 +373,9 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BMP390
     /// This function will wait until the data is acquired, perform a burst read
     /// and compensate the returned raw data using the calibration data.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let power_ctrl = self.read_register::<PowerControl>().await.map_err(Error::Bus)?;
+        let power_ctrl = self.read_register::<PowerControl>().await?;
         self.write_register(power_ctrl.with_sensor_mode(SensorMode::Forced))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
 
         let temperature_enable = power_ctrl.read_temperature_enable();
         let pressure_enable = power_ctrl.read_pressure_enable();
@@ -387,7 +388,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BMP390
         }
 
         // Read current oversampling config to determine required measurement delay
-        let reg_ctrl_m = self.read_register::<OversamplingControl>().await.map_err(Error::Bus)?;
+        let reg_ctrl_m = self.read_register::<OversamplingControl>().await?;
         let o_t = reg_ctrl_m.read_temperature_oversampling();
         let o_p = reg_ctrl_m.read_pressure_oversampling();
 
@@ -396,13 +397,9 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BMP390
         let max_measurement_delay_us = 234 + (392 + 2020 * o_p.factor()) + (163 + o_t.factor() * 2020);
         delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self
-            .read_register::<BurstMeasurements>()
-            .await
-            .map_err(Error::Bus)?
-            .read_all();
+        let raw_data = self.read_register::<BurstMeasurements>().await?.read_all();
         let Some(ref cal) = self.calibration_data else {
-            return Err(Error::NotCalibrated);
+            return Err(MeasurementError::NotCalibrated);
         };
 
         let temperature_enable = power_ctrl.read_temperature_enable();

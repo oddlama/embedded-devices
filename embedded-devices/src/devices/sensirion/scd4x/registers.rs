@@ -13,7 +13,10 @@ pub const DATA_READY_MASK: u16 = 0b11111111111;
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StartPeriodicMeasurement {}
 
-/// Starts the periodic measurement mode. The signal update interval is 5 second
+/// Command returns a sensor running in periodic measurement mode or low power periodic measurement
+/// mode back to the idle state, e.g. to then allow changing the sensor configuration or to save
+/// power. Note that the sensor will only respond to other commands 500 ms after the
+/// stop_periodic_measurement command has been issued.
 #[device_register(super::SCD4x)]
 #[register(address = 0x3f86, mode = "w")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]

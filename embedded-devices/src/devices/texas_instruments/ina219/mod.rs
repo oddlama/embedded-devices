@@ -96,6 +96,21 @@ pub mod registers;
 
 type INA219I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
+/// All possible errors that may occur during measurement
+#[derive(Debug, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Bus error
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// The conversion ready flag was not set within the expected time frame.
+    #[error("conversion timeout")]
+    Timeout,
+    /// Measurement was ready, but an overflow occurred. The power and
+    /// current measurement may be incorrect.
+    #[error("overflow in measurement")]
+    Overflow(Measurement),
+}
+
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
@@ -110,18 +125,6 @@ pub struct Measurement {
     /// Measured power
     #[measurement(Power)]
     pub power: Power,
-}
-
-/// All possible errors that may occur during measurement
-#[derive(Debug)]
-pub enum MeasurementError<BusError> {
-    /// Bus error
-    Bus(BusError),
-    /// The conversion ready flag was not set within the expected time frame.
-    Timeout,
-    /// Measurement was ready, but an overflow occurred. The power and
-    /// current measurement may be incorrect.
-    Overflow(Measurement),
 }
 
 /// The INA219 is a 12-bit current shunt and power monitor that can sense
@@ -228,25 +231,13 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
     pub async fn read_measurements(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
-        let bus_voltage = self
-            .read_register::<self::registers::BusVoltage>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
 
-        let shunt_voltage = self
-            .read_register::<self::registers::ShuntVoltage>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
 
-        let current = self
-            .read_register::<self::registers::Current>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let current = self.read_register::<self::registers::Current>().await?;
 
-        let power = self
-            .read_register::<self::registers::Power>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let power = self.read_register::<self::registers::Power>().await?;
 
         let measurement = Measurement {
             shunt_voltage: shunt_voltage.read_voltage(),
@@ -277,15 +268,11 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219
     /// [`self::registers::OperatingMode::ShuntAndBusTriggered´] and enable all conversion outputs causing the
     /// device to perform a single conversion a return to sleep afterwards.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let reg_conf = self
-            .read_register::<self::registers::Configuration>()
-            .await
-            .map_err(MeasurementError::Bus)?;
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // Initiate measurement
         self.write_register(reg_conf.with_operating_mode(self::registers::OperatingMode::ShuntAndBusTriggered))
-            .await
-            .map_err(MeasurementError::Bus)?;
+            .await?;
 
         // Wait until measurement is ready, plus 1ms extra
         let measurement_time_us = reg_conf.read_bus_adc_resolution().conversion_time_us()
@@ -295,27 +282,15 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219
         // Wait for the conversion ready flag to be set
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
-            let bus_voltage = self
-                .read_register::<self::registers::BusVoltage>()
-                .await
-                .map_err(MeasurementError::Bus)?;
+            let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
 
             if bus_voltage.read_conversion_ready() {
-                let shunt_voltage = self
-                    .read_register::<self::registers::ShuntVoltage>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
 
-                let current = self
-                    .read_register::<self::registers::Current>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let current = self.read_register::<self::registers::Current>().await?;
 
                 // Reading this register clears the conversion_ready flag
-                let power = self
-                    .read_register::<self::registers::Power>()
-                    .await
-                    .map_err(MeasurementError::Bus)?;
+                let power = self.read_register::<self::registers::Power>().await?;
 
                 let measurement = Measurement {
                     shunt_voltage: shunt_voltage.read_voltage(),

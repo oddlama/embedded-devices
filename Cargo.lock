@@ -190,6 +190,7 @@ dependencies = [
  "embedded-registers",
  "maybe-async-cfg",
  "paste",
+ "thiserror",
  "uom",
 ]
 

@@ -74,13 +74,16 @@ pub mod registers;
 type MCP9808I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur in device initialization
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
-    Bus(BusError),
+    #[error("bus error")]
+    Bus(#[from] BusError),
     /// Invalid Device Id was encountered
+    #[error("invalid device id")]
     InvalidDeviceId,
     /// Invalid Manufacturer Id was encountered
+    #[error("invalid manufacturer id")]
     InvalidManufacturerId,
 }
 
@@ -142,12 +145,12 @@ impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
         use self::registers::DeviceIdRevision;
         use self::registers::ManufacturerId;
 
-        let device_id = self.read_register::<DeviceIdRevision>().await.map_err(InitError::Bus)?;
+        let device_id = self.read_register::<DeviceIdRevision>().await?;
         if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
             return Err(InitError::InvalidDeviceId);
         }
 
-        let manufacturer_id = self.read_register::<ManufacturerId>().await.map_err(InitError::Bus)?;
+        let manufacturer_id = self.read_register::<ManufacturerId>().await?;
         if manufacturer_id.read_manufacturer_id() != self::registers::MANUFACTURER_ID_VALID {
             return Err(InitError::InvalidManufacturerId);
         }

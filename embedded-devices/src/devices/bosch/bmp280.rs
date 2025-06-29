@@ -33,7 +33,7 @@
 //! ## Usage (sync)
 //!
 //! ```rust, only_if(sync)
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -47,16 +47,16 @@
 //!
 //! // Create and initialize the device
 //! let mut bmp280 = BMP280Sync::new_i2c(i2c, Address::Primary);
-//! bmp280.init(&mut Delay).unwrap();
+//! bmp280.init(&mut Delay)?;
 //! // Enable sensors
 //! bmp280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
 //!     iir_filter: IIRFilter::Disabled,
-//! }).unwrap();
+//! })?;
 //!
 //! // Read measurement
-//! let measurement = bmp280.measure(&mut Delay)?;
+//! let measurement = bmp280.measure(&mut Delay).unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
@@ -67,7 +67,7 @@
 //! ## Usage (async)
 //!
 //! ```rust, only_if(async)
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::Error<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -81,16 +81,16 @@
 //!
 //! // Create and initialize the device
 //! let mut bmp280 = BMP280Async::new_i2c(i2c, Address::Primary);
-//! bmp280.init(&mut Delay).await.unwrap();
+//! bmp280.init(&mut Delay).await?;
 //! // Enable sensors
 //! bmp280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
 //!     pressure_oversampling: Oversampling::X_16,
 //!     iir_filter: IIRFilter::Disabled,
-//! }).await.unwrap();
+//! }).await?;
 //!
 //! // Read measurement
-//! let measurement = bmp280.measure(&mut Delay).await?;
+//! let measurement = bmp280.measure(&mut Delay).await.unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
@@ -103,7 +103,7 @@ use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
     registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
-    BME280CommonAsync, BME280CommonSync, Error,
+    BME280CommonAsync, BME280CommonSync, MeasurementError,
 };
 
 /// Measurement data
@@ -163,18 +163,17 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), Error<I::Error>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
         self.write_register(
             ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )
-        .await
-        .map_err(Error::Bus)?;
+        .await?;
 
-        let mut reg_config = self.read_register::<Config>().await.map_err(Error::Bus)?;
+        let mut reg_config = self.read_register::<Config>().await?;
         reg_config.write_filter(config.iir_filter);
-        self.write_register(reg_config).await.map_err(Error::Bus)?;
+        self.write_register(reg_config).await?;
 
         Ok(())
     }
@@ -187,7 +186,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, false> {
-    type Error = Error<I::Error>;
+    type Error = MeasurementError<I::Error>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,
@@ -196,10 +195,9 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
     /// This function will wait until the data is acquired, perform a burst read and compensate the
     /// returned raw data using the calibration data.
     async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
-        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await.map_err(Error::Bus)?;
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
-            .await
-            .map_err(Error::Bus)?;
+            .await?;
 
         // Use current oversampling config to determine required measurement delay
         let o_t = reg_ctrl_m.read_temperature_oversampling();
@@ -214,13 +212,9 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
 
         delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self
-            .read_register::<BurstMeasurementsPT>()
-            .await
-            .map_err(Error::Bus)?
-            .read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPT>().await?.read_all();
         let Some(ref cal) = self.calibration_data else {
-            return Err(Error::NotCalibrated);
+            return Err(MeasurementError::NotCalibrated);
         };
 
         let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
