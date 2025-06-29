@@ -57,7 +57,9 @@ fn extract_measurement_impl(struct_name: &syn::Ident, field: &Field) -> Result<O
     let trait_ident = syn::Ident::new(&trait_name, measurement_type.span());
 
     let method_name = measurement_type.to_string().to_case(Case::Snake);
-    let method_name = Regex::new(r"_(\d)").unwrap().replace_all(&method_name, "$1");
+    let method_name = Regex::new(r"([a-zA-Z])_(\d)")
+        .unwrap()
+        .replace_all(&method_name, "$1$2");
     let method_ident = syn::Ident::new(&method_name, measurement_type.span());
 
     let (return_expr, return_type) = if is_option_type(field_type) {

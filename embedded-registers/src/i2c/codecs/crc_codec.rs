@@ -90,6 +90,8 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
             let crc_val = crc.checksum(value);
             let crc_real = x[CHUNK_SIZE];
             if crc_real != crc_val {
+                // FIXME: this should not panic but return an error,
+                // which is easier said than done at this location
                 panic!("crc failed")
             }
         }

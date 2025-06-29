@@ -1,6 +1,7 @@
 use paste::paste;
 use uom::si::f64::{
-    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, Power, Pressure, Ratio, ThermodynamicTemperature,
+    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, Illuminance, Power, Pressure, Ratio,
+    ThermodynamicTemperature, Velocity,
 };
 
 /// This trait is implemented for any sensor specific measurement struct.
@@ -65,11 +66,15 @@ macro_rules! define_sensor_measurement {
 }
 
 define_sensor_measurement!(Charge, ElectricCharge, "charge");
+define_sensor_measurement!(Co2Concentration, Ratio, "CO2 concentration");
 define_sensor_measurement!(Current, ElectricCurrent, "current");
 define_sensor_measurement!(Energy, Energy, "energy");
+define_sensor_measurement!(Illuminance, Illuminance, "illuminance");
+define_sensor_measurement!(Pm2_5Concentration, Ratio, "PM2.5 concentration");
 define_sensor_measurement!(Power, Power, "power");
 define_sensor_measurement!(Pressure, Pressure, "pressure");
 define_sensor_measurement!(RelativeHumidity, Ratio, "relative humidity");
+define_sensor_measurement!(SoilMoisture, Ratio, "soil moisture");
 define_sensor_measurement!(Temperature, ThermodynamicTemperature, "temperature");
 define_sensor_measurement!(Voltage, ElectricPotential, "voltage");
-define_sensor_measurement!(Co2Concentration, Ratio, "co2 concentration");
+define_sensor_measurement!(WindSpeed, Velocity, "wind speed");
