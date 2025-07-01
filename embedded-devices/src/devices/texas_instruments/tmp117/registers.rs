@@ -1,5 +1,6 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
+use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 use embedded_registers::register;
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -10,7 +11,7 @@ pub const DEVICE_ID_VALID: u16 = 0x117;
 /// register with the conversion result. Following a reset, the temperature
 /// register reads –256°C until the first conversion, including averaging, is complete.
 #[device_register(super::TMP117)]
-#[register(address = 0b0000, mode = "r")]
+#[register(address = 0b0000, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Temperature {
     /// The temperature in °C with a resolution of 7.8125m°C/LSB.
@@ -153,7 +154,7 @@ pub enum AlertPinMode {
 
 /// The device configuration register.
 #[device_register(super::TMP117)]
-#[register(address = 0b0001, mode = "rw")]
+#[register(address = 0b0001, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     /// Set when the conversion result is higher than the high limit.
@@ -228,7 +229,7 @@ macro_rules! define_temp_limit_register {
     ($name:ident, $address:expr, $value_default:expr, $doc:expr) => {
         #[doc = $doc]
         #[device_register(super::TMP117)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.
@@ -306,7 +307,7 @@ pub enum EepromLockMode {
 
 /// The EEPROM unlock register.
 #[device_register(super::TMP117)]
-#[register(address = 0b0100, mode = "rw")]
+#[register(address = 0b0100, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct EepromUnlock {
     /// EEPROM lock mode. Defaults to locked on power-on.
@@ -329,7 +330,7 @@ macro_rules! define_eeprom_register {
     ($name:ident, $address:expr, $doc:expr) => {
         #[doc = $doc]
         #[device_register(super::TMP117)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             /// The data stored in this register
@@ -382,7 +383,7 @@ To support NIST traceability do not delete or reprogram the EEPROM3 register.
 /// of 7.8125 m°C/LSB and same range of ±256°C as the temperature result register. If the added result
 /// exceeds value boundaries, then the temperature result will clamp to the maximum or minimum value.
 #[device_register(super::TMP117)]
-#[register(address = 0b0111, mode = "rw")]
+#[register(address = 0b0111, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct TemperatureOffset {
     /// The temperature offset in °C with a resolution of 7.8125m°C/LSB.
@@ -411,7 +412,7 @@ impl TemperatureOffset {
 
 /// The device-id and revision register.
 #[device_register(super::TMP117)]
-#[register(address = 0b1111, mode = "r")]
+#[register(address = 0b1111, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceIdRevision {
     /// Indicates the revision number of the device. 0 indicates the first revision.

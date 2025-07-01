@@ -1,4 +1,4 @@
-use crate::{ReadableRegister, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
 use bytemuck::Zeroable;
 
 /// This codec represents the most commonly found codecs for I2C devices.
@@ -23,6 +23,10 @@ use bytemuck::Zeroable;
 #[derive(Default)]
 pub struct SimpleCodec<const HEADER_SIZE: usize> {}
 
+impl<const HEADER_SIZE: usize> RegisterCodec for SimpleCodec<HEADER_SIZE> {
+    type Error = ();
+}
+
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec, I2cBoundBus),
     sync(feature = "sync"),
@@ -31,9 +35,11 @@ pub struct SimpleCodec<const HEADER_SIZE: usize> {}
 )]
 impl<const HEADER_SIZE: usize> crate::i2c::Codec for SimpleCodec<HEADER_SIZE> {
     #[inline]
-    async fn read_register<R, I, A>(bound_bus: &mut crate::i2c::I2cBoundBus<I, A>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(
+        bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
+    ) -> Result<R, RegisterError<Self::Error, I::Error>>
     where
-        R: ReadableRegister,
+        R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
@@ -51,9 +57,9 @@ impl<const HEADER_SIZE: usize> crate::i2c::Codec for SimpleCodec<HEADER_SIZE> {
     async fn write_register<R, I, A>(
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
         register: impl AsRef<R>,
-    ) -> Result<(), I::Error>
+    ) -> Result<(), RegisterError<Self::Error, I::Error>>
     where
-        R: WritableRegister,
+        R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
@@ -72,6 +78,6 @@ impl<const HEADER_SIZE: usize> crate::i2c::Codec for SimpleCodec<HEADER_SIZE> {
         };
 
         let data = bytemuck::bytes_of_mut(&mut buffer);
-        bound_bus.interface.write(bound_bus.address, data).await
+        Ok(bound_bus.interface.write(bound_bus.address, data).await?)
     }
 }

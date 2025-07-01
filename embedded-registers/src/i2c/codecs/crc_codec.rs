@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::{ReadableRegister, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
 use arrayvec::ArrayVec;
 use bytemuck::Zeroable;
 use crc::Algorithm;
@@ -30,7 +30,7 @@ use crc::Algorithm;
 /// Example implemenation for a basic CRC Algorithm:
 ///
 /// ```
-/// use embedded_registers::i2c::codecs::Crc8Algorithm;
+/// use embedded_registers::i2c::codecs::crc_codec::Crc8Algorithm;
 /// use crc::{Algorithm, CRC_8_NRSC_5};
 ///
 /// #[derive(Default)]
@@ -53,6 +53,18 @@ pub trait Crc8Algorithm: Default {
     fn instance() -> &'static Algorithm<u8>;
 }
 
+#[derive(Debug, defmt::Format, thiserror::Error)]
+pub enum CrcError {
+    #[error("the calculated crc checksum {calculated:#02x} did not match the expected value {expected:#02x}")]
+    CrcMismatch { calculated: u8, expected: u8 },
+}
+
+impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'static> RegisterCodec
+    for Crc8Codec<HEADER_SIZE, CHUNK_SIZE, C>
+{
+    type Error = CrcError;
+}
+
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec, I2cBoundBus),
     sync(feature = "sync"),
@@ -63,9 +75,11 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
     for Crc8Codec<HEADER_SIZE, CHUNK_SIZE, C>
 {
     #[inline]
-    async fn read_register<R, I, A>(bound_bus: &mut crate::i2c::I2cBoundBus<I, A>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(
+        bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
+    ) -> Result<R, RegisterError<Self::Error, I::Error>>
     where
-        R: ReadableRegister,
+        R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
@@ -87,12 +101,10 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
         for (i, x) in array.chunks(CHUNK_SIZE + 1).enumerate() {
             let value = &x[0..CHUNK_SIZE];
             data[i..i + CHUNK_SIZE].copy_from_slice(value);
-            let crc_val = crc.checksum(value);
-            let crc_real = x[CHUNK_SIZE];
-            if crc_real != crc_val {
-                // FIXME: this should not panic but return an error,
-                // which is easier said than done at this location
-                panic!("crc failed")
+            let calculated = crc.checksum(value);
+            let expected = x[CHUNK_SIZE];
+            if expected != calculated {
+                return Err(RegisterError::r#Codec(CrcError::CrcMismatch { calculated, expected }));
             }
         }
 
@@ -103,9 +115,9 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
     async fn write_register<R, I, A>(
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
         register: impl AsRef<R>,
-    ) -> Result<(), I::Error>
+    ) -> Result<(), RegisterError<Self::Error, I::Error>>
     where
-        R: WritableRegister,
+        R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
@@ -128,10 +140,9 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm + 'stat
         let mut array = ArrayVec::<_, 64>::new();
         for x in data.chunks(CHUNK_SIZE) {
             array.try_extend_from_slice(x).unwrap();
-            let crc_val = crc.checksum(x);
-            array.push(crc_val);
+            array.push(crc.checksum(x));
         }
 
-        bound_bus.interface.write(bound_bus.address, &array).await
+        Ok(bound_bus.interface.write(bound_bus.address, &array).await?)
     }
 }

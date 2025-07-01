@@ -1,6 +1,8 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
-use embedded_registers::register;
+use embedded_registers::{register, spi::codecs::simple_codec::SimpleCodec};
+
+pub type MAX31865SpiCodec = SimpleCodec<1, 6, 0, 7, false, 0>;
 
 /// Conversion mode.
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -49,7 +51,7 @@ pub enum FilterMode {
 
 /// The device configuration register.
 #[device_register(super::MAX31865)]
-#[register(address = 0b0000, mode = "rw")]
+#[register(address = 0b0000, mode = "rw", spi_codec = "MAX31865SpiCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Configuration {
     /// When no conversions are being performed, VBIAS may be disabled to reduce power
@@ -99,7 +101,7 @@ pub struct Configuration {
 
 /// The RTD resistance data.
 #[device_register(super::MAX31865)]
-#[register(address = 0b0001, mode = "r")]
+#[register(address = 0b0001, mode = "r", spi_codec = "MAX31865SpiCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Resistance {
     /// The ratio of RTD resistance to reference resistance.
@@ -116,7 +118,7 @@ macro_rules! define_fault_threshold_register {
     ($name:ident, $address:expr, $value_default:expr, $doc:expr) => {
         #[doc = $doc]
         #[device_register(super::MAX31865)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", spi_codec = "MAX31865SpiCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             /// The ratio of RTD resistance to reference resistance.
@@ -165,7 +167,7 @@ Low Fault Threshold register is 0000h.
 /// these status bits can have different possible causes.
 /// Refer to the datasheet for a table of possible causes.
 #[device_register(super::MAX31865)]
-#[register(address = 0b0111, mode = "r")]
+#[register(address = 0b0111, mode = "r", spi_codec = "MAX31865SpiCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct FaultStatus {
     /// Measured resistance greater than High Fault Threshold value.

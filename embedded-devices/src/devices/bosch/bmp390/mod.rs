@@ -76,6 +76,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -83,20 +84,19 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 pub mod address;
 pub mod registers;
 
+use crate::utils::from_bus_error;
+
 use self::address::Address;
 use self::registers::{
     BurstMeasurements, ChipId, Cmd, Config, IIRFilter, Oversampling, OversamplingControl, PowerControl, SensorMode,
     TrimmingCoefficients, TrimmingCoefficientsBitfield,
 };
 
-type BME390SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 1>;
-type BME390I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
-
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
@@ -109,11 +109,14 @@ pub enum InitError<BusError> {
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     #[error("not yet calibrated")]
     NotCalibrated,
 }
+
+from_bus_error!(InitError);
+from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -223,7 +226,7 @@ pub struct BMP390<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> BMP390<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, BME390I2cCodec>>
+impl<I> BMP390<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -246,7 +249,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> BMP390<embedded_registers::spi::SpiDevice<I, BME390SpiCodec>>
+impl<I> BMP390<embedded_registers::spi::SpiDevice<I>>
 where
     I: hal::spi::r#SpiDevice,
 {
@@ -277,7 +280,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         // Soft-reset device
         self.reset(delay).await?;
 
@@ -296,7 +299,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// compensate measurements. It is required to call this once
     /// before taking any measurements. Calling [`Self::init`] will
     /// automatically do this.
-    pub async fn calibrate(&mut self) -> Result<(), I::Error> {
+    pub async fn calibrate(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
         let coefficients = self.read_register::<TrimmingCoefficients>().await?.read_all();
         self.calibration_data = Some(CalibrationData(coefficients));
 
@@ -307,7 +310,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// of 10ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             match self.try_reset(delay).await {
@@ -324,7 +327,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// of 10ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         self.write_register(self::registers::Command::default().with_command(Cmd::Reset))
             .await?;
         delay.delay_ms(10).await;
@@ -338,7 +341,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(
             PowerControl::default()
                 .with_temperature_enable(config.temperature_oversampling.is_some())
@@ -368,7 +371,7 @@ impl<I: embedded_registers::RegisterInterface> BMP390<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BMP390<I> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,

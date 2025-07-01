@@ -1,5 +1,6 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
+use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 use embedded_registers::register;
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -7,7 +8,7 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 /// At the end of every conversion, the device updates the temperature
 /// register with the conversion result.
 #[device_register(super::TMP102)]
-#[register(address = 0b0000, mode = "r")]
+#[register(address = 0b0000, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Temperature {
     /// The temperature in °C with a resolution of 7.8125m°C/LSB.
@@ -116,7 +117,7 @@ pub enum Resolution {
 
 /// The device configuration register.
 #[device_register(super::TMP102)]
-#[register(address = 0b0001, mode = "rw")]
+#[register(address = 0b0001, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     #[register(default = false)]
@@ -157,7 +158,7 @@ macro_rules! define_temp_limit_register {
     ($name:ident, $address:expr, $doc:expr) => {
         #[doc = $doc]
         #[device_register(super::TMP102)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.

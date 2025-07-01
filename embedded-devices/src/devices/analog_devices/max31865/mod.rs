@@ -67,17 +67,16 @@ use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 use crate::utils::callendar_van_dusen;
+use crate::utils::from_bus_error;
 
 pub mod registers;
-
-type MAX31865SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, false, 0>;
 
 /// All possible errors that may occur in fault detection
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum FaultDetectionError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Timeout (the detection never finished in the allocated time frame)
     #[error("fault detection timeout")]
     Timeout,
@@ -91,11 +90,14 @@ pub enum FaultDetectionError<BusError> {
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// A fault was detected. Read the FaultStatus register for details.
     #[error("fault detected")]
     FaultDetected,
 }
+
+from_bus_error!(FaultDetectionError);
+from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -130,7 +132,7 @@ pub struct MAX31865<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MAX31865<embedded_registers::spi::SpiDevice<I, MAX31865SpiCodec>>
+impl<I> MAX31865<embedded_registers::spi::SpiDevice<I>>
 where
     I: hal::spi::r#SpiDevice,
 {
@@ -166,7 +168,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         delay: &mut D,
         wiring_mode: WiringMode,
         filter_mode: FilterMode,
-    ) -> Result<(), FaultDetectionError<I::Error>> {
+    ) -> Result<(), FaultDetectionError<I::BusError>> {
         // Configure the wiring mode and filter mode
         self.write_register(
             self::registers::Configuration::default()
@@ -188,7 +190,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     pub async fn detect_faults<D: hal::delay::DelayNs>(
         &mut self,
         delay: &mut D,
-    ) -> Result<(), FaultDetectionError<I::Error>> {
+    ) -> Result<(), FaultDetectionError<I::BusError>> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // The automatic fault detection waits 100µs before checking for faults,
@@ -271,7 +273,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     /// it to a temperature by using the internal Callendar-Van Dusen lookup table.
     ///
     /// Checks for faults.
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, MeasurementError<I::Error>> {
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, MeasurementError<I::BusError>> {
         let resistance = self.read_register::<registers::Resistance>().await?;
 
         if resistance.read_fault() {
@@ -289,7 +291,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX31865<I> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will enable bias voltage, transition the device into

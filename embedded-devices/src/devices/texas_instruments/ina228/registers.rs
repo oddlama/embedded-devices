@@ -1,5 +1,6 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
+use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 use embedded_registers::register;
 use uom::si::electric_charge::coulomb;
 use uom::si::electric_current::ampere;
@@ -33,7 +34,7 @@ impl AdcRange {
 
 /// Device configuration register
 #[device_register(super::INA228)]
-#[register(address = 0x0, mode = "rw")]
+#[register(address = 0x0, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     /// Setting this flag generates a system reset that is the same
@@ -151,7 +152,7 @@ impl AverageCount {
 
 /// ADC configuration register.
 #[device_register(super::INA228)]
-#[register(address = 0x1, mode = "rw")]
+#[register(address = 0x1, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AdcConfiguration {
     /// The operating mode of the device. If all of the temperature, bus or shunt conversion
@@ -190,7 +191,7 @@ pub struct AdcConfiguration {
 /// represents shunt resistance used to calculate current value in Amperes.
 /// This also sets the resolution for the Current register.
 #[device_register(super::INA228)]
-#[register(address = 0x2, mode = "rw")]
+#[register(address = 0x2, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ShuntCalibration {
     #[bondrewd(bit_length = 1, reserve)]
@@ -204,7 +205,7 @@ pub struct ShuntCalibration {
 
 /// Shunt temperature coefficient register
 #[device_register(super::INA228)]
-#[register(address = 0x3, mode = "rw")]
+#[register(address = 0x3, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ShuntTemperatureCoefficient {
     #[bondrewd(bit_length = 2, reserve)]
@@ -221,7 +222,7 @@ pub struct ShuntTemperatureCoefficient {
 
 /// Shunt voltage measurement register
 #[device_register(super::INA228)]
-#[register(address = 0x4, mode = "r")]
+#[register(address = 0x4, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct ShuntVoltage {
     /// Differential voltage measured across the shunt output.
@@ -244,7 +245,7 @@ impl ShuntVoltage {
 
 /// Bus voltage measurement register
 #[device_register(super::INA228)]
-#[register(address = 0x5, mode = "r")]
+#[register(address = 0x5, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct BusVoltage {
     /// Bus voltage output. Two's complement value, however always positive.
@@ -266,7 +267,7 @@ impl BusVoltage {
 
 /// Die temperature measurement register
 #[device_register(super::INA228)]
-#[register(address = 0x6, mode = "r")]
+#[register(address = 0x6, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Temperature {
     /// Internal die temperature measurement. Two's complement value.
@@ -284,7 +285,7 @@ impl Temperature {
 
 /// Current calculation register
 #[device_register(super::INA228)]
-#[register(address = 0x7, mode = "r")]
+#[register(address = 0x7, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Current {
     /// The raw calculated current. Two's complement value.
@@ -307,7 +308,7 @@ impl Current {
 
 /// Power calculation register
 #[device_register(super::INA228)]
-#[register(address = 0x8, mode = "r")]
+#[register(address = 0x8, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Power {
     /// The raw calculated power. Positive unsigned value. W/LSB is determined by calibration
@@ -327,7 +328,7 @@ impl Power {
 
 /// Energy accumulation register. Only contains a valid value when operating in continuous mode.
 #[device_register(super::INA228)]
-#[register(address = 0x9, mode = "r")]
+#[register(address = 0x9, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 5)]
 pub struct Energy {
     /// The raw accumulated energy. Positive unsigned value. W/LSB is determined by calibration
@@ -349,7 +350,7 @@ impl Energy {
 
 /// Charge accumulation register. Only contains a valid value when operating in continuous mode.
 #[device_register(super::INA228)]
-#[register(address = 0xa, mode = "r")]
+#[register(address = 0xa, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 5)]
 pub struct Charge {
     /// The raw accumulated charge. Two's complement value.
@@ -387,7 +388,7 @@ pub enum AlertPolarity {
 
 /// Diagnostics and alert register
 #[device_register(super::INA228)]
-#[register(address = 0xb, mode = "rw")]
+#[register(address = 0xb, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DiagnosticsAndAlert {
     /// Determines whether the alert pin resets automatically or latches.
@@ -459,7 +460,7 @@ macro_rules! define_shunt_voltage_threshold_register {
     ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $value_default:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
         #[doc = $desc]
         #[device_register(super::INA228)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             #[doc = "The"]
@@ -539,7 +540,7 @@ macro_rules! define_bus_voltage_threshold_register {
     ($name:ident, desc = $desc:expr, address = $address:expr, value_default = $value_default:expr, resolution = $resolution_factor:expr, value_doc = $value_doc:expr) => {
         #[doc = $desc]
         #[device_register(super::INA228)]
-        #[register(address = $address, mode = "rw")]
+        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
         #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
         pub struct $name {
             #[bondrewd(bit_length = 1, reserve)]
@@ -610,7 +611,7 @@ protection). Unsigned representation, positive value only. Resolution is 3.125 m
 
 /// Temperature Over-Limit Threshold Register
 #[device_register(super::INA228)]
-#[register(address = 0x10, mode = "rw")]
+#[register(address = 0x10, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct TemperatureOverlimitThreshold {
     /// The threshold for comparison of the value to detect over temperature measurements.
@@ -652,7 +653,7 @@ impl TemperatureOverlimitThreshold {
 
 /// Power Over-Limit Threshold Register
 #[device_register(super::INA228)]
-#[register(address = 0x11, mode = "rw")]
+#[register(address = 0x11, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct PowerOverlimitThreshold {
     /// The threshold for comparison of the value to detect power over-limit measurements.
@@ -704,7 +705,7 @@ impl PowerOverlimitThreshold {
 
 /// Manufacturer Id Register
 #[device_register(super::INA228)]
-#[register(address = 0x3e, mode = "r")]
+#[register(address = 0x3e, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ManufacturerId {
     /// Manufacturer Id. Reads `"TI"` in ASCII.
@@ -714,7 +715,7 @@ pub struct ManufacturerId {
 
 /// Device Id Register
 #[device_register(super::INA228)]
-#[register(address = 0x3f, mode = "r")]
+#[register(address = 0x3f, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DeviceId {
     /// Device Id.

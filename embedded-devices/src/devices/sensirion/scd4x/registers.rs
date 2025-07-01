@@ -1,3 +1,4 @@
+use crate::devices::sensirion::SensirionI2cCodec;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
@@ -9,7 +10,7 @@ pub const DATA_READY_MASK: u16 = 0b11111111111;
 
 /// Starts the periodic measurement mode. The signal update interval is 5 second
 #[device_register(super::SCD4x)]
-#[register(address = 0x21b1, mode = "w")]
+#[register(address = 0x21b1, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StartPeriodicMeasurement {}
 
@@ -18,7 +19,7 @@ pub struct StartPeriodicMeasurement {}
 /// power. Note that the sensor will only respond to other commands 500 ms after the
 /// stop_periodic_measurement command has been issued.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3f86, mode = "w")]
+#[register(address = 0x3f86, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StopPeriodicMeasurement {}
 
@@ -28,7 +29,7 @@ pub struct StopPeriodicMeasurement {}
 /// check data status. The I2C master can abort the read transfer with a NACK followed by a STOP
 /// condition after any data byte if the user is not interested in subsequent data.
 #[device_register(super::SCD4x)]
-#[register(address = 0xec05, mode = "r")]
+#[register(address = 0xec05, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct ReadMeasurement {
     pub co2: u16,
@@ -46,7 +47,7 @@ pub struct ReadMeasurement {
 ///
 /// Recommended temperature offset values are between 0°C and 20°C.
 #[device_register(super::SCD4x)]
-#[register(address = 0x241d, mode = "w")]
+#[register(address = 0x241d, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetTemperatureOffset {
     pub offset: u16,
@@ -54,7 +55,7 @@ pub struct SetTemperatureOffset {
 
 /// Get the current temperature offset value
 #[device_register(super::SCD4x)]
-#[register(address = 0x1218, mode = "r")]
+#[register(address = 0x1218, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetTemperatureOffset {
     pub offset: u16,
@@ -65,7 +66,7 @@ pub struct GetTemperatureOffset {
 /// the EEPROM, the persist_settings command must be issued. The default sensor altitude value is
 /// set to 0 meters above sea level. Valid input values are between 0 - 3,000 m.
 #[device_register(super::SCD4x)]
-#[register(address = 0x2427, mode = "w")]
+#[register(address = 0x2427, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetSensorAltitude {
     pub altitude: u16,
@@ -74,7 +75,7 @@ pub struct SetSensorAltitude {
 /// The get_sensor_altitude command can be sent while the SCD4x is in idle mode to read out the
 /// previously saved sensor altitude value set by the set_sensor_altitude command.
 #[device_register(super::SCD4x)]
-#[register(address = 0x2322, mode = "r")]
+#[register(address = 0x2322, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetSensorAltitude {
     pub altitude: u16,
@@ -86,7 +87,7 @@ pub struct GetSensorAltitude {
 /// recommended for applications experiencing significant ambient pressure changes to ensure sensor
 /// accuracy. Valid input values are between 70,000 - 120,000 Pa. The default value is 101,300 Pa.
 #[device_register(super::SCD4x)]
-#[register(address = 0xe000, mode = "rw")]
+#[register(address = 0xe000, mode = "rw", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AmbientPressure {
     #[register(default = 1013)]
@@ -96,7 +97,7 @@ pub struct AmbientPressure {
 /// Sets the current state of the ASC. By default, ASC is enabled. To save the setting to the
 /// EEPROM, the persist_settings command must be issued.
 #[device_register(super::SCD4x)]
-#[register(address = 0x2416, mode = "w")]
+#[register(address = 0x2416, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetAutomaticSelfCalibrationEnabled {
     #[bondrewd(bit_length = 15, reserve)]
@@ -108,7 +109,7 @@ pub struct SetAutomaticSelfCalibrationEnabled {
 
 /// Gets the current ASC state
 #[device_register(super::SCD4x)]
-#[register(address = 0x2313, mode = "r")]
+#[register(address = 0x2313, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetAutomaticSelfCalibrationEnabled {
     #[bondrewd(bit_length = 15, reserve)]
@@ -123,14 +124,14 @@ pub struct GetAutomaticSelfCalibrationEnabled {
 /// within one ASC period of operation. To save the setting to the EEPROM, the persist_settings
 /// command must be issued subsequently.
 #[device_register(super::SCD4x)]
-#[register(address = 0x243a, mode = "w")]
+#[register(address = 0x243a, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetAutomaticSelfCalibrationTarget {
     pub target: u16,
 }
 
 #[device_register(super::SCD4x)]
-#[register(address = 0x233f, mode = "r")]
+#[register(address = 0x233f, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetAutomaticSelfCalibrationTarget {
     pub target: u16,
@@ -138,13 +139,13 @@ pub struct GetAutomaticSelfCalibrationTarget {
 
 /// Starts the low power periodic measurement mode. The signal update interval is approximately 30 seconds.
 #[device_register(super::SCD4x)]
-#[register(address = 0x21ac, mode = "w")]
+#[register(address = 0x21ac, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StartLowPowerPeriodicMeasurement {}
 
 /// Polls the sensor for whether data from a periodic or single shot measurement is ready to be read out
 #[device_register(super::SCD4x)]
-#[register(address = 0xe4b8, mode = "r")]
+#[register(address = 0xe4b8, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetDataReadyStatus {
     pub status: u16,
@@ -161,14 +162,14 @@ pub struct GetDataReadyStatus {
 /// periodic measurement mode, low power periodic measurement mode (see Section 3.9) or single shot
 /// mode with 5 minute measurement interval.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3615, mode = "w")]
+#[register(address = 0x3615, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct PersistSettings {}
 
 /// Reading out the serial number can be used to identify the chip and to verify the presence of
 /// the sensor.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3682, mode = "r")]
+#[register(address = 0x3682, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct GetSerialNumber {
     #[bondrewd(bit_length = 48)]
@@ -178,7 +179,7 @@ pub struct GetSerialNumber {
 /// The perform_self_test command can be used as an end-of-line test to check the sensor
 /// functionality.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3639, mode = "r")]
+#[register(address = 0x3639, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct PerformSelfTest {
     pub status: u8,
@@ -190,7 +191,7 @@ pub struct PerformSelfTest {
 /// The perform_factory_reset command resets all configuration settings stored in the EEPROM and
 /// erases the FRC and ASC algorithm history
 #[device_register(super::SCD4x)]
-#[register(address = 0x3632, mode = "w")]
+#[register(address = 0x3632, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct PerformFactoryReset {}
 
@@ -198,13 +199,13 @@ pub struct PerformFactoryReset {}
 /// must be in the idle state before sending the reinit command. If the reinit command does not
 /// trigger the desired re-initialization, a power-cycle should be applied to the SCD4x.
 #[device_register(super::SCD4x)]
-#[register(address = 0x3646, mode = "w")]
+#[register(address = 0x3646, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct Reinit {}
 
 /// reads out the SCD4x sensor variant (e.g. SCD40 or SCD41).
 #[device_register(super::SCD4x)]
-#[register(address = 0x202f, mode = "r")]
+#[register(address = 0x202f, mode = "r", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetSensorVariant {
     pub variant: u16,
@@ -215,7 +216,7 @@ pub struct GetSensorVariant {
 /// On-demand measurement of CO2 concentration, relative humidity and temperature. The sensor output is read out
 /// by using the read_measurement command
 #[device_register(super::SCD4x)]
-#[register(address = 0x219d, mode = "w")]
+#[register(address = 0x219d, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct MeasureSingleShot {}
 
@@ -223,14 +224,14 @@ pub struct MeasureSingleShot {}
 /// consumption. The sensor output is read out by using the read_measurement command (Section
 /// 3.6.2). CO2 output is returned as 0 ppm
 #[device_register(super::SCD4x)]
-#[register(address = 0x2196, mode = "w")]
+#[register(address = 0x2196, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct MeasureSingleShotRHTOnly {}
 
 /// Put the sensor from idle to sleep to reduce current consumption. Can be used to power down when
 /// operating the sensor in power-cycled single shot mode
 #[device_register(super::SCD4x)]
-#[register(address = 0x36e0, mode = "w")]
+#[register(address = 0x36e0, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct PowerDown {}
 
@@ -238,7 +239,7 @@ pub struct PowerDown {}
 /// wake_up command. The sensor's idle state after wake up can be verified by reading out the
 /// serial number.
 #[device_register(super::SCD4x)]
-#[register(address = 0x36f6, mode = "w")]
+#[register(address = 0x36f6, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct WakeUp {}
 
@@ -252,7 +253,7 @@ pub struct WakeUp {}
 /// intended period in hours (e.g. for a 10-minute measurement interval, the scaled parameter value
 /// is obtained by multiplying the intended period in hours by 0.5).
 #[device_register(super::SCD4x)]
-#[register(address = 0x2445, mode = "w")]
+#[register(address = 0x2445, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetAutomaticSelfCalibrationInitialPeriod {
     #[register(default = 76)]
@@ -260,7 +261,7 @@ pub struct SetAutomaticSelfCalibrationInitialPeriod {
 }
 
 #[device_register(super::SCD4x)]
-#[register(address = 0x2340, mode = "w")]
+#[register(address = 0x2340, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetAutomaticSelfCalibrationInitialPeriod {
     #[register(default = 76)]
@@ -277,7 +278,7 @@ pub struct GetAutomaticSelfCalibrationInitialPeriod {
 /// hours (e.g. for a 10-minute measurement interval, the scaled parameter value is obtained by
 /// multiplying the intended period in hours by 0.5).
 #[device_register(super::SCD4x)]
-#[register(address = 0x2445, mode = "w")]
+#[register(address = 0x2445, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct SetAutomaticSelfCalibrationStandardPeriod {
     #[register(default = 156)]
@@ -285,7 +286,7 @@ pub struct SetAutomaticSelfCalibrationStandardPeriod {
 }
 
 #[device_register(super::SCD4x)]
-#[register(address = 0x2340, mode = "w")]
+#[register(address = 0x2340, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct GetAutomaticSelfCalibrationStandardPeriod {
     #[register(default = 156)]

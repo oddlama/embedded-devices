@@ -11,7 +11,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -42,7 +42,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -70,13 +70,12 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 pub mod address;
 pub mod registers;
-
-type TMP102I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -107,7 +106,7 @@ pub struct TMP102<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> TMP102<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, TMP102I2cCodec>>
+impl<I> TMP102<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -129,7 +128,7 @@ where
 )]
 impl<I: embedded_registers::RegisterInterface> TMP102<I> {
     /// Read the last temperature measured
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, I::Error> {
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, RegisterError<(), I::BusError>> {
         use self::registers::{Configuration, Temperature};
 
         // Read current configuration to determine conversion ratio
@@ -144,7 +143,7 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
         }
     }
 
-    pub async fn set_continuous(&mut self) -> Result<(), I::Error> {
+    pub async fn set_continuous(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
         use self::registers::Configuration;
 
         // Read current configuration and update it for continuous mode
@@ -165,7 +164,7 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP102<I> {
-    type Error = I::Error;
+    type Error = RegisterError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].

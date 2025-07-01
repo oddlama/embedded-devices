@@ -48,7 +48,7 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Manufacturer | Device | Interface | Description | Docs |
 |---|---|---|---|---|
 | Analog Devices | MAX31865 | SPI | Precision temperature converter for RTDs, NTCs and PTCs | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/analog_devices/max31865/index.html) |
-| Bosch | BME280 | I2C/SPI | Temperature, pressure and humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bme280/index.html) |
+| Bosch | BME280 | I2C/SPI | Temperature, pressure and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bme280/index.html) |
 | Bosch | BMP280 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp280/index.html) |
 | Bosch | BMP390 | I2C/SPI | Temperature and pressure sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/bosch/bmp390/index.html) |
 | Microchip | MCP3204 | SPI | 12-bit ADC, 4 single- or 2 differential channels | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/microchip/mcp3204/index.html) |
@@ -62,6 +62,11 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Sensirion | SCD40 | I2C | Photoacoustic NDIR CO₂ sensor (400-2000ppm) ±50ppm ±5.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
 | Sensirion | SCD41 | I2C | Improved photoacoustic NDIR CO₂ sensor (400-5000ppm) ±50ppm ±2.5%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
 | Sensirion | SCD43 | I2C | High accureacy photoacoustic NDIR CO₂ sensor (400-5000ppm) ±30ppm ±3.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
+| Sensirion | SEN60 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10) sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
+| Sensirion | SEN63C | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
+| Sensirion | SEN65 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
+| Sensirion | SEN66 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
+| Sensirion | SEN68 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, HCHO, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
 
 ## Example usage
 
@@ -88,14 +93,14 @@ bme280.configure(Configuration {
 // Measure now
 let measurement = bme280.measure(&mut Delay).await?;
 
-// Convert the returned temperature into an f32 in °C, do the same for pressure (Pa) and humidity (%RH)
+// Retrieve the returned temperature as °C, pressure in Pa and humidity in %RH
 let temp = measurement.temperature.get::<degree_celsius>();
-let pres = measurement.pressure.and_then(|x| x.get::<pascal>());
-let hum = measurement.humidity.and_then(|x| x.get::<percent>());
+let pres = measurement.pressure.unwrap().get::<pascal>();
+let hum = measurement.humidity.unwrap().get::<percent>();
 
-println!("Current temperature: {:?}°C", temp);
-println!("Current pressure: {:?}Pa", pres);
-println!("Current humidity: {:?}%RH", hum);
+println!("Current temperature: {}°C", temp);
+println!("Current pressure: {}Pa", pres);
+println!("Current humidity: {}%RH", hum);
 ```
 
 Note that every device is gated behind a crate feature, for example
@@ -156,7 +161,7 @@ We can define the corresponding register like so:
 ```rust
 /// Insert explanation of this register from the datasheet.
 #[device_register(MyDevice)]
-#[register(address = 0x42, mode = "rw")]
+#[register(address = 0x42, mode = "rw", i2c_codec = OneByteRegAddrCodec)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ValueRegister {
     /// Insert explanation of this value from the datasheet.
@@ -174,6 +179,11 @@ will interface with a device using the packed data representation which can be
 transferred over the bus as-is. Each field will automatically get accessor
 functions with which you may read or write them without incurring the overhead
 for full (de-)serialization.
+
+The given codec provides then necessary information about the protocol that is
+needed to access the register on a certain bus. It can determine how the
+register address is used on the wire and could do extra checks like CRC
+checksums.
 
 > [!NOTE]
 > I find it a bit misleading that the members written in `ValueRegister` end up in `ValueRegisterBitfield`.
@@ -230,7 +240,7 @@ pub enum TemperatureResolution {
 }
 
 #[device_register(MyDevice)]
-#[register(address = 0x44, mode = "rw")]
+#[register(address = 0x44, mode = "rw", i2c_codec = OneByteRegAddrCodec)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ComplexRegister {
     #[bondrewd(bit_length = 6, reserve)]
@@ -296,7 +306,7 @@ construct the device with the given interface.
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MyDevice<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, OneByteRegAddrCodec>>
+impl<I> MyDevice<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -312,11 +322,10 @@ where
 ```
 
 Here we use the `I2cDevice` interface provided by `embedded-registers`, which
-already implements the necessary trait from above. This means we pass it some
-information at compile time like the kind of I2C address that the device uses
-(7/10-bit), plus a Codec which provides information about the protocol i.e. how
-exactly registers are addressed, read and written on the given bus. In turn,
-`I2cDevice` provides a simple interface we can use to read/write registers.
+already implements the necessary trait from above. This means we pass down the
+given interface implementation plus some compile time information like the kind
+of I2C address that the device uses (7/10-bit). In turn, `I2cDevice` provides a
+simple interface we can use to read/write registers.
 
 The address enum `MyAddress` should contain all valid addresses for the device,
 plus a variant to allow specifying arbitrary addresses, in case the user uses
@@ -377,6 +386,16 @@ please refer to the [embedded-registers-derive](https://docs.rs/embedded-registe
 
 For an in-depth explanation of how the defined registers are used,
 please refer to the [embedded-registers](https://docs.rs/embedded-registers/latest/embedded_registers/) docs.
+
+## Device driver best-practices
+
+When writing new device drivers, please consider the following best-practices:
+
+- Expose all registers defined in the datasheet to allow accessing all device functions, only define functions for functionality
+- If the device is a sensor:
+  - Create a `Measurement` struct (singular!) that holds all values measured
+      by the sensor. Implement the relevant `*Measurement` traits.
+  - Implement the `Sensor` trait and all relevant subtraits (e.g. `TemperatureSensor`)
 
 ## Contributing
 

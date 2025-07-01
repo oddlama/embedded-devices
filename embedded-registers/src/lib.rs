@@ -18,15 +18,16 @@
 //!
 //! ## Defining a register
 //!
-//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw")]`.
+//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw", codec = OneByteRegAddrCodec)]`.
 //! The necessary derive attribute for Bondrewd is added automatically.
 //! Take for example this 2-byte read-write register at device addresses `0x42,0x43`, which contains two `u8` values:
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
 //! use embedded_registers::register;
+//! use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 //!
-//! #[register(address = 0x42, mode = "rw")]
+//! #[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct ValueRegister {
 //!     pub width: u8,
@@ -57,21 +58,22 @@
 //! ```rust, only_if(async)
 //! # #![feature(generic_arg_infer)]
 //! # use embedded_registers::register;
-//! # #[register(address = 0x42, mode = "rw")]
+//! # use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+//! # #[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 //! # #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! # pub struct ValueRegister {
 //! #     pub width: u8,
 //! #     pub height: u8,
 //! # }
-//! use embedded_registers::{i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync};
+//! use embedded_registers::{i2c::I2cDeviceAsync, RegisterError, RegisterInterfaceAsync};
 //!
-//! async fn init<I>(mut i2c_bus: I) -> Result<(), I::Error>
+//! async fn init<I>(mut i2c_bus: I) -> Result<(), RegisterError<(), I::Error>>
 //! where
 //!     I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! {
 //!     // Imagine we already have constructed a device using
-//!     // the i2c bus from your controller, a device address and default codec:
-//!     let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c_bus, 0x12);
+//!     // the i2c bus from your controller and a device address:
+//!     let mut dev = I2cDeviceAsync::new(i2c_bus, 0x12);
 //!     // We can now retrieve the register
 //!     let mut reg = dev.read_register::<ValueRegister>().await?;
 //!
@@ -106,6 +108,23 @@ pub mod spi;
 pub use bondrewd;
 pub use bytemuck;
 
+/// A combined error type for Codec or Bus errors
+#[derive(Debug, thiserror::Error)]
+pub enum RegisterError<CodecError, BusError> {
+    /// The codec failed to encore or decode this register
+    #[error("codec error")]
+    Codec(CodecError),
+    /// An error ocurred on the underlying interface
+    #[error("bus error")]
+    Bus(#[from] BusError),
+}
+
+/// A base trait for all codecs
+pub trait RegisterCodec {
+    /// An error type for codec specific errors
+    type Error;
+}
+
 /// The basis trait for all registers. A register is a type
 /// that maps to a specific register on an embedded device and
 /// should own the raw data required for this register.
@@ -119,28 +138,26 @@ pub trait Register: Default + Clone + bytemuck::Pod {
     /// The virtual address of this register
     const ADDRESS: u64;
 
-    /// The associated bondrewd bitfield type
+    /// The associated bitfield type
     type Bitfield;
-    /// The SPI codec that should be used for this register when no
-    /// codec is specified by the user. Setting this to `spi::codecs::NoCodec`
-    /// will automatically cause accesses to use the device's default codec.
-    /// If the device doesn't support SPI communication, this can be ignored.
+    /// A common error type which can represent all associated codec errors
+    type CodecError;
+    /// The SPI codec that should be used for this register. If the device doesn't support SPI
+    /// communication, this can be ignored.
     #[cfg(all(feature = "sync", not(feature = "async")))]
-    type SpiCodec: spi::CodecSync;
+    type SpiCodec: spi::CodecSync<Error = Self::CodecError>;
     #[cfg(all(not(feature = "sync"), feature = "async"))]
-    type SpiCodec: spi::CodecAsync;
+    type SpiCodec: spi::CodecAsync<Error = Self::CodecError>;
     #[cfg(all(feature = "sync", feature = "async"))]
-    type SpiCodec: spi::CodecSync + spi::CodecAsync;
-    /// The I2C codec that should be used for this register when no
-    /// codec is specified by the user. Setting this to `i2c::codecs::NoCodec`
-    /// will automatically cause accesses to use the device's default codec.
-    /// If the device doesn't support I2C communication, this can be ignored.
+    type SpiCodec: spi::CodecSync<Error = Self::CodecError> + spi::CodecAsync<Error = Self::CodecError>;
+    /// The I2C codec that should be used for this register. If the device doesn't support I2C
+    /// communication, this can be ignored.
     #[cfg(all(feature = "sync", not(feature = "async")))]
-    type I2cCodec: i2c::CodecSync;
+    type I2cCodec: i2c::CodecSync<Error = Self::CodecError>;
     #[cfg(all(not(feature = "sync"), feature = "async"))]
-    type I2cCodec: i2c::CodecAsync;
+    type I2cCodec: i2c::CodecAsync<Error = Self::CodecError>;
     #[cfg(all(feature = "sync", feature = "async"))]
-    type I2cCodec: i2c::CodecSync + i2c::CodecAsync;
+    type I2cCodec: i2c::CodecSync<Error = Self::CodecError> + i2c::CodecAsync<Error = Self::CodecError>;
 
     /// Provides immutable access to the raw data.
     fn data(&self) -> &[u8];
@@ -160,15 +177,19 @@ pub trait WritableRegister: Register {}
 #[allow(async_fn_in_trait)]
 #[maybe_async_cfg::maybe(sync(feature = "sync"), async(feature = "async"))]
 pub trait RegisterInterface {
-    type Error;
+    /// A type representing errors on the underlying bus
+    type BusError;
 
     /// Reads the given register via this interface
-    async fn read_register<R>(&mut self) -> Result<R, Self::Error>
+    async fn read_register<R>(&mut self) -> Result<R, RegisterError<<R as Register>::CodecError, Self::BusError>>
     where
         R: ReadableRegister;
 
     /// Writes the given register via this interface
-    async fn write_register<R>(&mut self, register: impl AsRef<R>) -> Result<(), Self::Error>
+    async fn write_register<R>(
+        &mut self,
+        register: impl AsRef<R>,
+    ) -> Result<(), RegisterError<<R as Register>::CodecError, Self::BusError>>
     where
         R: WritableRegister;
 }

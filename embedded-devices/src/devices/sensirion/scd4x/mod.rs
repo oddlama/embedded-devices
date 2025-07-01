@@ -70,12 +70,12 @@
 //! # }
 //! ```
 
-/// TODO: forced field calibration.
-/// This is currently not supported as it consists of a write followed by a read 400 ms later
-/// The codec does not allow this as is.
-use crc::{Algorithm, CRC_8_NRSC_5};
+// TODO: forced field calibration.
+// This is currently not supported as it consists of a write followed by a read 400 ms later
+// The codec does not allow this as is.
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::i2c::codecs::Crc8Algorithm;
+use embedded_registers::i2c::codecs::crc_codec::CrcError;
+use embedded_registers::RegisterError;
 use registers::{
     AmbientPressure, GetDataReadyStatus, GetSensorVariant, GetSerialNumber, MeasureSingleShot, PowerDown,
     ReadMeasurement, Reinit, SetSensorAltitude, StartLowPowerPeriodicMeasurement, StartPeriodicMeasurement,
@@ -115,7 +115,10 @@ pub enum SensorVariant {
 pub enum Error<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
+    /// Codec error
+    #[error("crc codec error")]
+    Crc(CrcError),
     /// Invalid chip id was encountered in `init`
     #[error("invalid sensor variant 0x{0:#04x}")]
     InvalidSensorVariant(u16),
@@ -136,6 +139,15 @@ pub enum Error<BusError> {
     DataNotReady,
 }
 
+impl<BusError> From<RegisterError<CrcError, BusError>> for Error<BusError> {
+    fn from(value: RegisterError<CrcError, BusError>) -> Self {
+        match value {
+            RegisterError::Codec(x) => Self::Crc(x),
+            RegisterError::Bus(x) => Self::Bus(x),
+        }
+    }
+}
+
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
@@ -148,17 +160,6 @@ pub struct Measurement {
     #[measurement(RelativeHumidity)]
     pub humidity: Ratio,
 }
-
-#[derive(Default)]
-pub struct SCD4xCrcCodec {}
-
-impl Crc8Algorithm for SCD4xCrcCodec {
-    fn instance() -> &'static Algorithm<u8> {
-        const CUSTOM_ALG: crc::Algorithm<u8> = CRC_8_NRSC_5;
-        &CUSTOM_ALG
-    }
-}
-type SCD4xI2cCodec = embedded_registers::i2c::codecs::Crc8Codec<2, 2, SCD4xCrcCodec>;
 
 /// The SCD4x is Sensirion's second generation series of optical CO2 sensors. Several product variants
 /// exist with accuracy ranges from 400 – 2,000 ppm (SCD40) up to 400 – 5,000 ppm (SCD43).
@@ -187,7 +188,7 @@ pub struct SCD4x<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> SCD4x<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, SCD4xI2cCodec>>
+impl<I> SCD4x<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -216,7 +217,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     /// Initializes the sensor by first waking the sensor, then stopping any ongoing measurement,
     /// calling reinit and finally verifing the device id. Calling this function is mandatory to
     /// ensure subsequent function calls know the sensor variant.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::BusError>> {
         let _ = self.write_register(WakeUp::default()).await;
         delay.delay_ms(30).await;
 
@@ -244,7 +245,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     /// Sets the current sensor altitude in meters above sea level. This value is used to derive an
     /// expected air pressure value which will be used in signal compensation. Expects a value
     /// between 0 and 3000 meters. This function must be called while the sensor is in idle mode.
-    pub async fn set_sensor_altitude(&mut self, height: &mut Length) -> Result<(), Error<I::Error>> {
+    pub async fn set_sensor_altitude(&mut self, height: Length) -> Result<(), Error<I::BusError>> {
         if self.state != SensorState::Idle {
             return Err(Error::InvalidSensorState(self.state.clone()));
         }
@@ -257,7 +258,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     /// Sets the ambient pressure which will be used for live signal compensation. A value between
     /// 70,000 to 120,000 Pa is expected. This function must be called while the sensor is in
     /// periodic measurement mode.
-    pub async fn set_sensor_ambient_pressure(&mut self, height: &mut Pressure) -> Result<(), Error<I::Error>> {
+    pub async fn set_sensor_ambient_pressure(&mut self, height: Pressure) -> Result<(), Error<I::BusError>> {
         if self.state != SensorState::PeriodicMeasurement || self.state != SensorState::LowPowerPeriodicMeasurement {
             return Err(Error::InvalidSensorState(self.state.clone()));
         }
@@ -273,7 +274,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
         delay: &mut D,
         wait_time: u32,
         max_iterations: u32,
-    ) -> Result<Measurement, Error<I::Error>> {
+    ) -> Result<Measurement, Error<I::BusError>> {
         let mut iteration = 0;
         loop {
             let ready = self.read_register::<GetDataReadyStatus>().await?;
@@ -300,7 +301,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     }
 
     // /// Performs a device self test and checks the result
-    // pub async fn perform_self_test<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::Error>> {
+    // pub async fn perform_self_test<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), Error<I::BusError>> {
     //     let crc = crc::Crc::<u8>::new(SCD4xCrcCodec::instance());
     //     let header = &PerformSelfTest::ADDRESS.to_be_bytes()[core::mem::size_of_val(&PerformSelfTest::ADDRESS) - 2..];
     //
@@ -342,7 +343,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
         &mut self,
         delay: &mut D,
         state: SensorState,
-    ) -> Result<(), Error<I::Error>> {
+    ) -> Result<(), Error<I::BusError>> {
         match (&self.state, &state) {
             (SensorState::Idle, SensorState::PeriodicMeasurement) => {
                 self.write_register(StartPeriodicMeasurement::default()).await?;
@@ -459,7 +460,7 @@ impl<I: embedded_registers::RegisterInterface> SCD4x<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for SCD4x<I> {
-    type Error = Error<I::Error>;
+    type Error = Error<I::BusError>;
     type Measurement = Measurement;
 
     // Performs a one-shot measurement. If the sensor supports single shot measurement, we will
@@ -485,7 +486,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for SCD4x<
             SensorState::LowPowerPeriodicMeasurement => self.get_measurement(delay, 2000, (30000 / 2000) * 2).await,
             SensorState::Sleep => {
                 // Sleep is only supported on the SCD41 or SCD43 since both support single shot
-                // measurement we start one without further guards
+                // measurement we start without further guards
                 self.change_state(delay, SensorState::Idle).await?;
                 self.write_register(MeasureSingleShot::default()).await?;
                 delay.delay_ms(4000).await;

@@ -1,4 +1,4 @@
-use crate::{ReadableRegister, Register, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
 use bytemuck::Zeroable;
 
 /// This codec represents the most commonly found codecs for SPI devices.
@@ -65,6 +65,18 @@ impl<
     }
 }
 
+impl<
+        const HEADER_SIZE: usize,
+        const ADDR_MSB: u8,
+        const ADDR_LSB: u8,
+        const RW_BIT: u8,
+        const RW_1_IS_READ: bool,
+        const READ_DELAY: usize,
+    > RegisterCodec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
+{
+    type Error = ();
+}
+
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec),
     sync(feature = "sync"),
@@ -81,9 +93,9 @@ impl<
     > crate::spi::Codec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     #[inline]
-    async fn read_register<R, I>(interface: &mut I) -> Result<R, I::Error>
+    async fn read_register<R, I>(interface: &mut I) -> Result<R, RegisterError<Self::Error, I::Error>>
     where
-        R: ReadableRegister,
+        R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice,
     {
         #[repr(C, packed(1))]
@@ -104,9 +116,12 @@ impl<
     }
 
     #[inline]
-    async fn write_register<R, I>(interface: &mut I, register: impl AsRef<R>) -> Result<(), I::Error>
+    async fn write_register<R, I>(
+        interface: &mut I,
+        register: impl AsRef<R>,
+    ) -> Result<(), RegisterError<Self::Error, I::Error>>
     where
-        R: WritableRegister,
+        R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice,
     {
         #[repr(C, packed(1))]
@@ -125,6 +140,6 @@ impl<
         // Set RW_BIT if necessary
         data[HEADER_SIZE - 1 - (RW_BIT as usize) / 8] |= ((!RW_1_IS_READ) as u8) << (RW_BIT % 8);
         Self::fill_addr_header::<R>(data);
-        interface.write(data).await
+        Ok(interface.write(data).await?)
     }
 }

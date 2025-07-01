@@ -21,6 +21,7 @@ embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-registers-derive = { version = "0.9.13", path = "../embedded-registers-derive", optional = true }
 maybe-async-cfg = "0.2.5"
+thiserror = { version = "2.0.12", default-features = false }
 
 [features]
 default = ["derive", "sync", "async"]
@@ -28,4 +29,4 @@ default = ["derive", "sync", "async"]
 sync = []
 async = ["dep:embedded-hal-async"]
 derive = ["dep:embedded-registers-derive"]
-std = []
+std = ["thiserror/std"]

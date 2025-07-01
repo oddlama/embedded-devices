@@ -103,6 +103,7 @@
 //! ```
 
 use embedded_devices_derive::sensor;
+use embedded_registers::RegisterError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
@@ -167,7 +168,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(
             ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
@@ -190,7 +191,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, false> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, false> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,

@@ -23,7 +23,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -49,7 +49,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -72,20 +72,20 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::WritableRegister;
+use embedded_registers::{RegisterError, WritableRegister};
 use uom::si::f64::ThermodynamicTemperature;
+
+use crate::utils::from_bus_error;
 
 pub mod address;
 pub mod registers;
-
-type TMP117I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Invalid Device Id was encountered
     #[error("invalid device id {0:#04x}")]
     InvalidDeviceId(u16),
@@ -96,11 +96,14 @@ pub enum InitError<BusError> {
 pub enum EepromError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// EEPROM is still busy after 13ms
     #[error("eeprom still busy")]
     EepromStillBusy,
 }
+
+from_bus_error!(InitError);
+from_bus_error!(EepromError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -131,7 +134,7 @@ pub struct TMP117<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> TMP117<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, TMP117I2cCodec>>
+impl<I> TMP117<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -157,7 +160,7 @@ where
 impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     /// Initialize the sensor by waiting for the boot-up period and verifying its device id.
     /// Calling this function is not mandatory, but recommended to ensure proper operation.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         use self::registers::DeviceIdRevision;
 
         // Soft-reset device
@@ -175,7 +178,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     /// Performs a soft-reset of the device.
     /// The datasheet specifies a time to reset of 2ms which is
     /// automatically awaited before allowing further communication.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(self::registers::Configuration::default().with_soft_reset(true))
             .await?;
         delay.delay_ms(2).await;
@@ -184,7 +187,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
 
     /// Write a register value into EEPROM. Usually this will persist the register
     /// value as the new power-on default. Not all registers / register-bits support this.
-    pub async fn write_eeprom<R, D>(&mut self, delay: &mut D) -> Result<(), EepromError<I::Error>>
+    pub async fn write_eeprom<R, D>(&mut self, delay: &mut D) -> Result<(), EepromError<I::BusError>>
     where
         R: WritableRegister,
         D: hal::delay::DelayNs,
@@ -224,7 +227,7 @@ impl<I: embedded_registers::RegisterInterface> TMP117<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP117<I> {
-    type Error = I::Error;
+    type Error = RegisterError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the conversion mode to

@@ -88,9 +88,12 @@
 //! # }
 //! ```
 
+use crate::utils::from_bus_error;
+
 use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use uom::si::electric_current::ampere;
 use uom::si::electrical_resistance::ohm;
 use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Power};
@@ -98,14 +101,12 @@ use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Pow
 pub mod address;
 pub mod registers;
 
-type INA219I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
-
 /// All possible errors that may occur during measurement
 #[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// The conversion ready flag was not set within the expected time frame.
     #[error("conversion timeout")]
     Timeout,
@@ -114,6 +115,8 @@ pub enum MeasurementError<BusError> {
     #[error("overflow in measurement")]
     Overflow(Measurement),
 }
+
+from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -158,7 +161,7 @@ pub struct INA219<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> INA219<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, INA219I2cCodec>>
+impl<I> INA219<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -193,14 +196,14 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
         &mut self,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
-    ) -> Result<(), I::Error> {
+    ) -> Result<(), RegisterError<(), I::BusError>> {
         self.reset().await?;
         self.calibrate(shunt_resistance, max_expected_current).await?;
         Ok(())
     }
 
     /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
-    pub async fn reset(&mut self) -> Result<(), I::Error> {
+    pub async fn reset(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(self::registers::Configuration::default().with_reset(true))
             .await?;
 
@@ -213,7 +216,7 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
         &mut self,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
-    ) -> Result<(), I::Error> {
+    ) -> Result<(), RegisterError<(), I::BusError>> {
         self.shunt_resistance = shunt_resistance;
         self.max_expected_current = max_expected_current;
 
@@ -234,7 +237,7 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
 
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
-    pub async fn read_measurements(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
+    pub async fn read_measurements(&mut self) -> Result<Measurement, MeasurementError<I::BusError>> {
         let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
 
         let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
@@ -265,7 +268,7 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219<I> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the operating mode to
@@ -290,9 +293,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219
 
             if bus_voltage.read_conversion_ready() {
                 let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
-
                 let current = self.read_register::<self::registers::Current>().await?;
-
                 // Reading this register clears the conversion_ready flag
                 let power = self.read_register::<self::registers::Power>().await?;
 

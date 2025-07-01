@@ -1,6 +1,9 @@
 use bondrewd::{BitfieldEnum, Bitfields};
 use embedded_devices_derive::device_register;
-use embedded_registers::register;
+use embedded_registers::{i2c::codecs::OneByteRegAddrCodec, register, spi::codecs::simple_codec::SimpleCodec};
+
+pub type BME280SpiCodec = SimpleCodec<1, 6, 0, 7, true, 0>;
+pub type BME280I2cCodec = OneByteRegAddrCodec;
 
 /// Known chip ids
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -22,7 +25,12 @@ pub enum Chip {
 /// The chip identification number. This number can
 /// be read as soon as the device finished the power-on-reset.
 #[device_register(super::BME280Common)]
-#[register(address = 0xd0, mode = "r")]
+#[register(
+    address = 0xd0,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Id {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
@@ -44,7 +52,12 @@ pub enum ResetMagic {
 /// the device is reset using the complete power-on-reset procedure.
 /// Writing other values than 0xB6 has no effect.
 #[device_register(super::BME280Common)]
-#[register(address = 0xe0, mode = "w")]
+#[register(
+    address = 0xe0,
+    mode = "w",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Reset {
     #[bondrewd(enum_primitive = "u8", bit_length = 8)]
@@ -103,7 +116,12 @@ impl Oversampling {
 /// The humidity control register. Changes to this register only become effective
 /// after a write to the ControlMeasurement register!
 #[device_register(super::BME280Common)]
-#[register(address = 0xf2, mode = "rw")]
+#[register(
+    address = 0xf2,
+    mode = "rw",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ControlHumidity {
     #[bondrewd(bit_length = 5, reserve)]
@@ -119,7 +137,12 @@ pub struct ControlHumidity {
 
 /// The status register.
 #[device_register(super::BME280Common)]
-#[register(address = 0xf3, mode = "r")]
+#[register(
+    address = 0xf3,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Status {
     #[bondrewd(bit_length = 4, reserve)]
@@ -165,7 +188,12 @@ pub enum SensorMode {
 /// data acquisition options of the device. The register needs to be written
 /// after changing [`ControlHumidity`] for those changes to become effective.
 #[device_register(super::BME280Common)]
-#[register(address = 0xf4, mode = "rw")]
+#[register(
+    address = 0xf4,
+    mode = "rw",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ControlMeasurement {
     /// Controls oversampling of temperature data.
@@ -233,7 +261,12 @@ pub enum IIRFilter {
 /// Writes to this register in [`SensorMode::Normal`] may be ignored.
 /// In [`SensorMode::Sleep`] writes are not ignored.
 #[device_register(super::BME280Common)]
-#[register(address = 0xf4, mode = "rw")]
+#[register(
+    address = 0xf4,
+    mode = "rw",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct Config {
     /// Controls inactive duration t_standby in [`SensorMode::Normal`].
@@ -256,7 +289,12 @@ pub struct Config {
 
 /// Device-internal calibration registers (section 1)
 #[device_register(super::BME280Common)]
-#[register(address = 0x88, mode = "r")]
+#[register(
+    address = 0x88,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 26)]
 pub struct TrimmingParameters1 {
     pub dig_t1: u16,
@@ -279,7 +317,12 @@ pub struct TrimmingParameters1 {
 
 /// Device-internal calibration registers (section 2)
 #[device_register(super::BME280Common)]
-#[register(address = 0xe1, mode = "r")]
+#[register(
+    address = 0xe1,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "le", enforce_bytes = 7)]
 pub struct TrimmingParameters2 {
     pub dig_h2: i16,
@@ -292,7 +335,12 @@ pub struct TrimmingParameters2 {
 
 /// This register contains the raw pressure measurement
 #[device_register(super::BME280Common)]
-#[register(address = 0xf7, mode = "r")]
+#[register(
+    address = 0xf7,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Pressure {
     /// The raw pressure measurement
@@ -307,7 +355,12 @@ pub struct Pressure {
 
 /// This register contains the raw temperature measurement
 #[device_register(super::BME280Common)]
-#[register(address = 0xfa, mode = "r")]
+#[register(
+    address = 0xfa,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 3)]
 pub struct Temperature {
     /// The raw temperature measurement
@@ -322,7 +375,12 @@ pub struct Temperature {
 
 /// This register contains the raw humidity measurement
 #[device_register(super::BME280Common)]
-#[register(address = 0xfd, mode = "r")]
+#[register(
+    address = 0xfd,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Humidity {
     /// The raw humidity measurement
@@ -332,7 +390,12 @@ pub struct Humidity {
 
 /// Burst register read of pressure and temperature
 #[device_register(super::BME280Common)]
-#[register(address = 0xf7, mode = "r")]
+#[register(
+    address = 0xf7,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 6)]
 pub struct BurstMeasurementsPT {
     #[bondrewd(struct_size = 3)]
@@ -343,7 +406,12 @@ pub struct BurstMeasurementsPT {
 
 /// Burst register read of pressure, temperature and humidity
 #[device_register(super::BME280Common)]
-#[register(address = 0xf7, mode = "r")]
+#[register(
+    address = 0xf7,
+    mode = "r",
+    i2c_codec = "BME280I2cCodec",
+    spi_codec = "BME280SpiCodec"
+)]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 8)]
 pub struct BurstMeasurementsPTH {
     #[bondrewd(struct_size = 3)]

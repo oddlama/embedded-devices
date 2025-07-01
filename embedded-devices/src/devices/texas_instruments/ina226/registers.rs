@@ -1,5 +1,6 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
+use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 use embedded_registers::register;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
@@ -101,7 +102,7 @@ pub enum OperatingMode {
 
 /// Device configuration register
 #[device_register(super::INA226)]
-#[register(address = 0x00, mode = "rw")]
+#[register(address = 0x00, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Configuration {
     /// Setting this flag generates a system reset that is the same
@@ -148,7 +149,7 @@ impl Configuration {
 
 /// Shunt voltage measurement data
 #[device_register(super::INA226)]
-#[register(address = 0x01, mode = "r")]
+#[register(address = 0x01, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ShuntVoltage {
     /// The raw voltage measurement with 2.5µV/LSB resolution
@@ -166,7 +167,7 @@ impl ShuntVoltage {
 
 /// Shunt voltage measurement data
 #[device_register(super::INA226)]
-#[register(address = 0x02, mode = "r")]
+#[register(address = 0x02, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct BusVoltage {
     /// The raw voltage measurement with 1.25mV/LSB resolution
@@ -184,7 +185,7 @@ impl BusVoltage {
 
 /// Power measurement data
 #[device_register(super::INA226)]
-#[register(address = 0x03, mode = "r")]
+#[register(address = 0x03, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Power {
     /// The raw power measurement, W/LSB is determined by calibration register
@@ -203,7 +204,7 @@ impl Power {
 
 /// Contains the amount of current flowing through the shunt resistor
 #[device_register(super::INA226)]
-#[register(address = 0x04, mode = "r")]
+#[register(address = 0x04, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Current {
     /// The raw current measurement, A/LSB is determined by calibration register
@@ -220,7 +221,7 @@ impl Current {
 }
 
 #[device_register(super::INA226)]
-#[register(address = 0x05, mode = "rw")]
+#[register(address = 0x05, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct Calibration {
     #[bondrewd(bit_length = 1, reserve)]
@@ -233,7 +234,7 @@ pub struct Calibration {
 }
 
 #[device_register(super::INA226)]
-#[register(address = 0x06, mode = "rw")]
+#[register(address = 0x06, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct MaskEnable {
     /// Alert pin shunt voltage over voltage
@@ -275,7 +276,7 @@ pub struct MaskEnable {
 }
 
 #[device_register(super::INA226)]
-#[register(address = 0x07, mode = "rw")]
+#[register(address = 0x07, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AlertLimit {
     /// The value used to compare against the other register as configured in
@@ -285,7 +286,7 @@ pub struct AlertLimit {
 }
 
 #[device_register(super::INA226)]
-#[register(address = 0xFE, mode = "r")]
+#[register(address = 0xFE, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ManufacturerId {
     /// Manufacturer Id. Reads `"TI"` in ASCII.
@@ -294,7 +295,7 @@ pub struct ManufacturerId {
 }
 
 #[device_register(super::INA226)]
-#[register(address = 0xFF, mode = "r")]
+#[register(address = 0xFF, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct DieId {
     /// Die Id.

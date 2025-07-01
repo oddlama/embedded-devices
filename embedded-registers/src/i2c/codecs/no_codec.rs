@@ -1,18 +1,16 @@
-use crate::{ReadableRegister, WritableRegister};
+use core::marker::PhantomData;
 
-/// A codec that represents absense of a codec. This has two main usecases:
-///
-/// Firstly, if this is used as the default codec for a device, it essentially
-/// requires any associated register to explicitly specify a codec. Otherwise
-/// accessing that register via the [`RegisterInterfaceSync`](crate::RegisterInterfaceSync)
-/// or [`RegisterInterfaceAsync`](crate::RegisterInterfaceAsync) trait will cause a panic.
-///
-/// Secondly, specifying this codec as the default for a register will cause
-/// any reads or writes to that register via the [`RegisterInterfaceSync`](crate::RegisterInterfaceSync)
-/// or [`RegisterInterfaceAsync`](crate::RegisterInterfaceAsync) traits to be performed
-/// through the default codec of the device.
-#[derive(Default)]
-pub struct NoCodec {}
+use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
+
+/// A codec that represents absense of a codec. This is only used as a placeholder in register
+/// definitions to specify that the associated interface is not supported.
+pub struct NoCodec<E: 'static> {
+    _marker: PhantomData<E>,
+}
+
+impl<E: 'static> RegisterCodec for NoCodec<E> {
+    type Error = E;
+}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), Codec, I2cBoundBus),
@@ -20,11 +18,13 @@ pub struct NoCodec {}
     async(feature = "async"),
     keep_self
 )]
-impl crate::i2c::Codec for NoCodec {
+impl<E: 'static> crate::i2c::Codec for NoCodec<E> {
     #[inline]
-    async fn read_register<R, I, A>(_bound_bus: &mut crate::i2c::I2cBoundBus<I, A>) -> Result<R, I::Error>
+    async fn read_register<R, I, A>(
+        _bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
+    ) -> Result<R, RegisterError<Self::Error, I::Error>>
     where
-        R: ReadableRegister,
+        R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
@@ -35,9 +35,9 @@ impl crate::i2c::Codec for NoCodec {
     async fn write_register<R, I, A>(
         _bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
         _register: impl AsRef<R>,
-    ) -> Result<(), I::Error>
+    ) -> Result<(), RegisterError<Self::Error, I::Error>>
     where
-        R: WritableRegister,
+        R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {

@@ -1,5 +1,2 @@
-mod no_codec;
-mod simple_codec;
-
-pub use no_codec::NoCodec;
-pub use simple_codec::SimpleCodec;
+pub mod no_codec;
+pub mod simple_codec;

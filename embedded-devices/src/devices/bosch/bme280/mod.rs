@@ -109,6 +109,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use uom::si::f64::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
@@ -117,20 +118,19 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 pub mod address;
 pub mod registers;
 
+use crate::utils::from_bus_error;
+
 use self::address::Address;
 use self::registers::{
     BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
     TrimmingParameters1, TrimmingParameters2,
 };
 
-type BME280SpiCodec = embedded_registers::spi::codecs::SimpleCodec<1, 6, 0, 7, true, 0>;
-type BME280I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
-
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
@@ -143,11 +143,14 @@ pub enum InitError<BusError> {
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     #[error("not yet calibrated")]
     NotCalibrated,
 }
+
+from_bus_error!(InitError);
+from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -354,8 +357,7 @@ impl CalibrationData {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I, const IS_BME: bool>
-    BME280Common<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, BME280I2cCodec>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>, IS_BME>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -378,7 +380,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I, const IS_BME: bool> BME280Common<embedded_registers::spi::SpiDevice<I, BME280SpiCodec>, IS_BME>
+impl<I, const IS_BME: bool> BME280Common<embedded_registers::spi::SpiDevice<I>, IS_BME>
 where
     I: hal::spi::r#SpiDevice,
 {
@@ -409,7 +411,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         // Soft-reset device
         self.reset(delay).await?;
 
@@ -428,7 +430,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// compensate measurements. It is required to call this once
     /// before taking any measurements. Calling [`Self::init`] will
     /// automatically do this.
-    pub async fn calibrate(&mut self) -> Result<(), I::Error> {
+    pub async fn calibrate(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
         let params1 = self.read_register::<TrimmingParameters1>().await?;
         let params2 = self.read_register::<TrimmingParameters2>().await?;
         self.calibration_data = Some(CalibrationData::new(params1, params2));
@@ -440,7 +442,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             match self.try_reset(delay).await {
@@ -457,7 +459,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::Error>> {
+    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
         self.write_register(self::registers::Reset::default()).await?;
         delay.delay_ms(2).await;
 
@@ -479,7 +481,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. Check
     /// sensor mode beforehand and call [`Self::reset`] if necessary. To configure advanced
     /// settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), I::Error> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(ControlHumidity::default().with_oversampling(config.humidity_oversampling))
             .await?;
 
@@ -506,7 +508,7 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, true> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will transition the device into forced mode,

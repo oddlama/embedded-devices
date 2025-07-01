@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -46,7 +46,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -69,20 +69,21 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use registers::Resolution;
 use uom::si::f64::ThermodynamicTemperature;
 
+use crate::utils::from_bus_error;
+
 pub mod address;
 pub mod registers;
-
-type MCP9808I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
 
 /// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Invalid Device Id was encountered
     #[error("invalid device id")]
     InvalidDeviceId,
@@ -90,6 +91,8 @@ pub enum InitError<BusError> {
     #[error("invalid manufacturer id")]
     InvalidManufacturerId,
 }
+
+from_bus_error!(InitError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -119,7 +122,7 @@ pub struct MCP9808<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MCP9808<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, MCP9808I2cCodec>>
+impl<I> MCP9808<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -145,7 +148,7 @@ where
 impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
     /// Initializes the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
-    pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {
+    pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
         use self::registers::DeviceIdRevision;
         use self::registers::ManufacturerId;
 
@@ -170,7 +173,7 @@ impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MCP9808<I> {
-    type Error = I::Error;
+    type Error = RegisterError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will power up the sensor, wait until a conversion is

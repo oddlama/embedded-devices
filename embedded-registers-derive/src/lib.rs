@@ -44,9 +44,9 @@
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::{register, i2c::{I2cDeviceAsync, I2cDeviceSync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, RegisterInterfaceSync, ReadableRegister};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, I2cDeviceSync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, RegisterInterfaceSync, ReadableRegister, RegisterError};
 //!
-//! #[register(address = 0b111, mode = "r")]
+//! #[register(address = 0b111, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct DeviceId {
 //!     device_id: u8,
@@ -54,21 +54,21 @@
 //! }
 //!
 //! // sync:
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # async fn test<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType
 //! # {
-//! let mut dev = I2cDeviceSync::<_, _, OneByteRegAddrCodec>::new(i2c /* bus */, 0x24 /* i2c addr */);
+//! let mut dev = I2cDeviceSync::new(i2c /* bus */, 0x24 /* i2c addr */);
 //! let reg = dev.read_register::<DeviceId>()?;
 //! # Ok(())
 //! # }
 //!
 //! // async:
-//! # async fn test_async<I>(mut i2c: I) -> Result<(), I::Error>
+//! # async fn test_async<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c /* bus */, 0x24 /* i2c addr */);
+//! let mut dev = I2cDeviceAsync::new(i2c /* bus */, 0x24 /* i2c addr */);
 //! let reg = dev.read_register::<DeviceId>().await?;
 //! # Ok(())
 //! # }
@@ -86,7 +86,7 @@
 //! ```
 //! #![feature(generic_arg_infer)]
 //! # use defmt::{info, Format};
-//! use embedded_registers::{register, i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, ReadableRegister, WritableRegister};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, ReadableRegister, WritableRegister, RegisterError};
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
@@ -106,7 +106,7 @@
 //!     Shutdown = 1,
 //! }
 //!
-//! #[register(address = 0b001, mode = "rw")]
+//! #[register(address = 0b001, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! pub struct Config {
 //!     // padding
@@ -129,11 +129,11 @@
 //!     # reserved2: u8,
 //! }
 //!
-//! # async fn test<I>(mut i2c: I) -> Result<(), I::Error>
+//! # async fn test<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
-//! # let mut dev = I2cDeviceAsync::<_, _, OneByteRegAddrCodec>::new(i2c, 0x24);
+//! # let mut dev = I2cDeviceAsync::new(i2c, 0x24);
 //! // This now allows us to read and write the register, while only
 //! // unpacking the fields we require:
 //! let mut reg = dev.read_register::<Config>().await?;
@@ -168,10 +168,10 @@ struct RegisterArgs {
     /// The register mode (one of "r", "w", "rw")
     #[darling(default)]
     mode: String,
-    /// The default SPI codec for this register
+    /// The SPI codec for this register
     #[darling(default)]
     spi_codec: Option<Type>,
-    /// The default I2C codec for this register
+    /// The I2C codec for this register
     #[darling(default)]
     i2c_codec: Option<Type>,
 }
@@ -307,20 +307,40 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         filtered_fields.push(filtered_field);
     }
 
-    let read_all_comment = format!("Unpack all fields and return them as a [`{bitfield_ident}`]. If you don't need all fields, this is more expensive than just using the appropriate `read_*` functions directly.");
-    let write_all_comment = format!("Pack all fields in the given [`{bitfield_ident}`] representation. If you only want to write some fields, this is more expensive than just using the appropriate `write_*` functions directly.");
+    let read_all_comment = format!(
+        "Unpack all fields and return them as a [`{bitfield_ident}`]. If you don't need all fields, this is more expensive than just using the appropriate `read_*` functions directly."
+    );
+    let write_all_comment = format!(
+        "Pack all fields in the given [`{bitfield_ident}`] representation. If you only want to write some fields, this is more expensive than just using the appropriate `write_*` functions directly."
+    );
     let address = args.address;
 
     let is_read = matches!(args.mode.as_str(), "r" | "rw");
     let is_write = matches!(args.mode.as_str(), "w" | "rw");
 
-    let spi_codec = args
-        .spi_codec
-        .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::spi::codecs::NoCodec").unwrap());
+    fn add_error_to_type(ty: Type, traitname: &str) -> Type {
+        let ty_str = quote! { #ty }.to_string();
+        let wrapped_str = format!("<{ty_str} as {traitname}>::Error");
+        syn::parse_str(&wrapped_str).unwrap()
+    }
 
-    let i2c_codec = args
-        .i2c_codec
-        .unwrap_or_else(|| syn::parse_str::<syn::Type>("embedded_registers::i2c::codecs::NoCodec").unwrap());
+    let codec_error = args
+        .spi_codec
+        .as_ref()
+        .map(|ty| add_error_to_type(ty.clone(), "embedded_registers::RegisterCodec"))
+        .or(args
+            .i2c_codec
+            .as_ref()
+            .map(|ty| add_error_to_type(ty.clone(), "embedded_registers::RegisterCodec")))
+        .unwrap_or_else(|| syn::parse_str::<syn::Type>("()").unwrap());
+
+    let spi_codec = args.spi_codec.unwrap_or_else(|| {
+        syn::parse_str::<syn::Type>("embedded_registers::spi::codecs::no_codec::NoCodec::<Self::CodecError>").unwrap()
+    });
+
+    let i2c_codec = args.i2c_codec.unwrap_or_else(|| {
+        syn::parse_str::<syn::Type>("embedded_registers::i2c::codecs::no_codec::NoCodec::<Self::CodecError>").unwrap()
+    });
 
     let mut output = quote! {
         #[derive(bondrewd::Bitfields, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
@@ -404,6 +424,7 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
 
         impl embedded_registers::Register for #ident {
             type Bitfield = #bitfield_ident;
+            type CodecError = #codec_error;
             type SpiCodec = #spi_codec;
             type I2cCodec = #i2c_codec;
 

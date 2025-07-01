@@ -100,9 +100,12 @@
 //! # }
 //! ```
 
+use crate::utils::from_bus_error;
+
 use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_registers::RegisterError;
 use registers::AdcRange;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
@@ -113,14 +116,12 @@ use uom::si::f64::{ElectricCharge, ElectricCurrent, ElectricPotential, Electrica
 pub mod address;
 pub mod registers;
 
-type INA228I2cCodec = embedded_registers::i2c::codecs::OneByteRegAddrCodec;
-
 /// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// Invalid Device Id was encountered
     #[error("invalid device id {0:#04x}")]
     InvalidDeviceId(u16),
@@ -134,7 +135,7 @@ pub enum InitError<BusError> {
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(#[from] BusError),
+    Bus(BusError),
     /// The conversion ready flag was not set within the expected time frame.
     #[error("conversion timeout")]
     Timeout,
@@ -143,6 +144,9 @@ pub enum MeasurementError<BusError> {
     #[error("overflow in measurement")]
     Overflow(Measurement),
 }
+
+from_bus_error!(InitError);
+from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -199,7 +203,7 @@ pub struct INA228<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> INA228<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress, INA228I2cCodec>>
+impl<I> INA228<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -236,7 +240,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
         delay: &mut D,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
-    ) -> Result<(), InitError<I::Error>> {
+    ) -> Result<(), InitError<I::BusError>> {
         use registers::{DeviceId, ManufacturerId};
 
         // Reset the device and wait until it is ready. The datasheet specifies
@@ -260,7 +264,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
     }
 
     /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
-    pub async fn reset(&mut self) -> Result<(), I::Error> {
+    pub async fn reset(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
         self.write_register(self::registers::Configuration::default().with_reset(true))
             .await?;
 
@@ -274,7 +278,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
         &mut self,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
-    ) -> Result<(), I::Error> {
+    ) -> Result<(), RegisterError<(), I::BusError>> {
         self.shunt_resistance = shunt_resistance;
         self.max_expected_current = max_expected_current;
         let max_expected_shunt_voltage = shunt_resistance * max_expected_current;
@@ -309,19 +313,13 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
 
     /// Returns the currently stored measurement values without triggering a new measurement.
     /// A timeout error cannot occur here.
-    pub async fn read_measurement(&mut self) -> Result<Measurement, MeasurementError<I::Error>> {
+    pub async fn read_measurement(&mut self) -> Result<Measurement, MeasurementError<I::BusError>> {
         let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
-
         let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
-
         let temperature = self.read_register::<self::registers::Temperature>().await?;
-
         let current = self.read_register::<self::registers::Current>().await?;
-
         let energy = self.read_register::<self::registers::Energy>().await?;
-
         let charge = self.read_register::<self::registers::Charge>().await?;
-
         let power = self.read_register::<self::registers::Power>().await?;
 
         let measurement = Measurement {
@@ -351,7 +349,7 @@ impl<I: embedded_registers::RegisterInterface> INA228<I> {
     async(feature = "async")
 )]
 impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228<I> {
-    type Error = MeasurementError<I::Error>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the operating mode to
@@ -385,17 +383,11 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA228
 
             if diag.read_conversion_ready() {
                 let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
-
                 let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
-
                 let temperature = self.read_register::<self::registers::Temperature>().await?;
-
                 let current = self.read_register::<self::registers::Current>().await?;
-
                 let energy = self.read_register::<self::registers::Energy>().await?;
-
                 let charge = self.read_register::<self::registers::Charge>().await?;
-
                 // Reading this register clears the conversion_ready flag
                 let power = self.read_register::<self::registers::Power>().await?;
 
