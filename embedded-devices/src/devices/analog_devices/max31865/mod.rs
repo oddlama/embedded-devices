@@ -9,7 +9,8 @@
 //!
 //! ## Usage (sync)
 //!
-//! ```rust, only_if(sync)
+//! ```rust
+//! # #[cfg(feature = "sync")] mod test {
 //! # fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal::spi::SpiDevice,
@@ -28,11 +29,13 @@
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! ## Usage (async)
 //!
-//! ```rust, only_if(async)
+//! ```rust
+//! # #[cfg(feature = "async")] mod test {
 //! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::spi::SpiDevice,
@@ -50,6 +53,7 @@
 //!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 

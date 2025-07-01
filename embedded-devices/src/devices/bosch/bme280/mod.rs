@@ -34,7 +34,8 @@
 //!
 //! ## Usage (sync)
 //!
-//! ```rust, only_if(sync)
+//! ```rust
+//! # #[cfg(feature = "sync")] mod test {
 //! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
@@ -66,11 +67,13 @@
 //! println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humidity);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! ## Usage (async)
 //!
-//! ```rust, only_if(async)
+//! ```rust
+//! # #[cfg(feature = "async")] mod test {
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
@@ -101,6 +104,7 @@
 //! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
 //! println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humidity);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 

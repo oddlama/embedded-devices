@@ -13,7 +13,8 @@
 //!
 //! ## Usage (sync)
 //!
-//! ```rust, only_if(sync)
+//! ```rust
+//! # #[cfg(feature = "sync")] mod test {
 //! # fn test<I>(mut spi: I) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal::spi::SpiDevice,
@@ -33,11 +34,13 @@
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! ## Usage (async)
 //!
-//! ```rust, only_if(async)
+//! ```rust
+//! # #[cfg(feature = "async")] mod test {
 //! # async fn test<I>(mut spi: I) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::spi::SpiDevice,
@@ -56,6 +59,7 @@
 //! let voltage = value.get::<millivolt>();
 //! println!("V_in at channel 0: {:?}mV", value);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 

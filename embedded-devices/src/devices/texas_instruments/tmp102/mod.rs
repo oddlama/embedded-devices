@@ -9,7 +9,8 @@
 //!
 //! ## Usage (sync)
 //!
-//! ```rust, no_run, only_if(sync)
+//! ```rust, no_run
+//! # #[cfg(feature = "sync")] mod test {
 //! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
@@ -34,11 +35,13 @@
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! ## Usage (async)
 //!
-//! ```rust, no_run, only_if(async)
+//! ```rust, no_run
+//! # #[cfg(feature = "async")] mod test {
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
@@ -62,6 +65,7 @@
 //!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 

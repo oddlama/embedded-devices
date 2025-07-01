@@ -7,7 +7,8 @@
 //!
 //! ## Usage (sync)
 //!
-//! ```rust, only_if(sync)
+//! ```rust
+//! # #[cfg(feature = "sync")] mod test {
 //! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
@@ -36,11 +37,13 @@
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! ## Usage (async)
 //!
-//! ```rust, only_if(async)
+//! ```rust
+//! # #[cfg(feature = "async")] mod test {
 //! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bmp390::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
@@ -68,6 +71,7 @@
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! println!("Current measurement: {:?}°C, {:?} Pa", temp, pressure);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 
