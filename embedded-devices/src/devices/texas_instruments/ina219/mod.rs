@@ -18,13 +18,13 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina219::{INA219Sync, address::Address, address::Pin};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -32,7 +32,7 @@
 //! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
-//! let mut ina219 = INA219Sync::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! let mut ina219 = INA219Sync::new_i2c(delay, i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina219.init(
 //!   // Most units use a 100mΩ shunt resistor
 //!   ElectricalResistance::new::<ohm>(0.1),
@@ -41,7 +41,7 @@
 //! ).unwrap();
 //!
 //! // One-shot read all values
-//! let measurement = ina219.measure(&mut Delay).unwrap();
+//! let measurement = ina219.measure().unwrap();
 //! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
 //! let current = measurement.current.get::<milliampere>();
 //! let power = measurement.power.get::<milliwatt>();
@@ -55,13 +55,13 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina219::{INA219Async, address::Address, address::Pin};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -69,7 +69,7 @@
 //! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
-//! let mut ina219 = INA219Async::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! let mut ina219 = INA219Async::new_i2c(delay, i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina219.init(
 //!   // Most units use a 100mΩ shunt resistor
 //!   ElectricalResistance::new::<ohm>(0.1),
@@ -78,7 +78,7 @@
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
-//! let measurement = ina219.measure(&mut Delay).await.unwrap();
+//! let measurement = ina219.measure().await.unwrap();
 //! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
 //! let current = measurement.current.get::<milliampere>();
 //! let power = measurement.power.get::<milliwatt>();
@@ -101,12 +101,11 @@ use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Pow
 pub mod address;
 pub mod registers;
 
-/// All possible errors that may occur during measurement
 #[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// The conversion ready flag was not set within the expected time frame.
     #[error("conversion timeout")]
     Timeout,
@@ -145,7 +144,9 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct INA219<I: embedded_registers::RegisterInterface> {
+pub struct INA219<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+    /// The delay provider
+    delay: D,
     /// The interface to communicate with the device
     interface: I,
     /// Shunt resistance
@@ -161,9 +162,10 @@ pub struct INA219<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> INA219<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> INA219<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
@@ -171,8 +173,9 @@ where
     /// Before using this device, you should call the [`Self::init`] method which
     /// saves the calibration values to enable current and power output.
     #[inline]
-    pub fn new_i2c(interface: I, address: Address) -> Self {
+    pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
+            delay,
             interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             shunt_resistance: Default::default(),
             max_expected_current: Default::default(),
@@ -187,7 +190,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> INA219<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA219<D, I> {
     /// Soft-resets the device, calibrates it with the given shunt resistor
     /// value and maximum expected current.
     ///
@@ -263,18 +266,22 @@ impl<I: embedded_registers::RegisterInterface> INA219<I> {
 
 #[sensor(Voltage, Current, Power)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for INA219<D, I> {
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the operating mode to
     /// [`self::registers::OperatingMode::ShuntAndBusTriggered´] and enable all conversion outputs causing the
     /// device to perform a single conversion a return to sleep afterwards.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // Initiate measurement
@@ -284,7 +291,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219
         // Wait until measurement is ready, plus 1ms extra
         let measurement_time_us = reg_conf.read_bus_adc_resolution().conversion_time_us()
             + reg_conf.read_shunt_adc_resolution().conversion_time_us();
-        delay.delay_us(1000 + measurement_time_us).await;
+        self.delay.delay_us(1000 + measurement_time_us).await;
 
         // Wait for the conversion ready flag to be set
         const TRIES: u8 = 5;
@@ -311,7 +318,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA219
                 }
             }
 
-            delay.delay_us(1000).await;
+            self.delay.delay_us(1000).await;
         }
 
         Err(MeasurementError::Timeout)

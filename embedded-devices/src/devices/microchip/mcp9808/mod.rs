@@ -20,21 +20,21 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Sync, address::Address, registers::AmbientTemperature};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut mcp9808 = MCP9808Sync::new_i2c(i2c, Address::Default);
+//! let mut mcp9808 = MCP9808Sync::new_i2c(delay, i2c, Address::Default);
 //! mcp9808.init().unwrap();
 //!
 //! // Read the current temperature in °C
-//! let temp = mcp9808.measure(&mut Delay)?
+//! let temp = mcp9808.measure()?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
@@ -46,21 +46,21 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::microchip::mcp9808::{MCP9808Async, address::Address, registers::AmbientTemperature};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut mcp9808 = MCP9808Async::new_i2c(i2c, Address::Default);
+//! let mut mcp9808 = MCP9808Async::new_i2c(delay, i2c, Address::Default);
 //! mcp9808.init().await.unwrap();
 //!
 //! // Read the current temperature in °C
-//! let temp = mcp9808.measure(&mut Delay).await?
+//! let temp = mcp9808.measure().await?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
@@ -78,12 +78,11 @@ use crate::utils::from_bus_error;
 pub mod address;
 pub mod registers;
 
-/// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// Invalid Device Id was encountered
     #[error("invalid device id")]
     InvalidDeviceId,
@@ -112,7 +111,9 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct MCP9808<I: embedded_registers::RegisterInterface> {
+pub struct MCP9808<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+    /// The delay provider
+    delay: D,
     /// The interface to communicate with the device
     interface: I,
 }
@@ -122,9 +123,10 @@ pub struct MCP9808<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MCP9808<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> MCP9808<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
@@ -132,8 +134,9 @@ where
     /// Before using this device, you should call the [`Self::init`] method which
     /// initializes the device and ensures that it is working correctly.
     #[inline]
-    pub fn new_i2c(interface: I, address: self::address::Address) -> Self {
+    pub fn new_i2c(delay: D, interface: I, address: self::address::Address) -> Self {
         Self {
+            delay,
             interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
         }
     }
@@ -145,7 +148,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MCP9808<D, I> {
     /// Initializes the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
@@ -168,17 +171,21 @@ impl<I: embedded_registers::RegisterInterface> MCP9808<I> {
 
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MCP9808<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for MCP9808<D, I> {
     type Error = RegisterError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will power up the sensor, wait until a conversion is
     /// ready and return to sleep afterwards.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         use self::registers::{AmbientTemperature, Configuration, ShutdownMode};
 
         // Enable conversions
@@ -189,7 +196,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MCP980
         // Wait until conversion is ready
         let resolution = self.read_register::<Resolution>().await?;
         let conversion_time = 1000 + resolution.read_temperature_resolution().conversion_time_us();
-        delay.delay_us(conversion_time).await;
+        self.delay.delay_us(conversion_time).await;
 
         // Go to sleep
         reg_conf.write_shutdown_mode(ShutdownMode::Shutdown);

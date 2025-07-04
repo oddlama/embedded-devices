@@ -59,6 +59,11 @@ texas_instruments-tmp117 = []
 
 # Sensirion
 sensirion-scd4x = []
+sensirion-sen60 = []
+sensirion-sen63c = []
+sensirion-sen65 = []
+sensirion-sen66 = []
+sensirion-sen68 = []
 
 [package.metadata.docs.rs]
 all-features = true

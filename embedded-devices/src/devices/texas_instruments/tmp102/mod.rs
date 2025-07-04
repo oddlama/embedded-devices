@@ -11,17 +11,17 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Sync, address::Address, registers::Temperature};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
-//! let mut tmp102 = TMP102Sync::new_i2c(i2c, Address::Gnd);
+//! let mut tmp102 = TMP102Sync::new_i2c(delay, i2c, Address::Gnd);
 //!
 //! // Read the latest temperature conversion in °C
 //! let temp = tmp102
@@ -30,7 +30,7 @@
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay)?
+//! let temp = tmp102.measure()?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
@@ -42,17 +42,17 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::tmp102::{TMP102Async, address::Address, registers::Temperature};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device. Default conversion mode is continuous.
-//! let mut tmp102 = TMP102Async::new_i2c(i2c, Address::Gnd);
+//! let mut tmp102 = TMP102Async::new_i2c(delay, i2c, Address::Gnd);
 //!
 //! // Read the latest temperature conversion in °C
 //! let temp = tmp102
@@ -61,7 +61,7 @@
 //! println!("Current temperature: {:?}°C", temp);
 //!
 //! // Perform a one-shot measurement now and return to sleep afterwards.
-//! let temp = tmp102.measure(&mut Delay).await?
+//! let temp = tmp102.measure().await?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Oneshot temperature: {:?}°C", temp);
 //! # Ok(())
@@ -96,7 +96,9 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct TMP102<I: embedded_registers::RegisterInterface> {
+pub struct TMP102<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+    /// The delay provider
+    delay: D,
     /// The interface to communicate with the device
     interface: I,
 }
@@ -106,15 +108,17 @@ pub struct TMP102<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> TMP102<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> TMP102<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
     #[inline]
-    pub fn new_i2c(interface: I, address: self::address::Address) -> Self {
+    pub fn new_i2c(delay: D, interface: I, address: self::address::Address) -> Self {
         Self {
+            delay,
             interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
         }
     }
@@ -126,7 +130,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> TMP102<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D, I> {
     /// Read the last temperature measured
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, RegisterError<(), I::BusError>> {
         use self::registers::{Configuration, Temperature};
@@ -159,11 +163,15 @@ impl<I: embedded_registers::RegisterInterface> TMP102<I> {
 
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP102<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for TMP102<D, I> {
     type Error = RegisterError<(), I::BusError>;
     type Measurement = Measurement;
 
@@ -172,7 +180,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP102
     ///
     /// This function will initialize the measurement, wait until the data is acquired and return
     /// the temperature.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         use self::registers::{Configuration, Temperature};
 
         // Read current configuration to determine conversion ratio and delay
@@ -184,7 +192,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for TMP102
 
         // Wait for the duration of the conversion
         let active_conversion_time = reg_conf.read_conversion_cycle_time().conversion_time_ms() + 10;
-        delay.delay_ms(active_conversion_time).await;
+        self.delay.delay_ms(active_conversion_time).await;
 
         let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
         if reg_conf.read_extended() {

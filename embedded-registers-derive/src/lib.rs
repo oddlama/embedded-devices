@@ -464,12 +464,30 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
             }
         }
 
+        impl From<#ident> for #bitfield_ident {
+            #[inline]
+            fn from(val: #ident) -> Self {
+                use bondrewd::Bitfields;
+                #bitfield_ident::from_bytes(val.data)
+            }
+        }
+
         impl From<&#bitfield_ident> for #ident {
             #[inline]
             fn from(value: &#bitfield_ident) -> Self {
                 use bondrewd::Bitfields;
                 Self {
                     data: value.clone().into_bytes(),
+                }
+            }
+        }
+
+        impl From<#bitfield_ident> for #ident {
+            #[inline]
+            fn from(value: #bitfield_ident) -> Self {
+                use bondrewd::Bitfields;
+                Self {
+                    data: value.into_bytes(),
                 }
             }
         }

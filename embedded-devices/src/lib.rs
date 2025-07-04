@@ -4,8 +4,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(generic_arg_infer)]
 
+pub mod device;
 pub mod devices;
-pub mod sensors;
+pub mod sensor;
 pub mod utils;
 
 pub use uom;

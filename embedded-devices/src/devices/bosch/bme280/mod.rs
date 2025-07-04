@@ -36,21 +36,21 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::bosch::bme280::{BME280Sync, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::pressure::pascal;
 //! use uom::si::ratio::percent;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut bme280 = BME280Sync::new_i2c(i2c, Address::Primary);
-//! bme280.init(&mut Delay)?;
+//! let mut bme280 = BME280Sync::new_i2c(delay, i2c, Address::Primary);
+//! bme280.init()?;
 //! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
@@ -60,7 +60,7 @@
 //! })?;
 //!
 //! // Read measurement
-//! let measurement = bme280.measure(&mut Delay).unwrap();
+//! let measurement = bme280.measure().unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
@@ -74,21 +74,21 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::bosch::bme280::InitError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::bosch::bme280::{BME280Async, Configuration, address::Address};
 //! use embedded_devices::devices::bosch::bme280::registers::{IIRFilter, Oversampling};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::pressure::pascal;
 //! use uom::si::ratio::percent;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
-//! bme280.init(&mut Delay).await?;
+//! let mut bme280 = BME280Async::new_i2c(delay, i2c, Address::Primary);
+//! bme280.init().await?;
 //! // Enable sensors
 //! bme280.configure(Configuration {
 //!     temperature_oversampling: Oversampling::X_16,
@@ -98,7 +98,7 @@
 //! }).await?;
 //!
 //! // Read measurement
-//! let measurement = bme280.measure(&mut Delay).await.unwrap();
+//! let measurement = bme280.measure().await.unwrap();
 //! let temp = measurement.temperature.get::<degree_celsius>();
 //! let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
 //! let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
@@ -130,7 +130,7 @@ use self::registers::{
 pub enum InitError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
@@ -143,7 +143,7 @@ pub enum InitError<BusError> {
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     #[error("not yet calibrated")]
     NotCalibrated,
@@ -179,7 +179,9 @@ pub(super) struct TFine(i32);
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct BME280Common<I: embedded_registers::RegisterInterface, const IS_BME: bool> {
+pub struct BME280Common<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool> {
+    /// The delay provider
+    pub(super) delay: D,
     /// The interface to communicate with the device
     interface: I,
     /// Calibration data
@@ -192,7 +194,7 @@ pub struct BME280Common<I: embedded_registers::RegisterInterface, const IS_BME: 
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
 #[cfg(feature = "sync")]
-pub type BME280Sync<I> = BME280CommonSync<I, true>;
+pub type BME280Sync<D, I> = BME280CommonSync<D, I, true>;
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 /// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
@@ -200,7 +202,7 @@ pub type BME280Sync<I> = BME280CommonSync<I, true>;
 /// consumption allow the implementation in battery driven devices such as handsets, GPS modules or
 /// watches.
 #[cfg(feature = "async")]
-pub type BME280Async<I> = BME280CommonAsync<I, true>;
+pub type BME280Async<D, I> = BME280CommonAsync<D, I, true>;
 
 /// Common configuration values for the BME280 sensor.
 #[derive(Debug, Clone)]
@@ -357,9 +359,10 @@ impl CalibrationData {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I, const IS_BME: bool> BME280Common<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>, IS_BME>
+impl<D, I, const IS_BME: bool> BME280Common<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>, IS_BME>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
@@ -367,8 +370,9 @@ where
     /// Before using this device, you must call the [`Self::init`] method which
     /// initializes the device and ensures that it is working correctly.
     #[inline]
-    pub fn new_i2c(interface: I, address: Address) -> Self {
+    pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
+            delay,
             interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             calibration_data: None,
         }
@@ -380,9 +384,10 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I, const IS_BME: bool> BME280Common<embedded_registers::spi::SpiDevice<I>, IS_BME>
+impl<D, I, const IS_BME: bool> BME280Common<D, embedded_registers::spi::SpiDevice<I>, IS_BME>
 where
     I: hal::spi::r#SpiDevice,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -390,8 +395,9 @@ where
     /// Before using this device, you must call the [`Self::init`] method which
     /// initializes the device and ensures that it is working correctly.
     #[inline]
-    pub fn new_spi(interface: I) -> Self {
+    pub fn new_spi(delay: D, interface: I) -> Self {
         Self {
+            delay,
             interface: embedded_registers::spi::SpiDevice::new(interface),
             calibration_data: None,
         }
@@ -404,16 +410,16 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<I, IS_BME> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<D, I, IS_BME> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     ///
     /// Beware that by default all internal sensors are disabled. Please
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
-    pub async fn init<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
+    pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
         // Soft-reset device
-        self.reset(delay).await?;
+        self.reset().await?;
 
         // Verify chip id
         let chip = self.read_register::<Id>().await?.read_chip();
@@ -442,10 +448,10 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
+    pub async fn reset(&mut self) -> Result<(), InitError<I::BusError>> {
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
-            match self.try_reset(delay).await {
+            match self.try_reset().await {
                 Ok(()) => return Ok(()),
                 Err(InitError::NvmCopyInProgress) => continue,
                 Err(e) => return Err(e),
@@ -459,9 +465,9 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     /// of 2ms, which is automatically awaited before allowing further communication.
     ///
     /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<(), InitError<I::BusError>> {
+    pub async fn try_reset(&mut self) -> Result<(), InitError<I::BusError>> {
         self.write_register(self::registers::Reset::default()).await?;
-        delay.delay_ms(2).await;
+        self.delay.delay_ms(2).await;
 
         if self.read_register::<self::registers::Status>().await?.read_update() {
             return Err(InitError::NvmCopyInProgress);
@@ -477,7 +483,7 @@ impl<I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Common<D, I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. Check
     /// sensor mode beforehand and call [`Self::reset`] if necessary. To configure advanced
     /// settings, please directly update the respective registers.
@@ -503,11 +509,17 @@ impl<I: embedded_registers::RegisterInterface> BME280Common<I, true> {
 
 #[sensor(Temperature, Pressure, RelativeHumidity)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280Common<I, true> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor
+    for BME280Common<D, I, true>
+{
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
@@ -520,7 +532,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
     /// Specific measurements will only be included if they were enabled beforehand by calling
     /// [`Self::calibrate`]. Pressure and humidity measurement specifically require
     /// temperature measurements to be enabled.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Forced))
             .await?;
@@ -541,7 +553,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for BME280
             max_measurement_delay_us += 575 + 2300 * o_h.factor();
         }
 
-        delay.delay_us(max_measurement_delay_us).await;
+        self.delay.delay_us(max_measurement_delay_us).await;
 
         let raw_data = self.read_register::<BurstMeasurementsPTH>().await?.read_all();
         let Some(ref cal) = self.calibration_data else {

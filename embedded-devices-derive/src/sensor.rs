@@ -53,7 +53,7 @@ pub(crate) fn sensor(args: TokenStream, orig_input: TokenStream) -> syn::Result<
         // Generate the new impl block
         let new_impl = quote! {
             #(#copyable_attrs)*
-            impl #impl_generics crate::sensors::#sensor_trait_name for #self_ty #where_clause {}
+            impl #impl_generics crate::sensor::#sensor_trait_name for #self_ty #where_clause {}
         };
 
         result.extend(new_impl);

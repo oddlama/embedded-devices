@@ -15,13 +15,13 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Sync, address::Address, address::Pin};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -29,9 +29,8 @@
 //! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
-//! let mut ina226 = INA226Sync::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! let mut ina226 = INA226Sync::new_i2c(delay, i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina226.init(
-//!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
 //!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
@@ -39,7 +38,7 @@
 //! ).unwrap();
 //!
 //! // One-shot read all values
-//! let measurement = ina226.measure(&mut Delay).unwrap();
+//! let measurement = ina226.measure().unwrap();
 //! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
 //! let current = measurement.current.get::<milliampere>();
 //! let power = measurement.power.get::<milliwatt>();
@@ -53,13 +52,13 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, mut Delay: D) -> Result<(), I::Error>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::texas_instruments::ina226::{INA226Async, address::Address, address::Pin};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::electric_current::{ampere, milliampere};
 //! use uom::si::electric_potential::millivolt;
 //! use uom::si::electrical_resistance::ohm;
@@ -67,9 +66,8 @@
 //! use uom::si::f64::{ElectricCurrent, ElectricalResistance};
 //!
 //! // Create and initialize the device
-//! let mut ina226 = INA226Async::new_i2c(i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
+//! let mut ina226 = INA226Async::new_i2c(delay, i2c, Address::A0A1(Pin::Gnd, Pin::Gnd));
 //! ina226.init(
-//!    &mut Delay,
 //!   // Most units use a 100mΩ shunt resistor
 //!   ElectricalResistance::new::<ohm>(0.1),
 //!   // Maximum expected current 3A
@@ -77,7 +75,7 @@
 //! ).await.unwrap();
 //!
 //! // One-shot read all values
-//! let measurement = ina226.measure(&mut Delay).await.unwrap();
+//! let measurement = ina226.measure().await.unwrap();
 //! let bus_voltage = measurement.bus_voltage.get::<millivolt>();
 //! let current = measurement.current.get::<milliampere>();
 //! let power = measurement.power.get::<milliwatt>();
@@ -100,7 +98,6 @@ use uom::si::f64::{ElectricCurrent, ElectricPotential, ElectricalResistance, Pow
 pub mod address;
 pub mod registers;
 
-/// All possible errors that may occur in device initialization
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
@@ -114,12 +111,11 @@ pub enum InitError<BusError> {
     InvalidManufacturerId(u16),
 }
 
-/// All possible errors that may occur during measurement
 #[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// The conversion ready flag was not set within the expected time frame.
     #[error("conversion timeout")]
     Timeout,
@@ -160,7 +156,9 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct INA226<I: embedded_registers::RegisterInterface> {
+pub struct INA226<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+    /// The delay provider
+    delay: D,
     /// The interface to communicate with the device
     interface: I,
     /// Shunt resistance
@@ -176,9 +174,10 @@ pub struct INA226<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> INA226<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> INA226<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device with the given address on the specified bus.
     /// This consumes the I2C bus `I`.
@@ -186,8 +185,9 @@ where
     /// Before using this device, you should call the [`Self::init`] method which
     /// saves the calibration values to enable current and power output.
     #[inline]
-    pub fn new_i2c(interface: I, address: Address) -> Self {
+    pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
+            delay,
             interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
             shunt_resistance: Default::default(),
             max_expected_current: Default::default(),
@@ -202,14 +202,14 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> INA226<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA226<D, I> {
     /// Soft-resets the device, calibrates it with the given shunt resistor
     /// value and maximum expected current.
     ///
     /// You can change the values later using [`Self::calibrate`].
-    pub async fn init<D: hal::delay::DelayNs>(
+    pub async fn init(
         &mut self,
-        delay: &mut D,
+
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
     ) -> Result<(), InitError<I::BusError>> {
@@ -218,7 +218,7 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
         // Reset the device and wait for 0.5ms. The datasheet does not define
         // a specific startup time so we use a similar value as the INA228.
         self.reset().await?;
-        delay.delay_us(500).await;
+        self.delay.delay_us(500).await;
 
         // Verify we are talking to the correct device
         let manufacturer_id = self.read_register::<ManufacturerId>().await?.read_id();
@@ -297,18 +297,22 @@ impl<I: embedded_registers::RegisterInterface> INA226<I> {
 
 #[sensor(Voltage, Current, Power)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA226<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for INA226<D, I> {
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the operating mode to
     /// [`self::registers::OperatingMode::ShuntAndBusTriggered´] and enable all conversion outputs causing the
     /// device to perform a single conversion a return to sleep afterwards.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // Initiate measurement
@@ -318,7 +322,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA226
         // Wait until measurement is ready, plus 10% and 1ms extra
         let mut measurement_time_us = reg_conf.total_conversion_time_us();
         measurement_time_us += measurement_time_us / 10; // 10% extra (data sheet conversion times state ~10% higher maximum times)
-        delay.delay_us(1000 + measurement_time_us).await;
+        self.delay.delay_us(1000 + measurement_time_us).await;
 
         // Wait for the conversion ready flag to be set
         const TRIES: u8 = 5;
@@ -326,7 +330,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for INA226
             let flags = self.read_register::<self::registers::MaskEnable>().await?;
 
             if !flags.read_conversion_ready_flag() {
-                delay.delay_us(1000).await;
+                self.delay.delay_us(1000).await;
                 continue;
             }
 

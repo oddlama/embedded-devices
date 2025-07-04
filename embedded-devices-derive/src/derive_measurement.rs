@@ -10,7 +10,7 @@ pub fn generate(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let measurement_impls = extract_measurement_impls(name, fields)?;
 
     Ok(quote! {
-        impl crate::sensors::Measurement for #name {}
+        impl crate::sensor::Measurement for #name {}
 
         #(#measurement_impls)*
     })
@@ -69,7 +69,7 @@ fn extract_measurement_impl(struct_name: &syn::Ident, field: &Field) -> Result<O
     };
 
     Ok(Some(quote! {
-        impl crate::sensors::#trait_ident for #struct_name {
+        impl crate::sensor::#trait_ident for #struct_name {
             fn #method_ident(&self) -> Option<#return_type> {
                 #return_expr
             }

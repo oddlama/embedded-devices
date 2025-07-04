@@ -62,11 +62,11 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Sensirion | SCD40 | I2C | Photoacoustic NDIR CO₂ sensor (400-2000ppm) ±50ppm ±5.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
 | Sensirion | SCD41 | I2C | Improved photoacoustic NDIR CO₂ sensor (400-5000ppm) ±50ppm ±2.5%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
 | Sensirion | SCD43 | I2C | High accureacy photoacoustic NDIR CO₂ sensor (400-5000ppm) ±30ppm ±3.0%m.v. | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/scd4x/index.html) |
-| Sensirion | SEN60 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10) sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
-| Sensirion | SEN63C | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
-| Sensirion | SEN65 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
-| Sensirion | SEN66 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
-| Sensirion | SEN68 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, HCHO, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen6x/index.html) |
+| Sensirion | SEN60 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10) sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen60/index.html) |
+| Sensirion | SEN63C | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen63c/index.html) |
+| Sensirion | SEN65 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen65/index.html) |
+| Sensirion | SEN66 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen66/index.html) |
+| Sensirion | SEN68 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, HCHO, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen68/index.html) |
 
 ## Example usage
 
@@ -77,10 +77,10 @@ analogous, just without calling `.await`:
 
 ```rust
 // Create a device on the given interface and address
-let mut bme280 = BME280Async::new_i2c(i2c, Address::Primary);
+let mut bme280 = BME280Async::new_i2c(delay, i2c, Address::Primary);
 
 // Initializes (resets) the device and makes sure we can communicate
-bme280.init(&mut Delay).await?;
+bme280.init().await?;
 
 // Configure certain device parameters
 bme280.configure(Configuration {
@@ -91,7 +91,7 @@ bme280.configure(Configuration {
 }).await?;
 
 // Measure now
-let measurement = bme280.measure(&mut Delay).await?;
+let measurement = bme280.measure().await?;
 
 // Retrieve the returned temperature as °C, pressure in Pa and humidity in %RH
 let temp = measurement.temperature.get::<degree_celsius>();
@@ -161,7 +161,7 @@ We can define the corresponding register like so:
 ```rust
 /// Insert explanation of this register from the datasheet.
 #[device_register(MyDevice)]
-#[register(address = 0x42, mode = "rw", i2c_codec = OneByteRegAddrCodec)]
+#[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct ValueRegister {
     /// Insert explanation of this value from the datasheet.
@@ -240,7 +240,7 @@ pub enum TemperatureResolution {
 }
 
 #[device_register(MyDevice)]
-#[register(address = 0x44, mode = "rw", i2c_codec = OneByteRegAddrCodec)]
+#[register(address = 0x44, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
 pub struct ComplexRegister {
     #[bondrewd(bit_length = 6, reserve)]

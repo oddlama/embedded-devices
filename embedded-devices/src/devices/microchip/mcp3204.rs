@@ -23,11 +23,8 @@
 //! use uom::si::electric_potential::{volt, millivolt};
 //! use uom::si::f64::ElectricPotential;
 //!
-//! let mut mcp3204 = MCP3204Sync::new_spi(
-//!     spi,
-//!     // 2.5V reference
-//!     ElectricPotential::new::<volt>(2.5),
-//! );
+//! // 2.5V reference
+//! let mut mcp3204 = MCP3204Sync::new_spi(spi, ElectricPotential::new::<volt>(2.5));
 //!
 //! let value = mcp3204.convert(InputChannel::Single0)?;
 //! let voltage = value.get::<millivolt>();
@@ -49,11 +46,8 @@
 //! use uom::si::electric_potential::{volt, millivolt};
 //! use uom::si::f64::ElectricPotential;
 //!
-//! let mut mcp3204 = MCP3204Async::new_spi(
-//!     spi,
-//!     // 2.5V reference
-//!     ElectricPotential::new::<volt>(2.5),
-//! );
+//! // 2.5V reference
+//! let mut mcp3204 = MCP3204Async::new_spi(spi, ElectricPotential::new::<volt>(2.5));
 //!
 //! let value = mcp3204.convert(InputChannel::Single0).await?;
 //! let voltage = value.get::<millivolt>();

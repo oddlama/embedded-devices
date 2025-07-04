@@ -11,20 +11,20 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
+//! # fn test<I, D>(mut spi: I, delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal::spi::SpiDevice,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Sync, registers::{FilterMode, Resistance, WiringMode}};
-//! use embedded_devices::sensors::SensorSync;
+//! use embedded_devices::sensor::OneshotSensorSync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut max31865 = MAX31865Sync::new_spi(spi, 4.3);
-//! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
+//! let mut max31865 = MAX31865Sync::new_spi(delay, spi, 4.3);
+//! max31865.init(WiringMode::ThreeWire, FilterMode::F_50Hz).unwrap();
 //!
-//! let temp = max31865.measure(&mut Delay)?
+//! let temp = max31865.measure()?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
@@ -36,20 +36,20 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut spi: I, mut Delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
+//! # async fn test<I, D>(mut spi: I, delay: D) -> Result<(), embedded_devices::devices::analog_devices::max31865::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::spi::SpiDevice,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::analog_devices::max31865::{MAX31865Async, registers::{FilterMode, Resistance, WiringMode}};
-//! use embedded_devices::sensors::SensorAsync;
+//! use embedded_devices::sensor::OneshotSensorAsync;
 //! use uom::si::thermodynamic_temperature::degree_celsius;
 //!
 //! // Create and initialize the device
-//! let mut max31865 = MAX31865Async::new_spi(spi, 4.3);
-//! max31865.init(&mut Delay, WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
+//! let mut max31865 = MAX31865Async::new_spi(delay, spi, 4.3);
+//! max31865.init(WiringMode::ThreeWire, FilterMode::F_50Hz).await.unwrap();
 //!
-//! let temp = max31865.measure(&mut Delay).await?
+//! let temp = max31865.measure().await?
 //!     .temperature.get::<degree_celsius>();
 //! println!("Current temperature: {:?}°C", temp);
 //! # Ok(())
@@ -71,12 +71,11 @@ use crate::utils::from_bus_error;
 
 pub mod registers;
 
-/// All possible errors that may occur in fault detection
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum FaultDetectionError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// Timeout (the detection never finished in the allocated time frame)
     #[error("fault detection timeout")]
     Timeout,
@@ -85,12 +84,11 @@ pub enum FaultDetectionError<BusError> {
     FaultDetected,
 }
 
-/// All possible errors that may occur in temperature reads
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Bus error
     #[error("bus error")]
-    Bus(BusError),
+    Bus(#[from] BusError),
     /// A fault was detected. Read the FaultStatus register for details.
     #[error("fault detected")]
     FaultDetected,
@@ -117,7 +115,9 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct MAX31865<I: embedded_registers::RegisterInterface> {
+pub struct MAX31865<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+    /// The delay provider
+    delay: D,
     /// The interface to communicate with the device
     interface: I,
     /// The reference resistor value over to the nominal resistance of
@@ -132,9 +132,10 @@ pub struct MAX31865<I: embedded_registers::RegisterInterface> {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MAX31865<embedded_registers::spi::SpiDevice<I>>
+impl<D, I> MAX31865<D, embedded_registers::spi::SpiDevice<I>>
 where
     I: hal::spi::r#SpiDevice,
+    D: hal::delay::DelayNs,
 {
     /// Initializes a new device from the specified SPI device.
     /// This consumes the SPI device `I`.
@@ -146,8 +147,9 @@ where
     /// In many designs a resistor with a value of 4.3 times the nominal resistance is used,
     /// but your design may vary.
     #[inline]
-    pub fn new_spi(interface: I, reference_resistor_ratio: f64) -> Self {
+    pub fn new_spi(delay: D, interface: I, reference_resistor_ratio: f64) -> Self {
         Self {
+            delay,
             interface: embedded_registers::spi::SpiDevice::new(interface),
             reference_resistor_ratio,
         }
@@ -160,12 +162,13 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<D, I> {
     /// Initializes the device by configuring important settings and
     /// running an initial fault detection cycle.
-    pub async fn init<D: hal::delay::DelayNs>(
+    // TODO call this configure, make init verify device communication and reset
+    pub async fn init(
         &mut self,
-        delay: &mut D,
+
         wiring_mode: WiringMode,
         filter_mode: FilterMode,
     ) -> Result<(), FaultDetectionError<I::BusError>> {
@@ -183,14 +186,11 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         self.write_register(self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
             .await?;
 
-        self.detect_faults(delay).await
+        self.detect_faults().await
     }
 
     /// Runs the automatic fault detection.
-    pub async fn detect_faults<D: hal::delay::DelayNs>(
-        &mut self,
-        delay: &mut D,
-    ) -> Result<(), FaultDetectionError<I::BusError>> {
+    pub async fn detect_faults(&mut self) -> Result<(), FaultDetectionError<I::BusError>> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // The automatic fault detection waits 100µs before checking for faults,
@@ -208,7 +208,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
         // According to the flow diagram in the datasheet, automatic calibration waits
         // a total of 510µs. We will wait for a bit longer initially and then check
         // the status in the configuration register up to 5 times with some additional delay.
-        delay.delay_us(550).await;
+        self.delay.delay_us(550).await;
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             let cycle = self
@@ -232,7 +232,7 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
                 }
             }
 
-            delay.delay_us(100).await;
+            self.delay.delay_us(100).await;
         }
 
         // Disable VBIAS
@@ -286,25 +286,29 @@ impl<I: embedded_registers::RegisterInterface> MAX31865<I> {
 
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface, Sensor),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        OneshotSensor
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX31865<I> {
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for MAX31865<D, I> {
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will enable bias voltage, transition the device into
     /// oneshot mode, which will cause it to take a measurement and return to sleep mode
     /// afterwards.
-    async fn measure<D: hal::delay::DelayNs>(&mut self, delay: &mut D) -> Result<Self::Measurement, Self::Error> {
+    async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
 
         // Enable VBIAS before initiating one-shot measurement,
         // 10.5 RC time constants are recommended plus 1ms extra.
         // So we just wait 2ms which should be plenty of time.
         self.write_register(reg_conf.with_enable_bias_voltage(true)).await?;
-        delay.delay_us(2000).await;
+        self.delay.delay_us(2000).await;
 
         // Initiate measurement
         self.write_register(reg_conf.with_enable_bias_voltage(true).with_oneshot(true))
@@ -315,7 +319,7 @@ impl<I: embedded_registers::RegisterInterface> crate::sensors::Sensor for MAX318
             FilterMode::F_60Hz => 52000,
             FilterMode::F_50Hz => 62500,
         };
-        delay.delay_us(2000 + measurement_time_us).await;
+        self.delay.delay_us(2000 + measurement_time_us).await;
 
         // Revert config (disable VBIAS)
         self.write_register(reg_conf).await?;

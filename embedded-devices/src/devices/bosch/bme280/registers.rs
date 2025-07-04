@@ -231,6 +231,7 @@ pub enum StandbyTime {
     T_10 = 0b110,
     /// 20ms (BME280 only)
     T_20 = 0b111,
+    //TODO split this up into a bmx280 crate for common stuff.
     //TODO /// 2000ms (BMP280 only)
     //TODO T_2000 = 0b110,
     //TODO /// 4000ms (BMP280 only)
