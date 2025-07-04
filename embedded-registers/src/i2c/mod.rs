@@ -12,7 +12,7 @@ use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRe
     async(feature = "async")
 )]
 #[allow(async_fn_in_trait)]
-pub trait Codec: 'static + RegisterCodec {
+pub trait Codec: RegisterCodec {
     /// Read this register from the given I2C interface/device.
     async fn read_register<R, I, A>(
         bound_bus: &mut I2cBoundBus<I, A>,

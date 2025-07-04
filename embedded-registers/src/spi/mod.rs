@@ -12,7 +12,7 @@ use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRe
     async(feature = "async")
 )]
 #[allow(async_fn_in_trait)]
-pub trait Codec: 'static + RegisterCodec {
+pub trait Codec: RegisterCodec {
     /// Read this register from the given SPI interface/device.
     async fn read_register<R, I>(interface: &mut I) -> Result<R, RegisterError<Self::Error, I::Error>>
     where

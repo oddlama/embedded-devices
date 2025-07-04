@@ -1,4 +1,4 @@
-pub mod crc_codec;
+pub mod crc8_codec;
 pub mod no_codec;
 pub mod simple_codec;
 

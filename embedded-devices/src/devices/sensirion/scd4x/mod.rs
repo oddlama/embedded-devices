@@ -74,7 +74,7 @@
 // This is currently not supported as it consists of a write followed by a read 400 ms later
 // The codec does not allow this as is.
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::i2c::codecs::crc_codec::CrcError;
+use embedded_registers::i2c::codecs::crc8_codec::CrcError;
 use embedded_registers::RegisterError;
 use registers::{
     AmbientPressure, GetDataReadyStatus, GetSensorVariant, GetSerialNumber, MeasureSingleShot, PowerDown,
