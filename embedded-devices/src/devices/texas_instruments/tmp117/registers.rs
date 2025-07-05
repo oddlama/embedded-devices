@@ -56,13 +56,13 @@ pub enum ConversionMode {
 #[allow(non_camel_case_types)]
 pub enum ConversionCycleTime {
     /// 15.5ms
-    T_0015_5 = 0b000,
+    T_15_5 = 0b000,
     /// 125ms
-    T_0125 = 0b001,
+    T_125 = 0b001,
     /// 250ms
-    T_0250 = 0b010,
+    T_250 = 0b010,
     /// 500ms
-    T_0500 = 0b011,
+    T_500 = 0b011,
     /// 1s (power-up default)
     T_1000 = 0b100,
     /// 4s
@@ -71,6 +71,22 @@ pub enum ConversionCycleTime {
     T_8000 = 0b110,
     /// 16s
     T_16000 = 0b111,
+}
+
+impl ConversionCycleTime {
+    /// Conversion cycle time in microseconds.
+    pub fn interval_us(&self) -> u32 {
+        match self {
+            ConversionCycleTime::T_15_5 => 15_500,
+            ConversionCycleTime::T_125 => 125_000,
+            ConversionCycleTime::T_250 => 250_000,
+            ConversionCycleTime::T_500 => 500_000,
+            ConversionCycleTime::T_1000 => 1_000_000,
+            ConversionCycleTime::T_4000 => 4_000_000,
+            ConversionCycleTime::T_8000 => 8_000_000,
+            ConversionCycleTime::T_16000 => 16_000_000,
+        }
+    }
 }
 
 /// Conversion averaging modes.

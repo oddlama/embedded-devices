@@ -57,12 +57,11 @@
 //! # }
 //! ```
 
-use self::registers::FilterMode;
-use self::registers::WiringMode;
-
 use embedded_devices_derive::sensor;
 use embedded_devices_derive::{device, device_impl};
-use registers::FaultDetectionCycle;
+use registers::{
+    Configuration, ConversionMode, FaultDetectionCycle, FaultThresholdHigh, FaultThresholdLow, FilterMode, WiringMode,
+};
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
@@ -174,16 +173,15 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
     ) -> Result<(), FaultDetectionError<I::BusError>> {
         // Configure the wiring mode and filter mode
         self.write_register(
-            self::registers::Configuration::default()
+            Configuration::default()
                 .with_wiring_mode(wiring_mode)
                 .with_filter_mode(filter_mode),
         )
         .await?;
 
-        self.write_register(self::registers::FaultThresholdLow::default().with_resistance_ratio(0))
+        self.write_register(FaultThresholdLow::default().with_resistance_ratio(0))
             .await?;
-
-        self.write_register(self::registers::FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
+        self.write_register(FaultThresholdHigh::default().with_resistance_ratio(0x7fff))
             .await?;
 
         self.detect_faults().await
@@ -191,7 +189,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
 
     /// Runs the automatic fault detection.
     pub async fn detect_faults(&mut self) -> Result<(), FaultDetectionError<I::BusError>> {
-        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
+        let reg_conf = self.read_register::<Configuration>().await?;
 
         // The automatic fault detection waits 100µs before checking for faults,
         // which should be plenty of time to charge the RC filter.
@@ -199,9 +197,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
         self.write_register(
             reg_conf
                 .with_enable_bias_voltage(true)
-                .with_conversion_mode(self::registers::ConversionMode::NormallyOff)
+                .with_conversion_mode(ConversionMode::NormallyOff)
                 .with_clear_fault_status(false)
-                .with_fault_detection_cycle(self::registers::FaultDetectionCycle::Automatic),
+                .with_fault_detection_cycle(FaultDetectionCycle::Automatic),
         )
         .await?;
 
@@ -212,7 +210,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             let cycle = self
-                .read_register::<self::registers::Configuration>()
+                .read_register::<Configuration>()
                 .await?
                 .read_fault_detection_cycle();
 
@@ -222,7 +220,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
                 self.write_register(reg_conf.with_enable_bias_voltage(false)).await?;
 
                 let has_fault = self.read_register::<registers::Resistance>().await?.read_fault();
-
                 if has_fault {
                     // Fault detected
                     return Err(FaultDetectionError::FaultDetected);
@@ -301,7 +298,12 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     /// oneshot mode, which will cause it to take a measurement and return to sleep mode
     /// afterwards.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
-        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
+        let reg_conf = self
+            .read_register::<Configuration>()
+            .await?
+            .with_enable_bias_voltage(false)
+            .with_conversion_mode(ConversionMode::NormallyOff)
+            .with_oneshot(false);
 
         // Enable VBIAS before initiating one-shot measurement,
         // 10.5 RC time constants are recommended plus 1ms extra.
@@ -327,5 +329,84 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         Ok(Measurement {
             temperature: self.read_temperature().await?,
         })
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for MAX31865<D, I>
+{
+    type Error = MeasurementError<I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+
+        // Enable VBIAS and automatic conversions
+        self.write_register(
+            reg_conf
+                .with_enable_bias_voltage(true)
+                .with_conversion_mode(ConversionMode::Automatic)
+                .with_oneshot(false),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+
+        // Disable VBIAS and automatic conversions, back to sleep.
+        self.write_register(
+            reg_conf
+                .with_enable_bias_voltage(false)
+                .with_conversion_mode(ConversionMode::NormallyOff)
+                .with_oneshot(false),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        let measurement_time_us = match reg_conf.read_filter_mode() {
+            FilterMode::F_60Hz => 1_000_000 / 60,
+            FilterMode::F_50Hz => 1_000_000 / 50,
+        };
+
+        Ok(measurement_time_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        Ok(Some(Measurement {
+            temperature: self.read_temperature().await?,
+        }))
+    }
+
+    /// Not supported through registers
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        // TODO: could be supported by supplying ¬DRDY pin optionally in new
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
     }
 }

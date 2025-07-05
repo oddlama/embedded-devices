@@ -125,8 +125,20 @@ pub enum MeasurementError<BusError> {
     Overflow(Measurement),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ContinuousMeasurementError<BusError> {
+    /// Bus error
+    #[error("bus error")]
+    Bus(#[from] BusError),
+    /// Measurement was ready, but an overflow occurred. The power and
+    /// current measurement may be incorrect.
+    #[error("overflow in measurement")]
+    Overflow(Measurement),
+}
+
 from_bus_error!(InitError);
 from_bus_error!(MeasurementError);
+from_bus_error!(ContinuousMeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -327,7 +339,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         const TRIES: u8 = 5;
         for _ in 0..TRIES {
             let flags = self.read_register::<self::registers::MaskEnable>().await?;
-
             if !flags.read_conversion_ready_flag() {
                 self.delay.delay_us(1000).await;
                 continue;
@@ -354,5 +365,104 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         }
 
         Err(MeasurementError::Timeout)
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for INA226<D, I>
+{
+    type Error = ContinuousMeasurementError<I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
+        self.write_register(reg_conf.with_operating_mode(self::registers::OperatingMode::ShuntAndBusContinuous))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
+        self.write_register(reg_conf.with_operating_mode(self::registers::OperatingMode::PowerDown))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        let reg_conf = self.read_register::<self::registers::Configuration>().await?;
+        let mut measurement_time_us = reg_conf.total_conversion_time_us();
+        measurement_time_us += measurement_time_us / 10; // 10% extra (data sheet conversion times state ~10% higher maximum times)
+        Ok(measurement_time_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let flags = self.read_register::<self::registers::MaskEnable>().await?;
+        let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
+        let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
+        let current = self.read_register::<self::registers::Current>().await?;
+        // Reading this register clears the conversion_ready flag
+        let power = self.read_register::<self::registers::Power>().await?;
+
+        let measurement = Measurement {
+            shunt_voltage: shunt_voltage.read_voltage(),
+            bus_voltage: bus_voltage.read_voltage(),
+            current: current.read_current(self.current_lsb_na),
+            power: power.read_power(self.current_lsb_na),
+        };
+
+        if flags.read_math_overflow_flag() {
+            Err(ContinuousMeasurementError::Overflow(measurement))
+        } else {
+            Ok(Some(measurement))
+        }
+    }
+
+    /// Check if new measurements are available.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        let flags = self.read_register::<self::registers::MaskEnable>().await?;
+        Ok(flags.read_conversion_ready_flag())
+    }
+
+    /// Wait indefinitely until new measurements are available and return them. Checks whether data
+    /// is ready in intervals of 100us.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        loop {
+            let flags = self.read_register::<self::registers::MaskEnable>().await?;
+            if flags.read_conversion_ready_flag() {
+                let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
+                let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
+                let current = self.read_register::<self::registers::Current>().await?;
+                // Reading this register clears the conversion_ready flag
+                let power = self.read_register::<self::registers::Power>().await?;
+
+                let measurement = Measurement {
+                    shunt_voltage: shunt_voltage.read_voltage(),
+                    bus_voltage: bus_voltage.read_voltage(),
+                    current: current.read_current(self.current_lsb_na),
+                    power: power.read_power(self.current_lsb_na),
+                };
+
+                if flags.read_math_overflow_flag() {
+                    return Err(ContinuousMeasurementError::Overflow(measurement));
+                } else {
+                    return Ok(measurement);
+                }
+            }
+
+            self.delay.delay_us(100).await;
+        }
     }
 }

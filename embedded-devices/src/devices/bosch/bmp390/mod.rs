@@ -88,8 +88,8 @@ use crate::utils::from_bus_error;
 
 use self::address::Address;
 use self::registers::{
-    BurstMeasurements, ChipId, Cmd, Config, IIRFilter, Oversampling, OversamplingControl, PowerControl, SensorMode,
-    TrimmingCoefficients, TrimmingCoefficientsBitfield,
+    BurstMeasurements, ChipId, Cmd, Config, DataRateControl, IIRFilter, Oversampling, OversamplingControl,
+    PowerControl, SensorMode, TrimmingCoefficients, TrimmingCoefficientsBitfield,
 };
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
@@ -431,5 +431,87 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         };
 
         Ok(Measurement { temperature, pressure })
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for BMP390<D, I>
+{
+    type Error = MeasurementError<I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let power_ctrl = self.read_register::<PowerControl>().await?;
+        self.write_register(power_ctrl.with_sensor_mode(SensorMode::Normal))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let power_ctrl = self.read_register::<PowerControl>().await?;
+        self.write_register(power_ctrl.with_sensor_mode(SensorMode::Sleep))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        // Read current oversampling config to determine required measurement delay
+        let reg_ctrl_m = self.read_register::<OversamplingControl>().await?;
+        let o_t = reg_ctrl_m.read_temperature_oversampling();
+        let o_p = reg_ctrl_m.read_pressure_oversampling();
+
+        // Maximum time required to perform the measurement.
+        // See section 3.9.2 of the datasheet for more information.
+        let t_measure_us = 234 + (392 + 2020 * o_p.factor()) + (163 + o_t.factor() * 2020);
+
+        let data_rate_ctrl = self.read_register::<DataRateControl>().await?;
+        let t_standby_us = data_rate_ctrl.read_data_rate().interval_us();
+        Ok(t_measure_us + t_standby_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let raw_data = self.read_register::<BurstMeasurements>().await?.read_all();
+        let power_ctrl = self.read_register::<PowerControl>().await?;
+        let Some(ref cal) = self.calibration_data else {
+            return Err(MeasurementError::NotCalibrated);
+        };
+
+        let temperature_enable = power_ctrl.read_temperature_enable();
+        let pressure_enable = power_ctrl.read_pressure_enable();
+
+        let (temperature, pressure) = if temperature_enable {
+            let (temp, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
+            let press = pressure_enable.then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine));
+            (Some(temp), press)
+        } else {
+            (None, None)
+        };
+
+        Ok(Some(Measurement { temperature, pressure }))
+    }
+
+    /// Not supported, always returns true.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
     }
 }

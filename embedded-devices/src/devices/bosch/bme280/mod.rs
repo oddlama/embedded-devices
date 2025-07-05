@@ -574,3 +574,98 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         })
     }
 }
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for BME280Common<D, I, true>
+{
+    type Error = MeasurementError<I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
+        self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Normal))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
+        self.write_register(reg_ctrl_m.with_sensor_mode(SensorMode::Sleep))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        let reg_config = self.read_register::<Config>().await?;
+        let t_standby_us = reg_config.read_standby_time().time_us();
+
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
+        let reg_ctrl_h = self.read_register::<ControlHumidity>().await?;
+
+        let o_h = reg_ctrl_h.read_oversampling();
+        let o_t = reg_ctrl_m.read_temperature_oversampling();
+        let o_p = reg_ctrl_m.read_pressure_oversampling();
+
+        // Maximum time required to perform the measurement.
+        // See chapter 9 of the datasheet for more information.
+        let mut t_measure_us = 1250 + 2300 * o_t.factor();
+        if o_p.factor() > 0 {
+            t_measure_us += 575 + 2300 * o_p.factor();
+        }
+        if o_h.factor() > 0 {
+            t_measure_us += 575 + 2300 * o_h.factor();
+        }
+        Ok(t_measure_us + t_standby_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
+        let reg_ctrl_h = self.read_register::<ControlHumidity>().await?;
+
+        let o_h = reg_ctrl_h.read_oversampling();
+        let o_p = reg_ctrl_m.read_pressure_oversampling();
+
+        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?.read_all();
+        let Some(ref cal) = self.calibration_data else {
+            return Err(MeasurementError::NotCalibrated);
+        };
+
+        let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
+        let pressure = (o_p != Oversampling::Disabled)
+            .then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine))
+            .flatten();
+        let humidity =
+            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.humidity.humidity, t_fine));
+
+        Ok(Some(Measurement {
+            temperature,
+            pressure,
+            humidity,
+        }))
+    }
+
+    /// Not supported, always returns true.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
+    }
+}

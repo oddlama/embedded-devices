@@ -77,6 +77,8 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 pub mod address;
 pub mod registers;
 
+use self::registers::{Configuration, Temperature};
+
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
@@ -134,9 +136,7 @@ where
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D, I> {
     /// Read the last temperature measured
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, TransportError<(), I::BusError>> {
-        use self::registers::{Configuration, Temperature};
-
-        // Read current configuration to determine conversion ratio
+        // Read current configuration to determine conversion rate
         let reg_conf = self.read_register::<Configuration>().await?;
 
         // Read and return the temperature
@@ -146,19 +146,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D,
         } else {
             Ok(ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0))
         }
-    }
-
-    pub async fn set_continuous(&mut self) -> Result<(), TransportError<(), I::BusError>> {
-        use self::registers::Configuration;
-
-        // Read current configuration and update it for continuous mode
-        let reg_conf = self.read_register::<Configuration>().await?;
-
-        // Initiate measurement
-        self.write_register(reg_conf.with_oneshot(false).with_extended(true).with_shutdown(false))
-            .await?;
-
-        Ok(())
     }
 }
 
@@ -181,18 +168,12 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     /// This function will initialize the measurement, wait until the data is acquired and return
     /// the temperature.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
-        use self::registers::{Configuration, Temperature};
-
-        // Read current configuration to determine conversion ratio and delay
-        let mut reg_conf = self.read_register::<Configuration>().await?;
-        reg_conf.write_oneshot(true);
-
-        // Initiate measurement
-        self.write_register(reg_conf).await?;
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_oneshot(true).with_shutdown(false))
+            .await?;
 
         // Wait for the duration of the conversion
-        let active_conversion_time = reg_conf.read_conversion_cycle_time().conversion_time_ms() + 10;
-        self.delay.delay_ms(active_conversion_time).await;
+        self.delay.delay_us(12_500).await;
 
         let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
         if reg_conf.read_extended() {
@@ -204,5 +185,71 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
                 temperature: ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0),
             })
         }
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for TMP102<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_oneshot(false).with_shutdown(false))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_oneshot(false).with_shutdown(true))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        let conversion_time_us = reg_conf.read_conversion_cycle_time().conversion_time_ms() * 1000;
+        Ok(conversion_time_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let raw_temp = self.read_register::<Temperature>().await?.read_raw_temperature() as i32;
+        let reg_conf = self.read_register::<Configuration>().await?;
+        if reg_conf.read_extended() {
+            Ok(Some(Measurement {
+                temperature: ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 128.0),
+            }))
+        } else {
+            Ok(Some(Measurement {
+                temperature: ThermodynamicTemperature::new::<degree_celsius>(raw_temp as f64 / 256.0),
+            }))
+        }
+    }
+
+    /// Not supported, always returns true.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
     }
 }

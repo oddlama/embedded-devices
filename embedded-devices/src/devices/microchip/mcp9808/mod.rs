@@ -70,13 +70,14 @@
 
 use embedded_devices_derive::{device, device_impl, sensor};
 use embedded_registers::TransportError;
-use registers::Resolution;
 use uom::si::f64::ThermodynamicTemperature;
 
 use crate::utils::from_bus_error;
 
 pub mod address;
 pub mod registers;
+
+use self::registers::{AmbientTemperature, Configuration, DeviceIdRevision, ManufacturerId, Resolution, ShutdownMode};
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
@@ -152,9 +153,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MCP9808<D
     /// Initializes the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
-        use self::registers::DeviceIdRevision;
-        use self::registers::ManufacturerId;
-
         let device_id = self.read_register::<DeviceIdRevision>().await?;
         if device_id.read_device_id() != self::registers::DEVICE_ID_VALID {
             return Err(InitError::InvalidDeviceId);
@@ -186,8 +184,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     /// Performs a one-shot measurement. This will power up the sensor, wait until a conversion is
     /// ready and return to sleep afterwards.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
-        use self::registers::{AmbientTemperature, Configuration, ShutdownMode};
-
         // Enable conversions
         let mut reg_conf = self.read_register::<Configuration>().await?;
         reg_conf.write_shutdown_mode(ShutdownMode::Continuous);
@@ -205,5 +201,63 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
         // Read and return the temperature
         let temperature = self.read_register::<AmbientTemperature>().await?.read_temperature();
         Ok(Measurement { temperature })
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for MCP9808<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_shutdown_mode(ShutdownMode::Continuous))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_shutdown_mode(ShutdownMode::Shutdown))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        // Wait until conversion is ready
+        let resolution = self.read_register::<Resolution>().await?;
+        let conversion_time = resolution.read_temperature_resolution().conversion_time_us();
+        Ok(conversion_time)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let temperature = self.read_register::<AmbientTemperature>().await?.read_temperature();
+        Ok(Some(Measurement { temperature }))
+    }
+
+    /// Not supported, always returns true.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
     }
 }

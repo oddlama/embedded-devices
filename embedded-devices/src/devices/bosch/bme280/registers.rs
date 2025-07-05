@@ -238,6 +238,22 @@ pub enum StandbyTime {
     //TODO T_4000 = 0b111,
 }
 
+impl StandbyTime {
+    /// Standby time in microseconds.
+    pub fn time_us(&self) -> u32 {
+        match self {
+            StandbyTime::T_0_5 => 500,
+            StandbyTime::T_62_5 => 62_500,
+            StandbyTime::T_125 => 125_000,
+            StandbyTime::T_250 => 250_000,
+            StandbyTime::T_500 => 500_000,
+            StandbyTime::T_1000 => 1_000_000,
+            StandbyTime::T_10 => 10_000,
+            StandbyTime::T_20 => 20_000,
+        }
+    }
+}
+
 /// Lowpass filter settings for pressure and temperature values.
 /// Enabling any filter option increases the resolution of the
 /// respective measured quantity to 20 bits.

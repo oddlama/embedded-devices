@@ -80,6 +80,8 @@ use crate::utils::from_bus_error;
 pub mod address;
 pub mod registers;
 
+use self::registers::{AveragingMode, Configuration, ConversionMode, Temperature};
+
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Bus error
@@ -182,7 +184,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     /// The datasheet specifies a time to reset of 2ms which is
     /// automatically awaited before allowing further communication.
     pub async fn reset(&mut self) -> Result<(), TransportError<(), I::BusError>> {
-        self.write_register(self::registers::Configuration::default().with_soft_reset(true))
+        self.write_register(Configuration::default().with_soft_reset(true))
             .await?;
         self.delay.delay_ms(2).await;
         Ok(())
@@ -239,22 +241,86 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     /// [`self::registers::ConversionMode::Oneshot´] causing the device to perform a
     /// single conversion a return to sleep afterwards.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
-        use self::registers::{Configuration, ConversionMode, Temperature};
-
         // Read current averaging mode to determine required measurement delay
-        let mut reg_conf = self.read_register::<Configuration>().await?;
-        reg_conf.write_conversion_mode(ConversionMode::Oneshot);
+        let reg_conf = self.read_register::<Configuration>().await?;
 
         // Initiate measurement
-        self.write_register(reg_conf).await?;
+        self.write_register(reg_conf.with_conversion_mode(ConversionMode::Oneshot))
+            .await?;
 
         // Active conversion time is only linearly influenced by the averaging factor.
         // A single-conversion takes 15.5ms.
-        let active_conversion_time = reg_conf.read_averaging_mode().factor() as u32 * 15500;
+        let active_conversion_time = reg_conf.read_averaging_mode().factor() as u32 * 15_500;
         self.delay.delay_us(active_conversion_time).await;
 
         // Read and return the temperature
         let temperature = self.read_register::<Temperature>().await?.read_temperature();
         Ok(Measurement { temperature })
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ContinuousSensor
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for TMP117<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+    type Measurement = Measurement;
+
+    /// Starts continuous measurement.
+    async fn start_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_conversion_mode(ConversionMode::Continuous))
+            .await?;
+        Ok(())
+    }
+
+    /// Stops continuous measurement.
+    async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        self.write_register(reg_conf.with_conversion_mode(ConversionMode::Shutdown))
+            .await?;
+        Ok(())
+    }
+
+    /// Expected amount of time between measurements in microseconds.
+    async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error> {
+        let reg_conf = self.read_register::<Configuration>().await?;
+        let min_conversion_time = match reg_conf.read_averaging_mode() {
+            AveragingMode::X_1 => 0,
+            AveragingMode::X_8 => 125_000,
+            AveragingMode::X_32 => 500_000,
+            AveragingMode::X_64 => 1_000_000,
+        };
+        let conversion_time_us = reg_conf
+            .read_conversion_cycle_time()
+            .interval_us()
+            .max(min_conversion_time);
+        Ok(conversion_time_us)
+    }
+
+    /// Returns the most recent measurement. Will never return None.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
+        let temperature = self.read_register::<Temperature>().await?.read_temperature();
+        Ok(Some(Measurement { temperature }))
+    }
+
+    /// Not supported, always returns true.
+    async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    /// Opportunistically waits one conversion interval and returns the measurement.
+    async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+        let interval = self.measurement_interval_us().await?;
+        self.delay.delay_us(interval).await;
+        self.current_measurement().await.map(Option::unwrap)
     }
 }

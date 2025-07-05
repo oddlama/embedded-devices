@@ -579,6 +579,33 @@ pub enum DataRate {
     Invalid(u8),
 }
 
+impl DataRate {
+    /// Returns the interval of this data rate in microseconds.
+    pub fn interval_us(&self) -> u32 {
+        match self {
+            DataRate::F_200 => 5_000,
+            DataRate::F_100 => 10_000,
+            DataRate::F_50 => 20_000,
+            DataRate::F_25 => 40_000,
+            DataRate::F_12_5 => 80_000,
+            DataRate::F_6_25 => 160_000,
+            DataRate::F_3_1 => 320_000,
+            DataRate::F_1_5 => 640_000,
+            DataRate::F_0_78 => 1_280_000,
+            DataRate::F_0_39 => 2_560_000,
+            DataRate::F_0_2 => 5_120_000,
+            DataRate::F_0_1 => 10_240_000,
+            DataRate::F_0_05 => 20_480_000,
+            DataRate::F_0_02 => 40_960_000,
+            DataRate::F_0_01 => 81_920_000,
+            DataRate::F_0_006 => 163_840_000,
+            DataRate::F_0_003 => 327_680_000,
+            DataRate::F_0_0015 => 655_360_000,
+            DataRate::Invalid(_) => panic!("Cannot get interval of invalid DataRate"),
+        }
+    }
+}
+
 /// The data rate control register.
 #[device_register(super::BMP390)]
 #[register(
