@@ -103,7 +103,7 @@
 //! ```
 
 use embedded_devices_derive::sensor;
-use embedded_registers::RegisterError;
+use embedded_registers::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
@@ -159,6 +159,7 @@ impl Default for Configuration {
     }
 }
 
+#[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -168,7 +169,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
         self.write_register(
             ControlMeasurement::default()
                 .with_temperature_oversampling(config.temperature_oversampling)
@@ -184,7 +185,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
     }
 }
 
-#[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),

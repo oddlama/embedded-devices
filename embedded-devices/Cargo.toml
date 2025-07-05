@@ -58,7 +58,9 @@ texas_instruments-tmp102 = []
 texas_instruments-tmp117 = []
 
 # Sensirion
-sensirion-scd4x = []
+sensirion-scd40 = []
+sensirion-scd41 = []
+sensirion-scd43 = []
 sensirion-sen60 = []
 sensirion-sen63c = []
 sensirion-sen65 = []

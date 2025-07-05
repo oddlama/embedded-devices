@@ -23,7 +23,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -49,7 +49,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -72,7 +72,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::{RegisterError, WritableRegister};
+use embedded_registers::{TransportError, WritableRegister};
 use uom::si::f64::ThermodynamicTemperature;
 
 use crate::utils::from_bus_error;
@@ -154,6 +154,7 @@ where
 }
 
 #[device_impl]
+#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -180,7 +181,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     /// Performs a soft-reset of the device.
     /// The datasheet specifies a time to reset of 2ms which is
     /// automatically awaited before allowing further communication.
-    pub async fn reset(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn reset(&mut self) -> Result<(), TransportError<(), I::BusError>> {
         self.write_register(self::registers::Configuration::default().with_soft_reset(true))
             .await?;
         self.delay.delay_ms(2).await;
@@ -221,7 +222,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     }
 }
 
-#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
@@ -232,7 +232,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     async(feature = "async")
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for TMP117<D, I> {
-    type Error = RegisterError<(), I::BusError>;
+    type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the conversion mode to

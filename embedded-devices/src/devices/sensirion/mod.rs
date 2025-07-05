@@ -1,5 +1,16 @@
-#[cfg(feature = "sensirion-scd4x")]
-pub mod scd4x;
+#[cfg(any(
+    feature = "sensirion-scd40",
+    feature = "sensirion-scd41",
+    feature = "sensirion-scd43",
+))]
+pub(crate) mod scd4x;
+
+#[cfg(feature = "sensirion-scd40")]
+pub mod scd40;
+#[cfg(feature = "sensirion-scd41")]
+pub mod scd41;
+#[cfg(feature = "sensirion-scd43")]
+pub mod scd43;
 
 #[cfg(any(
     feature = "sensirion-sen63c",

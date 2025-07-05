@@ -11,7 +11,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -42,7 +42,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -70,7 +70,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::RegisterError;
+use embedded_registers::TransportError;
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
@@ -125,6 +125,7 @@ where
 }
 
 #[device_impl]
+#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -132,7 +133,7 @@ where
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D, I> {
     /// Read the last temperature measured
-    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, RegisterError<(), I::BusError>> {
+    pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, TransportError<(), I::BusError>> {
         use self::registers::{Configuration, Temperature};
 
         // Read current configuration to determine conversion ratio
@@ -147,7 +148,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D,
         }
     }
 
-    pub async fn set_continuous(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn set_continuous(&mut self) -> Result<(), TransportError<(), I::BusError>> {
         use self::registers::Configuration;
 
         // Read current configuration and update it for continuous mode
@@ -161,7 +162,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D,
     }
 }
 
-#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
@@ -172,7 +172,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D,
     async(feature = "async")
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for TMP102<D, I> {
-    type Error = RegisterError<(), I::BusError>;
+    type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].

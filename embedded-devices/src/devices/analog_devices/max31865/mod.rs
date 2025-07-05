@@ -3,7 +3,7 @@
 //! The MAX31865 is an easy-to-use resistance-to-digital converter optimized for platinum
 //! resistance temperature detectors (RTDs). An external resistor sets the sensitivity
 //! for the RTD being used and a precision delta-sigma ADC converts the ratio of the RTD
-//! resistance to the reference resistance into digital form. The MAX31865’s inputs are
+//! resistance to the reference resistance into digital form. The MAX31865's inputs are
 //! protected against overvoltage faults as large as ±45V. Programmable detection of RTD
 //! and cable open and short conditions is included.
 //!
@@ -157,6 +157,7 @@ where
 }
 
 #[device_impl]
+#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -284,7 +285,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
     }
 }
 
-#[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),

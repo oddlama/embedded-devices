@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -46,7 +46,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::RegisterError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -69,7 +69,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::RegisterError;
+use embedded_registers::TransportError;
 use registers::Resolution;
 use uom::si::f64::ThermodynamicTemperature;
 
@@ -180,7 +180,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MCP9808<D
     async(feature = "async")
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for MCP9808<D, I> {
-    type Error = RegisterError<(), I::BusError>;
+    type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will power up the sensor, wait until a conversion is

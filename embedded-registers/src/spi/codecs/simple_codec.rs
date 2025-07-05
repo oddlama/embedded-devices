@@ -1,4 +1,4 @@
-use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableRegister};
 use bytemuck::Zeroable;
 
 /// This codec represents the most commonly found codecs for SPI devices.
@@ -93,7 +93,7 @@ impl<
     > crate::spi::Codec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     #[inline]
-    async fn read_register<R, I>(interface: &mut I) -> Result<R, RegisterError<Self::Error, I::Error>>
+    async fn read_register<R, I>(interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice,
@@ -119,7 +119,7 @@ impl<
     async fn write_register<R, I>(
         interface: &mut I,
         register: impl AsRef<R>,
-    ) -> Result<(), RegisterError<Self::Error, I::Error>>
+    ) -> Result<(), TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice,

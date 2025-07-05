@@ -65,9 +65,9 @@
 //! #     pub width: u8,
 //! #     pub height: u8,
 //! # }
-//! use embedded_registers::{i2c::I2cDeviceAsync, RegisterError, RegisterInterfaceAsync};
+//! use embedded_registers::{i2c::I2cDeviceAsync, TransportError, RegisterInterfaceAsync};
 //!
-//! async fn init<I>(mut i2c_bus: I) -> Result<(), RegisterError<(), I::Error>>
+//! async fn init<I>(mut i2c_bus: I) -> Result<(), TransportError<(), I::Error>>
 //! where
 //!     I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! {
@@ -110,7 +110,7 @@ pub use bytemuck;
 
 /// A combined error type for Codec or Bus errors
 #[derive(Debug, thiserror::Error)]
-pub enum RegisterError<CodecError, BusError> {
+pub enum TransportError<CodecError, BusError> {
     /// The codec failed to encore or decode this register
     #[error("codec error")]
     Codec(CodecError),
@@ -181,7 +181,7 @@ pub trait RegisterInterface {
     type BusError;
 
     /// Reads the given register via this interface
-    async fn read_register<R>(&mut self) -> Result<R, RegisterError<<R as Register>::CodecError, Self::BusError>>
+    async fn read_register<R>(&mut self) -> Result<R, TransportError<<R as Register>::CodecError, Self::BusError>>
     where
         R: ReadableRegister;
 
@@ -189,7 +189,7 @@ pub trait RegisterInterface {
     async fn write_register<R>(
         &mut self,
         register: impl AsRef<R>,
-    ) -> Result<(), RegisterError<<R as Register>::CodecError, Self::BusError>>
+    ) -> Result<(), TransportError<<R as Register>::CodecError, Self::BusError>>
     where
         R: WritableRegister;
 }

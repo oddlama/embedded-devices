@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableRegister};
 use bytemuck::Zeroable;
 use crc::Algorithm;
 use heapless::Vec;
@@ -91,7 +91,7 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm> crate:
     #[inline]
     async fn read_register<R, I, A>(
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
-    ) -> Result<R, RegisterError<Self::Error, I::Error>>
+    ) -> Result<R, TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
@@ -121,7 +121,7 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm> crate:
             let calculated = crc.checksum(value);
             let expected = x[CHUNK_SIZE];
             if expected != calculated {
-                return Err(RegisterError::r#Codec(CrcError::CrcMismatch { calculated, expected }));
+                return Err(TransportError::r#Codec(CrcError::CrcMismatch { calculated, expected }));
             }
         }
 
@@ -132,7 +132,7 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm> crate:
     async fn write_register<R, I, A>(
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
         register: impl AsRef<R>,
-    ) -> Result<(), RegisterError<Self::Error, I::Error>>
+    ) -> Result<(), TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,

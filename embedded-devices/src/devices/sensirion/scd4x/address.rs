@@ -1,8 +1,6 @@
-use defmt::Format;
-
 const ADDRESS: u8 = 0x62;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Format)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, defmt::Format)]
 pub enum Address {
     /// Default address
     Default,

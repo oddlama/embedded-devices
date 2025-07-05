@@ -44,7 +44,7 @@
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::{register, i2c::{I2cDeviceAsync, I2cDeviceSync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, RegisterInterfaceSync, ReadableRegister, RegisterError};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, I2cDeviceSync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, RegisterInterfaceSync, ReadableRegister, TransportError};
 //!
 //! #[register(address = 0b111, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
@@ -54,7 +54,7 @@
 //! }
 //!
 //! // sync:
-//! # async fn test<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
+//! # async fn test<I>(mut i2c: I) -> Result<(), TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType
 //! # {
@@ -64,7 +64,7 @@
 //! # }
 //!
 //! // async:
-//! # async fn test_async<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
+//! # async fn test_async<I>(mut i2c: I) -> Result<(), TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {
@@ -86,7 +86,7 @@
 //! ```
 //! #![feature(generic_arg_infer)]
 //! # use defmt::{info, Format};
-//! use embedded_registers::{register, i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, ReadableRegister, WritableRegister, RegisterError};
+//! use embedded_registers::{register, i2c::{I2cDeviceAsync, codecs::OneByteRegAddrCodec}, RegisterInterfaceAsync, ReadableRegister, WritableRegister, TransportError};
 //! use bondrewd::BitfieldEnum;
 //!
 //! # #[allow(non_camel_case_types)]
@@ -129,7 +129,7 @@
 //!     # reserved2: u8,
 //! }
 //!
-//! # async fn test<I>(mut i2c: I) -> Result<(), RegisterError<(), I::Error>>
+//! # async fn test<I>(mut i2c: I) -> Result<(), TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType
 //! # {

@@ -561,7 +561,7 @@ sensirion_command!(CO2SensorAutomaticSelfCalibration, 20, false);
 #[register(address = 0x6720, mode = "rw", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 pub struct AmbientPressure {
-    /// Ambient pressure [hPa] to be used for pressure compensation. LSB = 1 hPa.
+    /// Ambient pressure in hPa to be used for pressure compensation. LSB = 1 hPa.
     #[register(default = 1013)]
     pub pressure: u16,
 }

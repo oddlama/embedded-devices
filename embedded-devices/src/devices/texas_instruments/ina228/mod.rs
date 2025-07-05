@@ -103,7 +103,7 @@ use crate::utils::from_bus_error;
 use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::RegisterError;
+use embedded_registers::TransportError;
 use registers::AdcRange;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
@@ -225,6 +225,7 @@ where
 }
 
 #[device_impl]
+#[sensor(Voltage, Temperature, Current, Power, Energy, Charge)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -264,7 +265,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA228<D,
     }
 
     /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
-    pub async fn reset(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn reset(&mut self) -> Result<(), TransportError<(), I::BusError>> {
         self.write_register(self::registers::Configuration::default().with_reset(true))
             .await?;
 
@@ -278,7 +279,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA228<D,
         &mut self,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
-    ) -> Result<(), RegisterError<(), I::BusError>> {
+    ) -> Result<(), TransportError<(), I::BusError>> {
         self.shunt_resistance = shunt_resistance;
         self.max_expected_current = max_expected_current;
         let max_expected_shunt_voltage = shunt_resistance * max_expected_current;
@@ -342,7 +343,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA228<D,
     }
 }
 
-#[sensor(Voltage, Temperature, Current, Power, Energy, Charge)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),

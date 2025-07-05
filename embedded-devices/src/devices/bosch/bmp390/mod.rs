@@ -76,7 +76,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::RegisterError;
+use embedded_registers::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -274,6 +274,7 @@ where
 }
 
 #[device_impl]
+#[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -305,7 +306,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
     /// compensate measurements. It is required to call this once
     /// before taking any measurements. Calling [`Self::init`] will
     /// automatically do this.
-    pub async fn calibrate(&mut self) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn calibrate(&mut self) -> Result<(), TransportError<(), I::BusError>> {
         let coefficients = self.read_register::<TrimmingCoefficients>().await?.read_all();
         self.calibration_data = Some(CalibrationData(coefficients));
 
@@ -347,7 +348,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
-    pub async fn configure(&mut self, config: Configuration) -> Result<(), RegisterError<(), I::BusError>> {
+    pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
         self.write_register(
             PowerControl::default()
                 .with_temperature_enable(config.temperature_oversampling.is_some())
@@ -370,7 +371,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
     }
 }
 
-#[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),

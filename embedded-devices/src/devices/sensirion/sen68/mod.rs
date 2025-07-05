@@ -11,7 +11,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen68::Error<I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen68::TransportError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -53,7 +53,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen68::Error<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen68::TransportError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -92,7 +92,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::{i2c::codecs::crc8_codec::CrcError, RegisterError};
+use embedded_registers::i2c::codecs::crc8_codec::CrcError;
 use registers::{DataReady, DeviceReset, MeasuredValues, StartContinuousMeasurement, StopMeasurement};
 use uom::si::{
     f64::{MassConcentration, Ratio, ThermodynamicTemperature},
@@ -106,7 +106,8 @@ use super::SensirionCommand;
 pub use super::sen6x::address;
 pub mod registers;
 
-pub type Error<E> = RegisterError<CrcError, E>;
+/// Any CRC or Bus related error
+pub type TransportError<E> = embedded_registers::TransportError<CrcError, E>;
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -150,7 +151,8 @@ pub struct Measurement {
     pub hcho_concentration: Option<Ratio>,
 }
 
-/// The SEN68 is a particulate matter (PM) sensor from Sensition's SEN6x sensor module family.
+/// The SEN68 is a particulate matter (PM), VOC, NOₓ, HCHO, temperature and relative humidity sensor
+/// sensor from Sensition's SEN6x sensor module family.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
 #[device]
@@ -195,6 +197,17 @@ where
 }
 
 #[device_impl]
+#[sensor(
+    Pm1Concentration,
+    Pm2_5Concentration,
+    Pm4Concentration,
+    Pm10Concentration,
+    RelativeHumidity,
+    Temperature,
+    VocIndex,
+    NoxIndex,
+    HchoConcentration
+)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
@@ -206,7 +219,7 @@ where
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> SEN68<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, and resetting the device.
-    pub async fn init(&mut self) -> Result<(), Error<I::BusError>> {
+    pub async fn init(&mut self) -> Result<(), TransportError<I::BusError>> {
         use crate::device::ResettableDevice;
 
         // Datasheet specifies 100ms before I2C communication may be started
@@ -227,7 +240,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> SEN68<D, 
     async(feature = "async")
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice for SEN68<D, I> {
-    type Error = Error<I::BusError>;
+    type Error = TransportError<I::BusError>;
 
     /// Resets the sensor by stopping any ongoing measurement, and resetting the device.
     async fn reset(&mut self) -> Result<(), Self::Error> {
@@ -243,17 +256,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     }
 }
 
-#[sensor(
-    Pm1Concentration,
-    Pm2_5Concentration,
-    Pm4Concentration,
-    Pm10Concentration,
-    RelativeHumidity,
-    Temperature,
-    VocIndex,
-    NoxIndex,
-    HchoConcentration
-)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
@@ -264,7 +266,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     async(feature = "async")
 )]
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor for SEN68<D, I> {
-    type Error = Error<I::BusError>;
+    type Error = TransportError<I::BusError>;
     type Measurement = Measurement;
 
     /// Starts continuous measurement.
@@ -287,9 +289,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     }
 
     /// Returns the most recent measurement.
-    async fn current_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
         let measurement = self.read_register::<MeasuredValues>().await?.read_all();
-        Ok(Measurement {
+        Ok(Some(Measurement {
             pm1_concentration: (measurement.mass_concentration_pm1 != u16::MAX).then(|| {
                 MassConcentration::new::<microgram_per_cubic_meter>(measurement.mass_concentration_pm1 as f64 / 10.0)
             }),
@@ -310,7 +312,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
             nox_index: (measurement.nox_index != i16::MAX).then_some(measurement.nox_index),
             hcho_concentration: (measurement.hcho_concentration != u16::MAX)
                 .then(|| Ratio::new::<part_per_billion>(measurement.hcho_concentration as f64 / 10.0)),
-        })
+        }))
     }
 
     /// Check if new measurements are available.
@@ -323,7 +325,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         loop {
             if self.is_measurement_ready().await? {
-                return self.current_measurement().await;
+                return self.current_measurement().await.map(Option::unwrap);
             }
             self.delay.delay_ms(100).await;
         }

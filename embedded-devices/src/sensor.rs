@@ -58,8 +58,10 @@ pub trait ContinuousSensor {
     /// with the device to determine the interval based on device settings.
     async fn measurement_interval_us(&mut self) -> Result<u32, Self::Error>;
 
-    /// Returns the most recent measurement.
-    async fn current_measurement(&mut self) -> Result<Self::Measurement, Self::Error>;
+    /// Returns the most recent measurement. If the sensor cannot provide the measurement
+    /// current/last measurement at any time (e.g. the register is cleared after it is read), this
+    /// should return `None` when there is no new data available.
+    async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error>;
 
     /// Check if new measurements are available. If the device does not support checking for
     /// availability of new measurements (e.g. via some form of data ready indicator), this method

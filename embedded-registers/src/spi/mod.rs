@@ -1,6 +1,6 @@
 pub mod codecs;
 
-use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRegister};
+use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableRegister};
 
 /// Represents a trait for SPI codecs. These are responsible to perform
 /// writes and reads to registers, given the register address and
@@ -14,7 +14,7 @@ use crate::{ReadableRegister, Register, RegisterCodec, RegisterError, WritableRe
 #[allow(async_fn_in_trait)]
 pub trait Codec: RegisterCodec {
     /// Read this register from the given SPI interface/device.
-    async fn read_register<R, I>(interface: &mut I) -> Result<R, RegisterError<Self::Error, I::Error>>
+    async fn read_register<R, I>(interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice;
@@ -23,7 +23,7 @@ pub trait Codec: RegisterCodec {
     async fn write_register<R, I>(
         interface: &mut I,
         register: impl AsRef<R>,
-    ) -> Result<(), RegisterError<Self::Error, I::Error>>
+    ) -> Result<(), TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice;
@@ -71,7 +71,7 @@ where
 
     /// Read this register from this spi device using the codec specified by the register.
     #[inline]
-    async fn read_register<R>(&mut self) -> Result<R, RegisterError<<R as Register>::CodecError, Self::BusError>>
+    async fn read_register<R>(&mut self) -> Result<R, TransportError<<R as Register>::CodecError, Self::BusError>>
     where
         R: ReadableRegister,
     {
@@ -83,7 +83,7 @@ where
     async fn write_register<R>(
         &mut self,
         register: impl AsRef<R>,
-    ) -> Result<(), RegisterError<<R as Register>::CodecError, Self::BusError>>
+    ) -> Result<(), TransportError<<R as Register>::CodecError, Self::BusError>>
     where
         R: WritableRegister,
     {
