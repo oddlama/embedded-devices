@@ -199,7 +199,11 @@ where
 #[device_impl]
 #[sensor(Voltage, Current, Power)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
@@ -213,16 +217,10 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA219<D,
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
     ) -> Result<(), TransportError<(), I::BusError>> {
+        use crate::device::ResettableDevice;
+
         self.reset().await?;
         self.calibrate(shunt_resistance, max_expected_current).await?;
-        Ok(())
-    }
-
-    /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
-    pub async fn reset(&mut self) -> Result<(), TransportError<(), I::BusError>> {
-        self.write_register(self::registers::Configuration::default().with_reset(true))
-            .await?;
-
         Ok(())
     }
 
@@ -255,11 +253,8 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA219<D,
     /// A timeout error cannot occur here.
     pub async fn read_measurements(&mut self) -> Result<Measurement, MeasurementError<I::BusError>> {
         let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
-
         let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
-
         let current = self.read_register::<self::registers::Current>().await?;
-
         let power = self.read_register::<self::registers::Power>().await?;
 
         let measurement = Measurement {
@@ -274,6 +269,28 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA219<D,
         } else {
             Ok(measurement)
         }
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+    for INA219<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+
+    /// Performs a soft-reset of the device, restoring internal registers to power-on reset values.
+    async fn reset(&mut self) -> Result<(), Self::Error> {
+        self.write_register(self::registers::Configuration::default().with_reset(true))
+            .await?;
+        Ok(())
     }
 }
 

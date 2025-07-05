@@ -100,9 +100,6 @@ pub enum InitError<BusError> {
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
-    /// Reset failed
-    #[error("reset failed")]
-    ResetFailed,
 }
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
@@ -276,7 +273,11 @@ where
 #[device_impl]
 #[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
@@ -288,6 +289,8 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
+        use crate::device::ResettableDevice;
+
         // Soft-reset device
         self.reset().await?;
 
@@ -313,38 +316,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
         Ok(())
     }
 
-    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
-    /// of 10ms, which is automatically awaited before allowing further communication.
-    ///
-    /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset(&mut self) -> Result<(), InitError<I::BusError>> {
-        const TRIES: u8 = 5;
-        for _ in 0..TRIES {
-            match self.try_reset().await {
-                Ok(()) => return Ok(()),
-                Err(InitError::ResetFailed) => continue,
-                Err(e) => return Err(e),
-            }
-        }
-
-        Err(InitError::ResetFailed)
-    }
-
-    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
-    /// of 10ms, which is automatically awaited before allowing further communication.
-    ///
-    /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset(&mut self) -> Result<(), InitError<I::BusError>> {
-        self.write_register(self::registers::Command::default().with_command(Cmd::Reset))
-            .await?;
-        self.delay.delay_ms(10).await;
-
-        if self.read_register::<self::registers::Error>().await?.read_cmd_err() {
-            return Err(InitError::ResetFailed);
-        }
-        Ok(())
-    }
-
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
     /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
     /// advanced settings, please directly update the respective registers.
@@ -367,6 +338,30 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
         self.write_register(Config::default().with_iir_filter(config.iir_filter))
             .await?;
 
+        Ok(())
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+    for BMP390<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+
+    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
+    /// of 10ms, which is automatically awaited before allowing further communication.
+    async fn reset(&mut self) -> Result<(), Self::Error> {
+        self.write_register(self::registers::Command::default().with_command(Cmd::Reset))
+            .await?;
+        self.delay.delay_ms(10).await;
         Ok(())
     }
 }

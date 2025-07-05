@@ -158,7 +158,11 @@ where
 #[device_impl]
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
@@ -167,6 +171,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     /// Calling this function is not mandatory, but recommended to ensure proper operation.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
         use self::registers::DeviceIdRevision;
+        use crate::device::ResettableDevice;
 
         // Soft-reset device
         self.reset().await?;
@@ -177,16 +182,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
             return Err(InitError::InvalidDeviceId(device_id));
         }
 
-        Ok(())
-    }
-
-    /// Performs a soft-reset of the device.
-    /// The datasheet specifies a time to reset of 2ms which is
-    /// automatically awaited before allowing further communication.
-    pub async fn reset(&mut self) -> Result<(), TransportError<(), I::BusError>> {
-        self.write_register(Configuration::default().with_soft_reset(true))
-            .await?;
-        self.delay.delay_ms(2).await;
         Ok(())
     }
 
@@ -221,6 +216,30 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
         }
 
         Err(EepromError::EepromStillBusy)
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+    for TMP117<D, I>
+{
+    type Error = TransportError<(), I::BusError>;
+
+    /// Performs a soft-reset of the device. The datasheet specifies a time to reset of 2ms which
+    /// is automatically awaited before allowing further communication.
+    async fn reset(&mut self) -> Result<(), Self::Error> {
+        self.write_register(Configuration::default().with_soft_reset(true))
+            .await?;
+        self.delay.delay_ms(2).await;
+        Ok(())
     }
 }
 

@@ -134,9 +134,6 @@ pub enum InitError<BusError> {
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
-    /// NVM data copy is still in progress.
-    #[error("nvm data copy still in progress")]
-    NvmCopyInProgress,
 }
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
@@ -406,7 +403,11 @@ where
 
 #[device_impl]
 #[maybe_async_cfg::maybe(
-    idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
@@ -418,6 +419,8 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_
     /// call [`Self::configure`] after initialization to enable the sensors,
     /// otherwise measurement may return valid-looking but static values.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
+        use crate::device::ResettableDevice;
+
         // Soft-reset device
         self.reset().await?;
 
@@ -443,35 +446,27 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_
 
         Ok(())
     }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        hal(sync = "embedded_hal", async = "embedded_hal_async"),
+        RegisterInterface,
+        ResettableDevice
+    ),
+    sync(feature = "sync"),
+    async(feature = "async")
+)]
+impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool>
+    crate::device::ResettableDevice for BME280Common<D, I, IS_BME>
+{
+    type Error = TransportError<(), I::BusError>;
 
     /// Performs a soft-reset of the device. The datasheet specifies a start-up time
     /// of 2ms, which is automatically awaited before allowing further communication.
-    ///
-    /// This will try resetting up to 5 times in case of an error.
-    pub async fn reset(&mut self) -> Result<(), InitError<I::BusError>> {
-        const TRIES: u8 = 5;
-        for _ in 0..TRIES {
-            match self.try_reset().await {
-                Ok(()) => return Ok(()),
-                Err(InitError::NvmCopyInProgress) => continue,
-                Err(e) => return Err(e),
-            }
-        }
-
-        Err(InitError::NvmCopyInProgress)
-    }
-
-    /// Performs a soft-reset of the device. The datasheet specifies a start-up time
-    /// of 2ms, which is automatically awaited before allowing further communication.
-    ///
-    /// This will check the status register for success, returning an error otherwise.
-    pub async fn try_reset(&mut self) -> Result<(), InitError<I::BusError>> {
+    async fn reset(&mut self) -> Result<(), Self::Error> {
         self.write_register(self::registers::Reset::default()).await?;
         self.delay.delay_ms(2).await;
-
-        if self.read_register::<self::registers::Status>().await?.read_update() {
-            return Err(InitError::NvmCopyInProgress);
-        }
         Ok(())
     }
 }
