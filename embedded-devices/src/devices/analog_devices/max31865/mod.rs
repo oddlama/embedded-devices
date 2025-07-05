@@ -169,7 +169,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
     // TODO call this configure, make init verify device communication and reset
     pub async fn init(
         &mut self,
-
         wiring_mode: WiringMode,
         filter_mode: FilterMode,
     ) -> Result<(), FaultDetectionError<I::BusError>> {

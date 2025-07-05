@@ -2,7 +2,8 @@ features:
 - add common traits for sensors and measurements
 - codecs can now return errors, so crc errors no longer panic
 - a delay provider is now only needed at device creation, not for each function call
-- support new sensors: SEN60, SEN63C, SEN65, SEN66, SEN68
+- support new sensors: Sensirion SEN60, SEN63C, SEN65, SEN66, SEN68
+- reworked: Sensirion SCD40, SCD41, SCD43
 
 improvements:
 - switched to uom f64 types everywhere. While rational32/rational64 do retain

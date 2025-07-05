@@ -210,7 +210,6 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA226<D,
     /// You can change the values later using [`Self::calibrate`].
     pub async fn init(
         &mut self,
-
         shunt_resistance: ElectricalResistance,
         max_expected_current: ElectricCurrent,
     ) -> Result<(), InitError<I::BusError>> {
