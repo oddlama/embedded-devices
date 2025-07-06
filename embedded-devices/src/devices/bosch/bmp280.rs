@@ -108,8 +108,13 @@ use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
     registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
-    BME280CommonAsync, BME280CommonSync, MeasurementError,
+    MeasurementError,
 };
+
+#[cfg(feature = "async")]
+use super::bme280::BME280CommonAsync;
+#[cfg(feature = "sync")]
+use super::bme280::BME280CommonSync;
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
