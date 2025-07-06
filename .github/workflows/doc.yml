@@ -1,4 +1,4 @@
-name: Format all files
+name: Build documentation
 on:
   push:
   pull_request:
@@ -8,12 +8,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  treefmt:
+  doc:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - name: Run treefmt
-        run: nix develop --no-update-lock-file --command treefmt --fail-on-change --no-cache
+      - name: Build documentation
+        run: RUSTDOCFLAGS="-D warnings" nix develop --no-update-lock-file --command cargo doc --all-features

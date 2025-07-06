@@ -1,4 +1,4 @@
-name: Format all files
+name: Build and test
 on:
   push:
   pull_request:
@@ -8,12 +8,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  treefmt:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - name: Run treefmt
-        run: nix develop --no-update-lock-file --command treefmt --fail-on-change --no-cache
+      - name: Test async only
+        run: nix develop --no-update-lock-file --command cargo test --no-default-features -F async,all-devices
+      - name: Test sync only
+        run: nix develop --no-update-lock-file --command cargo test --no-default-features -F sync,all-devices
+      - name: Test all
+        run: nix develop --no-update-lock-file --command cargo test --all-features
