@@ -316,9 +316,8 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
         Ok(())
     }
 
-    /// Configures common sensor settings. Sensor must be in sleep mode for this to work.
-    /// Check sensor mode beforehand and call [`Self::reset`] if necessary. To configure
-    /// advanced settings, please directly update the respective registers.
+    /// Configures common sensor settings. Sensor must be in sleep mode for this to work. To
+    /// configure advanced settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
         self.write_register(
             PowerControl::default()
