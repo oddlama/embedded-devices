@@ -107,8 +107,8 @@ use embedded_registers::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
-    registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
     MeasurementError,
+    registers::{BurstMeasurementsPT, Config, ControlMeasurement, IIRFilter, Oversampling, SensorMode},
 };
 
 #[cfg(feature = "async")]

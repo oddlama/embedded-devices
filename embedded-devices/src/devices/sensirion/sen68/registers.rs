@@ -3,7 +3,7 @@ use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
 use crate::{
-    devices::sensirion::{sensirion_command, SensirionI2cCodec},
+    devices::sensirion::{SensirionI2cCodec, sensirion_command},
     utils::reexport_registers,
 };
 

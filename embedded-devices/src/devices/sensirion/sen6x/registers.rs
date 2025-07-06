@@ -1,7 +1,7 @@
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
-use crate::devices::sensirion::{sensirion_command, SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch};
+use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch, sensirion_command};
 
 /// Starts a continuous measurement. After starting the measurement, it takes some time (~1.1s)
 /// until the first measurement results are available. You could poll with the command [`DataReady`]

@@ -153,12 +153,12 @@
 //! # }
 //! ```
 
-use darling::ast::NestedMeta;
 use darling::FromMeta;
+use darling::ast::NestedMeta;
 use proc_macro as pc;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use syn::{spanned::Spanned, Expr, Type};
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
+use syn::{Expr, Type, spanned::Spanned};
 
 #[derive(Debug, FromMeta)]
 #[darling(and_then = "Self::validate_mode")]

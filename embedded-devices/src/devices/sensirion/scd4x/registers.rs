@@ -2,7 +2,7 @@ use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
-use crate::devices::sensirion::{sensirion_command, SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch};
+use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch, sensirion_command};
 
 /// Starts the periodic measurement mode. The signal update interval is 5 seconds.
 #[cfg_attr(

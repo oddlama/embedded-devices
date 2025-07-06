@@ -86,7 +86,7 @@ use uom::si::{
     thermodynamic_temperature::degree_celsius,
 };
 
-use super::{scd4x::registers::SensorVariant, SensirionCommand};
+use super::{SensirionCommand, scd4x::registers::SensorVariant};
 
 pub use super::scd4x::address;
 pub mod registers;
