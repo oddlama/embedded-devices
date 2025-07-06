@@ -185,7 +185,7 @@ needed to access the register on a certain bus. It can determine how the
 register address is used on the wire and could do extra checks like CRC
 checksums.
 
-> [!NOTE]
+> \[!NOTE]
 > I find it a bit misleading that the members written in `ValueRegister` end up in `ValueRegisterBitfield`.
 > So this might change in the future, but I currently cannot think of another design that is as simple
 > to use as the one we have now. The issue is that we need a struct for the packed data and one for
@@ -255,7 +255,7 @@ pub struct ComplexRegister {
 }
 ```
 
-> [!NOTE]
+> \[!NOTE]
 > Instead of naming all registers `*Register`, in a real driver you'd likely place all registers
 > in a common `registers` module for convenience and then drop the suffix.
 
