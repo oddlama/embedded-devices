@@ -16,7 +16,7 @@ proc-macro = true
 
 [dependencies]
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
-bytemuck = { version = "1.22.0", features = ["derive", "min_const_generics"] }
+bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 darling = "0.20.11"
 defmt = "1.0.1"
 proc-macro2 = "1.0"

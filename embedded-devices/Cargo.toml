@@ -14,7 +14,7 @@ license.workspace = true
 [dependencies]
 approx = { version = "0.5.1", default-features = false }
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
-bytemuck = { version = "1.22.0", features = ["derive", "min_const_generics"] }
+bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 defmt = "1.0.1"
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
@@ -25,7 +25,7 @@ paste = "1.0.15"
 # uom = { version = "0.36.0", features = ["f32", "f64", "si", "rational32", "rational64"], default-features = false }
 # uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1e0e5ad5206a326403e79", features = ["f32", "f64", "si", "rational32", "rational64"], default-features = false }
 uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1e0e5ad5206a326403e79", features = ["f64", "si"], default-features = false }
-crc = "3.2.1"
+crc = "3.3.0"
 thiserror = { version = "2.0.12", default-features = false }
 
 [features]

@@ -13,8 +13,8 @@ license.workspace = true
 
 [dependencies]
 bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
-bytemuck = { version = "1.22.0", features = ["derive", "min_const_generics"] }
-crc = "3.2.1"
+bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
+crc = "3.3.0"
 defmt = "1.0.1"
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
