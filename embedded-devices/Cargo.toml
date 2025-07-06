@@ -35,7 +35,29 @@ sync = ["embedded-registers/sync"]
 async = ["dep:embedded-hal-async", "embedded-registers/async"]
 std = ["thiserror/std"]
 
-# Feature flags to enable supported devices
+# Feature flags to enable all supported devices
+all-devices = [
+	"analog_devices-max31865",
+	"bosch-bme280",
+	"bosch-bmp280",
+	"bosch-bmp390",
+	"microchip-mcp9808",
+	"microchip-mcp3204",
+	"microchip-mcp3208",
+	"texas_instruments-ina219",
+	"texas_instruments-ina226",
+	"texas_instruments-ina228",
+	"texas_instruments-tmp102",
+	"texas_instruments-tmp117",
+	"sensirion-scd40",
+	"sensirion-scd41",
+	"sensirion-scd43",
+	"sensirion-sen60",
+	"sensirion-sen63c",
+	"sensirion-sen65",
+	"sensirion-sen66",
+	"sensirion-sen68",
+]
 
 # Analog Devices
 analog_devices-max31865 = []
