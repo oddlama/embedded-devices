@@ -13,13 +13,13 @@ use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableR
 )]
 #[allow(async_fn_in_trait)]
 pub trait Codec: RegisterCodec {
-    /// Read this register from the given SPI interface/device.
+    /// Read this register through the given SPI interface
     async fn read_register<R, I>(interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice;
 
-    /// Write this register to the given SPI interface/device.
+    /// Write this register through the given SPI interface
     async fn write_register<R, I>(
         interface: &mut I,
         register: impl AsRef<R>,

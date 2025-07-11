@@ -18,7 +18,7 @@
 //!
 //! ## Defining a register
 //!
-//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw", codec = OneByteRegAddrCodec)]`.
+//! Registers are defined simply by annotating a bondrewd struct with `#[register(address = 0x42, mode = "rw", codec = "OneByteRegAddrCodec")]`.
 //! The necessary derive attribute for Bondrewd is added automatically.
 //! Take for example this 2-byte read-write register at device addresses `0x42,0x43`, which contains two `u8` values:
 //!
@@ -101,6 +101,7 @@
 #[cfg(not(any(feature = "sync", feature = "async")))]
 compile_error!("You must enable at least one of the create features `sync` or `async`");
 
+pub mod commands;
 pub mod i2c;
 pub mod spi;
 
@@ -125,13 +126,11 @@ pub trait RegisterCodec {
     type Error;
 }
 
-/// The basis trait for all registers. A register is a type
-/// that maps to a specific register on an embedded device and
-/// should own the raw data required for this register.
+/// The basis trait for all registers. A register is a type that maps to a specific register on an
+/// embedded device and should own the raw data required for this register.
 ///
-/// Additionally, a register knows the virtual address ossociated
-/// to the embedded device, and a bitfield representation of the
-/// data content.
+/// Additionally, a register knows the virtual address ossociated to the embedded device, and a
+/// bitfield representation of the data content.
 pub trait Register: Default + Clone + bytemuck::Pod {
     /// The size of the register in bytes
     const REGISTER_SIZE: usize;
@@ -165,27 +164,26 @@ pub trait Register: Default + Clone + bytemuck::Pod {
     fn data_mut(&mut self) -> &mut [u8];
 }
 
-/// This trait is a marker trait implemented by any register that can be read via a specific bus interface.
+/// This trait is a marker trait implemented by any register that can be read from a device.
 pub trait ReadableRegister: Register {}
 
-/// This trait is a marker trait implemented by any register that can be written via a specific bus interface.
+/// This trait is a marker trait implemented by any register that can be written to a device.
 pub trait WritableRegister: Register {}
 
-/// A trait that is implemented by any bus interface and allows
-/// devices with registers to share register read/write implementations
-/// independent of the actual interface in use.
-#[allow(async_fn_in_trait)]
+/// A trait that is implemented by any bus interface and allows devices with registers to share
+/// register read/write implementations independent of the actual interface in use.
 #[maybe_async_cfg::maybe(sync(feature = "sync"), async(feature = "async"))]
+#[allow(async_fn_in_trait)]
 pub trait RegisterInterface {
     /// A type representing errors on the underlying bus
     type BusError;
 
-    /// Reads the given register via this interface
+    /// Reads the given register through this interface
     async fn read_register<R>(&mut self) -> Result<R, TransportError<<R as Register>::CodecError, Self::BusError>>
     where
         R: ReadableRegister;
 
-    /// Writes the given register via this interface
+    /// Writes the given register through this interface
     async fn write_register<R>(
         &mut self,
         register: impl AsRef<R>,

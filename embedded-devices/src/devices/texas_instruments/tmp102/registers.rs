@@ -35,9 +35,9 @@ pub enum ConversionCycleTime {
     /// 1s
     T_1000 = 0b01,
     /// 250ms
-    T_250 = 0b010,
+    T_250 = 0b10,
     /// 125ms
-    T_125 = 0b011,
+    T_125 = 0b11,
 }
 impl ConversionCycleTime {
     /// Returns the averaging factor
@@ -137,7 +137,7 @@ pub struct Configuration {
     #[register(default = false)]
     pub shutdown: bool,
     /// Amount of time to wait between conversions.
-    #[bondrewd(enum_primitive = "u8", bit_length = 2, endianness = "little")]
+    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
     #[register(default = ConversionCycleTime::T_250)]
     pub conversion_cycle_time: ConversionCycleTime,
     /// Set when the conversion result is higher than the high limit.

@@ -13,7 +13,7 @@ use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableR
 )]
 #[allow(async_fn_in_trait)]
 pub trait Codec: RegisterCodec {
-    /// Read this register from the given I2C interface/device.
+    /// Read this register through the given I2C interface.
     async fn read_register<R, I, A>(
         bound_bus: &mut I2cBoundBus<I, A>,
     ) -> Result<R, TransportError<Self::Error, I::Error>>
@@ -22,7 +22,7 @@ pub trait Codec: RegisterCodec {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy;
 
-    /// Write this register to the given I2C interface/device.
+    /// Write this register through the given I2C interface.
     async fn write_register<R, I, A>(
         bound_bus: &mut I2cBoundBus<I, A>,
         register: impl AsRef<R>,

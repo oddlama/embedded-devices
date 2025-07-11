@@ -188,6 +188,7 @@ dependencies = [
  "embedded-hal",
  "embedded-hal-async",
  "embedded-registers",
+ "heapless",
  "maybe-async-cfg",
  "paste",
  "thiserror",

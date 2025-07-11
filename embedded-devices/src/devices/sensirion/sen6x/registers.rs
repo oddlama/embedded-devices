@@ -1,11 +1,9 @@
 use embedded_devices_derive::device_register;
 use embedded_registers::register;
 
-use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch, sensirion_command};
+use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch};
 
-/// Starts a continuous measurement. After starting the measurement, it takes some time (~1.1s)
-/// until the first measurement results are available. You could poll with the command [`DataReady`]
-/// to check when the results are ready to be read.
+/// See [`StartContinuousMeasurement`](super::commands::StartContinuousMeasurement) command.
 #[cfg_attr(
     feature = "sensirion-sen63c",
     device_register(crate::devices::sensirion::sen63c::SEN63C)
@@ -25,7 +23,6 @@ use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveF
 #[register(address = 0x0021, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StartContinuousMeasurement {}
-sensirion_command!(StartContinuousMeasurement, 50, false);
 
 /// Stops the measurement and returns to idle mode.
 #[cfg_attr(
@@ -47,7 +44,6 @@ sensirion_command!(StartContinuousMeasurement, 50, false);
 #[register(address = 0x0104, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StopMeasurement {}
-sensirion_command!(StopMeasurement, 1000, true);
 
 /// This command can be used to check if new measurement results are ready to read. The data ready
 /// flag is automatically reset after reading the measurement values
@@ -78,7 +74,6 @@ pub struct DataReady {
     #[register(default = false)]
     pub data_ready: bool,
 }
-sensirion_command!(DataReady, 20, true);
 
 /// Returns the measured number concentration values. The command [`DataReady`] can be used to
 /// check if new data is available since the last read operation. If no new data is available, the
@@ -120,7 +115,6 @@ pub struct NumberConcentrationValues {
     #[register(default = u16::MAX)]
     pub number_concentration_pm10: u16,
 }
-sensirion_command!(NumberConcentrationValues, 20, true);
 
 /// This command allows to compensate temperature effects of the design-in at customer side by
 /// applying custom temperature offsets to the ambient temperature. The compensated ambient
@@ -174,7 +168,6 @@ pub struct TemperatureOffsetParameters {
     #[register(default = 0)]
     pub slot: u16,
 }
-sensirion_command!(TemperatureOffsetParameters, 20, true);
 
 /// This command allows to set custom temperature acceleration parameters of the RH/T engine. It
 /// overwrites the default temperature acceleration parameters of the RH/T engine with custom
@@ -210,7 +203,6 @@ pub struct TemperatureAccelerationParameters {
     /// Filter constant T2, LSB = 0.1 second
     pub t2: u16,
 }
-sensirion_command!(TemperatureAccelerationParameters, 20, false);
 
 /// Gets the product name from the device.
 #[cfg_attr(
@@ -235,7 +227,6 @@ pub struct ProductName {
     /// Null-terminated ASCII string containing the product name.
     pub name: [u8; 32],
 }
-sensirion_command!(ProductName, 20, true);
 
 /// Gets the serial number from the device.
 #[cfg_attr(
@@ -260,7 +251,6 @@ pub struct SerialNumber {
     /// Null-terminated ASCII string containing the serial number.
     pub serial_number: [u8; 32],
 }
-sensirion_command!(SerialNumber, 20, true);
 
 /// Executes a reset on the device. This has the same effect as a power cycle.
 #[cfg_attr(
@@ -282,7 +272,6 @@ sensirion_command!(SerialNumber, 20, true);
 #[register(address = 0xD304, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct DeviceReset {}
-sensirion_command!(DeviceReset, 20, false);
 
 /// This command triggers fan cleaning. The fan is set to the maximum speed for 10 seconds and then
 /// automatically stopped. Wait at least 10s after this command before starting a measurement.
@@ -305,7 +294,6 @@ sensirion_command!(DeviceReset, 20, false);
 #[register(address = 0x5607, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct StartFanCleaning {}
-sensirion_command!(StartFanCleaning, 20, false);
 
 /// This command allows you to use the inbuilt heater in SHT sensor to reverse creep at high
 /// humidity. This command activates the SHT sensor heater with 200mW for 1s. The heater is then
@@ -332,7 +320,6 @@ sensirion_command!(StartFanCleaning, 20, false);
 #[register(address = 0x6765, mode = "w", i2c_codec = "SensirionI2cCodec")]
 #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 0)]
 pub struct ActivateSHTHeater {}
-sensirion_command!(ActivateSHTHeater, 1300, false);
 
 /// Gets/sets the parameters to customize the VOC algorithm. Writing has no effect if at least one
 /// parameter is outside the specified range.
@@ -383,7 +370,6 @@ pub struct VOCAlgorithmTuningParameters {
     #[register(default = 230)]
     pub gain_factor: i16,
 }
-sensirion_command!(VOCAlgorithmTuningParameters, 20, false);
 
 /// Allows backup/restore of the VOC algorithm state to resume operation after a power cycle or
 /// device reset, skipping initial learning phase.
@@ -419,7 +405,6 @@ pub struct VOCAlgorithmState {
     /// The opaque internal state.
     state: [u8; 8],
 }
-sensirion_command!(VOCAlgorithmState, 20, true);
 
 /// Gets/sets the parameters to customize the NOx algorithm. Writing has no effect if at least one
 /// parameter is outside the specified range.
@@ -470,7 +455,6 @@ pub struct NOxAlgorithmTuningParameters {
     #[register(default = 230)]
     pub gain_factor: i16,
 }
-sensirion_command!(NOxAlgorithmTuningParameters, 20, false);
 
 /// Execute the forced recalibration (FRC) of the CO2 signal. Refer to the datasheet for additional
 /// information on how this is to be used.
@@ -492,7 +476,6 @@ pub struct PerformForcedCO2Recalibration {
     /// Target co2 concentration of the test setup. LSB = 1 ppm.
     pub target_co2_concentration: u16,
 }
-sensirion_command!(PerformForcedCO2Recalibration, 500, false);
 
 /// Continuation of [`PerformForcedCO2Recalibration`]. Only use this directly after the wait period
 /// of forced CO2 recalibration.
@@ -514,7 +497,6 @@ pub struct PerformForcedCO2RecalibrationResult {
     #[register(default = u16::MAX)]
     pub correction: u16,
 }
-sensirion_command!(PerformForcedCO2RecalibrationResult, 0, false);
 
 /// Gets/sets the status of the CO2 sensor automatic self-calibration (ASC). The CO2 sensor
 /// supports automatic self-calibration (ASC) for long-term stability of the CO2 output. This
@@ -540,7 +522,6 @@ pub struct CO2SensorAutomaticSelfCalibration {
     /// feature.
     pub enable: bool,
 }
-sensirion_command!(CO2SensorAutomaticSelfCalibration, 20, false);
 
 /// Gets/sets the ambient pressure value. The ambient pressure can be used for pressure
 /// compensation in the CO2 sensor. Setting an ambient pressure overrides any pressure compensation
@@ -565,7 +546,6 @@ pub struct AmbientPressure {
     #[register(default = 1013)]
     pub pressure: u16,
 }
-sensirion_command!(AmbientPressure, 20, true);
 
 /// Gets/sets the current sensor altitude. The sensor altitude can be used for pressure
 /// compensation in the CO2 sensor. The default sensor altitude value is set to 0 meters above sea
@@ -587,4 +567,3 @@ pub struct SensorAltitude {
     /// Sensor altitude, valid input between 0 and 3000m. LSB = 1 meter.
     pub altitude: u16,
 }
-sensirion_command!(SensorAltitude, 20, false);

@@ -136,7 +136,6 @@ where
 impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D, I> {
     /// Read the last temperature measured
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, TransportError<(), I::BusError>> {
-        // Read current configuration to determine conversion rate
         let reg_conf = self.read_register::<Configuration>().await?;
 
         // Read and return the temperature
