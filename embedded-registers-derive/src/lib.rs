@@ -335,11 +335,17 @@ fn register_impl(args: TokenStream, input: TokenStream) -> syn::Result<TokenStre
         .unwrap_or_else(|| syn::parse_str::<syn::Type>("()").unwrap());
 
     let spi_codec = args.spi_codec.unwrap_or_else(|| {
-        syn::parse_str::<syn::Type>("embedded_registers::spi::codecs::no_codec::NoCodec::<Self::CodecError>").unwrap()
+        syn::parse_str::<syn::Type>(
+            "embedded_registers::spi::codecs::unsupported_codec::UnsupportedCodec::<Self::CodecError>",
+        )
+        .unwrap()
     });
 
     let i2c_codec = args.i2c_codec.unwrap_or_else(|| {
-        syn::parse_str::<syn::Type>("embedded_registers::i2c::codecs::no_codec::NoCodec::<Self::CodecError>").unwrap()
+        syn::parse_str::<syn::Type>(
+            "embedded_registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<Self::CodecError>",
+        )
+        .unwrap()
     });
 
     let mut output = quote! {

@@ -21,9 +21,9 @@ use bytemuck::Zeroable;
 /// |---|---|---|
 /// | `HEADER_SIZE` | `usize` | The size of the command header (register address) in bytes |
 #[derive(Default)]
-pub struct SimpleCodec<const HEADER_SIZE: usize> {}
+pub struct StandardCodec<const HEADER_SIZE: usize> {}
 
-impl<const HEADER_SIZE: usize> RegisterCodec for SimpleCodec<HEADER_SIZE> {
+impl<const HEADER_SIZE: usize> RegisterCodec for StandardCodec<HEADER_SIZE> {
     type Error = ();
 }
 
@@ -33,7 +33,7 @@ impl<const HEADER_SIZE: usize> RegisterCodec for SimpleCodec<HEADER_SIZE> {
     async(feature = "async"),
     keep_self
 )]
-impl<const HEADER_SIZE: usize> crate::i2c::Codec for SimpleCodec<HEADER_SIZE> {
+impl<const HEADER_SIZE: usize> crate::i2c::Codec for StandardCodec<HEADER_SIZE> {
     #[inline]
     async fn read_register<R, I, A>(
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,

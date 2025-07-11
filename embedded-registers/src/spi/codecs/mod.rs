@@ -1,2 +1,2 @@
-pub mod no_codec;
-pub mod simple_codec;
+pub mod standard_codec;
+pub mod unsupported_codec;

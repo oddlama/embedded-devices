@@ -1,8 +1,8 @@
 use bondrewd::{BitfieldEnum, Bitfields};
 use embedded_devices_derive::device_register;
-use embedded_registers::{i2c::codecs::OneByteRegAddrCodec, register, spi::codecs::simple_codec::SimpleCodec};
+use embedded_registers::{i2c::codecs::OneByteRegAddrCodec, register, spi::codecs::standard_codec::StandardCodec};
 
-pub type BMP390SpiCodec = SimpleCodec<1, 6, 0, 7, true, 1>;
+pub type BMP390SpiCodec = StandardCodec<1, 6, 0, 7, true, 1>;
 
 /// Known chip ids
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]

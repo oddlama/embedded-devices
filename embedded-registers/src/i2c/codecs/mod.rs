@@ -1,6 +1,5 @@
-pub mod crc8_codec;
-pub mod no_codec;
-pub mod simple_codec;
+pub mod standard_codec;
+pub mod unsupported_codec;
 
-pub type OneByteRegAddrCodec = simple_codec::SimpleCodec<1>;
-pub type TwoByteRegAddrCodec = simple_codec::SimpleCodec<2>;
+pub type OneByteRegAddrCodec = standard_codec::StandardCodec<1>;
+pub type TwoByteRegAddrCodec = standard_codec::StandardCodec<2>;

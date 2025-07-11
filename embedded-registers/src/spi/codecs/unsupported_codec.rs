@@ -4,11 +4,11 @@ use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableR
 
 /// A codec that represents absense of a codec. This is only used as a placeholder in register
 /// definitions to specify that the associated interface is not supported.
-pub struct NoCodec<E: 'static> {
+pub struct UnsupportedCodec<E: 'static> {
     _marker: PhantomData<E>,
 }
 
-impl<E: 'static> RegisterCodec for NoCodec<E> {
+impl<E: 'static> RegisterCodec for UnsupportedCodec<E> {
     type Error = E;
 }
 
@@ -18,14 +18,16 @@ impl<E: 'static> RegisterCodec for NoCodec<E> {
     async(feature = "async"),
     keep_self
 )]
-impl<E: 'static> crate::spi::Codec for NoCodec<E> {
+impl<E: 'static> crate::spi::Codec for UnsupportedCodec<E> {
     #[inline]
     async fn read_register<R, I>(_interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice,
     {
-        panic!("spi::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
+        panic!(
+            "spi::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
+        );
     }
 
     #[inline]
@@ -37,6 +39,8 @@ impl<E: 'static> crate::spi::Codec for NoCodec<E> {
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice,
     {
-        panic!("spi::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
+        panic!(
+            "spi::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
+        );
     }
 }

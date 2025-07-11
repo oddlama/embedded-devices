@@ -1,8 +1,8 @@
 use bondrewd::BitfieldEnum;
 use embedded_devices_derive::device_register;
-use embedded_registers::{register, spi::codecs::simple_codec::SimpleCodec};
+use embedded_registers::{register, spi::codecs::standard_codec::StandardCodec};
 
-pub type MAX31865SpiCodec = SimpleCodec<1, 6, 0, 7, false, 0>;
+pub type MAX31865SpiCodec = StandardCodec<1, 6, 0, 7, false, 0>;
 
 /// Conversion mode.
 #[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]

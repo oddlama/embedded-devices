@@ -27,7 +27,7 @@ use bytemuck::Zeroable;
 /// | `RW_BIT`                   | `u8`    | The bit index of the RW bit when interpreting the struct in big-endian |
 /// | `RW_1_IS_READ`             | `bool`  | whether the setting the RW bit signals read-mode (true) or write-mode (false) |
 /// | `READ_DELAY`               | `usize` | Number of bytes that we have to wait (send additional zeros) after sending the header until data arrives |
-pub struct SimpleCodec<
+pub struct StandardCodec<
     const HEADER_SIZE: usize,
     const ADDR_MSB: u8,
     const ADDR_LSB: u8,
@@ -43,7 +43,7 @@ impl<
     const RW_BIT: u8,
     const RW_1_IS_READ: bool,
     const READ_DELAY: usize,
-> SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
+> StandardCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     #[inline]
     pub fn fill_addr_header<R>(header: &mut [u8])
@@ -72,7 +72,7 @@ impl<
     const RW_BIT: u8,
     const RW_1_IS_READ: bool,
     const READ_DELAY: usize,
-> RegisterCodec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
+> RegisterCodec for StandardCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     type Error = ();
 }
@@ -90,7 +90,7 @@ impl<
     const RW_BIT: u8,
     const RW_1_IS_READ: bool,
     const READ_DELAY: usize,
-> crate::spi::Codec for SimpleCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
+> crate::spi::Codec for StandardCodec<HEADER_SIZE, ADDR_MSB, ADDR_LSB, RW_BIT, RW_1_IS_READ, READ_DELAY>
 {
     #[inline]
     async fn read_register<R, I>(interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>

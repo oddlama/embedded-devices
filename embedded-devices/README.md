@@ -125,7 +125,7 @@ appropriate object given an interface (and address if required).
 
 The vast majority of devices use similar "protocols" on top of I2C or SPI to
 expose their registers - which we call codecs. For both I2C and SPI we provide
-a `SimpleCodec` implementation, that should allow communication with most of
+a `StandardCodec` implementation, that should allow communication with most of
 the simpler devices in existence. If a device (or single register) requires a
 more involved codec (for example to verify CRC checksums), we probably have
 that covered already. You can always define custom codecs if necessary.

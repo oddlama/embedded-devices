@@ -4,11 +4,11 @@ use crate::{ReadableRegister, Register, RegisterCodec, TransportError, WritableR
 
 /// A codec that represents absense of a codec. This is only used as a placeholder in register
 /// definitions to specify that the associated interface is not supported.
-pub struct NoCodec<E: 'static> {
+pub struct UnsupportedCodec<E: 'static> {
     _marker: PhantomData<E>,
 }
 
-impl<E: 'static> RegisterCodec for NoCodec<E> {
+impl<E: 'static> RegisterCodec for UnsupportedCodec<E> {
     type Error = E;
 }
 
@@ -18,7 +18,7 @@ impl<E: 'static> RegisterCodec for NoCodec<E> {
     async(feature = "async"),
     keep_self
 )]
-impl<E: 'static> crate::i2c::Codec for NoCodec<E> {
+impl<E: 'static> crate::i2c::Codec for UnsupportedCodec<E> {
     #[inline]
     async fn read_register<R, I, A>(
         _bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
@@ -28,7 +28,9 @@ impl<E: 'static> crate::i2c::Codec for NoCodec<E> {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        panic!("i2c::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
+        panic!(
+            "i2c::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
+        );
     }
 
     #[inline]
@@ -41,6 +43,8 @@ impl<E: 'static> crate::i2c::Codec for NoCodec<E> {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        panic!("i2c::codecs::NoCodec cannot be used at runtime! Please specify a real codec to access this register.");
+        panic!(
+            "i2c::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
+        );
     }
 }
