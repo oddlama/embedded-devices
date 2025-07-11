@@ -174,8 +174,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. To
     /// configure advanced settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         self.write_register(
-            ControlMeasurement::default()
+            reg_ctrl_m
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )

@@ -138,23 +138,20 @@ impl<const HEADER_SIZE: usize, const CHUNK_SIZE: usize, C: Crc8Algorithm> crate:
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        #[repr(C, packed(1))]
-        #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]
-        struct Buffer<const HEADER_SIZE: usize, R> {
-            header: [u8; HEADER_SIZE],
-            register: R,
-        }
         let crc = crc::Crc::<u8>::new(C::instance());
-
-        let mut buffer = Buffer::<{ HEADER_SIZE }, R> {
-            header: R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..]
-                .try_into()
-                .expect("Unexpected compile-time header address size. This is a bug in the chosen Codec or embedded-registers."),
-            register: *register.as_ref(),
-        };
-        let data = bytemuck::bytes_of_mut(&mut buffer);
+        let header: [u8; HEADER_SIZE] = R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..]
+            .try_into()
+            .expect(
+                "Unexpected compile-time header address size. This is a bug in the chosen Codec or embedded-registers.",
+            );
+        let register = *register.as_ref();
+        let data = bytemuck::bytes_of(&register);
 
         let mut array = Vec::<u8, 64>::new();
+        array
+            .extend_from_slice(&header)
+            .expect("Register too large for CrcCodec implementation. Raise an issue in embedded_registers.");
+
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)

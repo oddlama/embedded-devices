@@ -487,8 +487,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
             .await?;
 
         // This must happen after ControlHumidity, otherwise the former will not have any effect
+        let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         self.write_register(
-            ControlMeasurement::default()
+            reg_ctrl_m
                 .with_temperature_oversampling(config.temperature_oversampling)
                 .with_pressure_oversampling(config.pressure_oversampling),
         )
