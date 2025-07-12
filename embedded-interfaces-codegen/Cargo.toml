@@ -1,0 +1,21 @@
+[package]
+name = "embedded-interfaces-codegen"
+edition = "2024"
+description = "A macro library for generating packed structs, register and command definitions for embedded-interfaces"
+documentation = "https://docs.rs/embedded-interfaces-codegen"
+keywords = ["embedded", "macro", "packed", "registers", "commands"]
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+prettyplease = "0.2.35"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }

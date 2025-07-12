@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "embedded-devices",
     "embedded-devices-derive",
+	"embedded-interfaces",
+	"embedded-interfaces-codegen",
     "embedded-registers",
     "embedded-registers-derive",
 ]

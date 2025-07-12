@@ -223,6 +223,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-interfaces"
+version = "0.9.13"
+dependencies = [
+ "bytemuck",
+ "crc",
+ "defmt",
+ "embedded-hal",
+ "embedded-hal-async",
+ "embedded-interfaces-codegen",
+ "heapless",
+ "maybe-async-cfg",
+ "thiserror",
+]
+
+[[package]]
+name = "embedded-interfaces-codegen"
+version = "0.9.13"
+dependencies = [
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "embedded-registers"
 version = "0.9.13"
 dependencies = [
@@ -342,6 +367,16 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "prettyplease"
+version = "0.2.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "061c1221631e079b26479d25bbf2275bfe5917ae8419cd7e34f13bfc2aa7539a"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.104",
+]
 
 [[package]]
 name = "proc-macro-error-attr2"

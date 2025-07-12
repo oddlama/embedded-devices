@@ -1,0 +1,30 @@
+[package]
+name = "embedded-interfaces"
+edition = "2024"
+description = "Traits for common embedded interfaces and procedural macros for effortless definition of registers and commands for embedded device drivers"
+documentation = "https://docs.rs/embedded-interfaces"
+keywords = ["embedded", "macro", "packed", "registers", "commands"]
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[dependencies]
+bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
+crc = "3.3.0"
+defmt = "1.0.1"
+embedded-hal = "1.0.0"
+embedded-hal-async = { version = "1.0.0", optional = true }
+embedded-interfaces-codegen = { version = "0.9.13", path = "../embedded-interfaces-codegen" }
+heapless = "0.8.0"
+maybe-async-cfg = "0.2.5"
+thiserror = { version = "2.0.12", default-features = false }
+
+[features]
+default = ["sync", "async"]
+
+sync = []
+async = ["dep:embedded-hal-async"]
+std = ["thiserror/std"]
