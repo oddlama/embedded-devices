@@ -23,7 +23,7 @@ pub fn generate_packed_struct_pair(
 ) -> syn::Result<TokenStream2> {
     // Process and validate bit patterns
     let total_size_bits = (size * 8) as u32;
-    let processed_fields = process_field_bit_patterns(fields, total_size_bits)?;
+    let processed_fields = process_field_bit_patterns(packed_name, fields, total_size_bits)?;
 
     let unpacked_struct = generate_unpacked_struct(&processed_fields, unpacked_name, doc_attrs)?;
     let packed_struct = generate_packed_struct(packed_name, unpacked_name, size, doc_attrs)?;

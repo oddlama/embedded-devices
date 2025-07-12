@@ -1,5 +1,6 @@
 //! Code generation for register definitions
 
+use proc_macro2::Ident;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::Expr;
@@ -33,8 +34,8 @@ fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDef
     let attrs = registers_def.get_effective_attrs(register)?;
 
     // Extract register attributes
-    let (addr, mode, size) = extract_register_attrs(&attrs)?;
-    let (codec_error, i2c_codec, spi_codec) = extract_codec_attrs(&attrs)?;
+    let (addr, mode, size) = extract_register_attrs(&register.name, &attrs)?;
+    let (codec_error, i2c_codec, spi_codec) = extract_codec_attrs(&register.name, &attrs)?;
 
     // Generate the packed/unpacked struct pair (reusable part)
     let packed_structs = generate_packed_struct_pair(
@@ -63,7 +64,7 @@ fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDef
     })
 }
 
-fn extract_register_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, String, usize)> {
+fn extract_register_attrs(register_name: &Ident, attrs: &[Attr]) -> syn::Result<(TokenStream2, String, usize)> {
     let mut addr = None;
     let mut mode = None;
     let mut size = None;
@@ -86,17 +87,17 @@ fn extract_register_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, 
         }
     }
 
-    let addr =
-        addr.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'addr' attribute"))?;
-    let mode =
-        mode.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'mode' attribute"))?;
-    let size =
-        size.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'size' attribute"))?;
+    let addr = addr.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'addr' attribute"))?;
+    let mode = mode.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'mode' attribute"))?;
+    let size = size.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'size' attribute"))?;
 
     Ok((addr, mode, size))
 }
 
-fn extract_codec_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, TokenStream2, TokenStream2)> {
+fn extract_codec_attrs(
+    register_name: &Ident,
+    attrs: &[Attr],
+) -> syn::Result<(TokenStream2, TokenStream2, TokenStream2)> {
     let mut codec_error = None;
     let mut i2c_codec = None;
     let mut spi_codec = None;
@@ -117,9 +118,12 @@ fn extract_codec_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, Tok
         }
     }
 
-    let codec_error = codec_error.unwrap_or_else(|| quote! { () });
-    let i2c_codec = i2c_codec.unwrap_or_else(|| quote! { () });
-    let spi_codec = spi_codec.unwrap_or_else(|| quote! { () });
+    let codec_error = codec_error
+        .ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'codec_error' attribute"))?;
+    let i2c_codec =
+        i2c_codec.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'i2c_codec' attribute"))?;
+    let spi_codec =
+        spi_codec.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'spi_codec' attribute"))?;
 
     Ok((codec_error, i2c_codec, spi_codec))
 }

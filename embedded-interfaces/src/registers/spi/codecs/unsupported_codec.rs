@@ -5,11 +5,11 @@ use crate::registers::{ReadableRegister, Register, RegisterCodec, WritableRegist
 
 /// A codec that represents absense of a codec. This is only used as a placeholder in register
 /// definitions to specify that the associated interface is not supported.
-pub struct UnsupportedCodec<E: 'static> {
+pub struct UnsupportedCodec<E> {
     _marker: PhantomData<E>,
 }
 
-impl<E: 'static> RegisterCodec for UnsupportedCodec<E> {
+impl<E> RegisterCodec for UnsupportedCodec<E> {
     type Error = E;
 }
 

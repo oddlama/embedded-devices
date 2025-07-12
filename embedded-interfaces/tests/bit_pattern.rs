@@ -1,16 +1,12 @@
 use embedded_interfaces::codegen::registers;
 
-// Mock types for testing
-struct DummyCodec;
-struct CustomType;
-
 #[test]
 fn test_bit_pattern_consolidation() {
     // This should compile and generate proper bit patterns
     registers! {
         defaults {
-            i2c_codec = DummyCodec,
-            spi_codec = DummyCodec,
+            i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+            spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
             codec_error = (),
         }
 
@@ -54,8 +50,8 @@ fn test_bit_pattern_consolidation() {
 fn test_array_types() {
     registers! {
         defaults {
-            i2c_codec = DummyCodec,
-            spi_codec = DummyCodec,
+            i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+            spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
             codec_error = (),
         }
 

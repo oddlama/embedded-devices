@@ -11,6 +11,7 @@ type TestSpiCodec = embedded_interfaces::registers::spi::codecs::standard_codec:
 
 registers! {
     defaults {
+        codec_error = (),
         i2c_codec = OneByteRegAddrCodec,
         spi_codec = TestSpiCodec,
     }
@@ -29,7 +30,7 @@ registers! {
     //     },
     // }
 
-    Range(addr = 0x0, mode = rw, size = 6) {
+    Range(addr = 0x0, mode = rw, size = 2) {
         // Single bit
         f0: u8[0],
         // Exclusive range

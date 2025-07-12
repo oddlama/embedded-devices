@@ -69,7 +69,7 @@ impl Parse for DefaultsBlock {
             content.parse::<Token![=]>()?;
             let value: Expr = content.parse()?;
 
-            defaults.push(DefaultEntry { name: attr_name, value });
+            defaults.push(Attr { name: attr_name, value });
 
             // Optional comma
             if content.peek(Token![,]) {
@@ -111,7 +111,7 @@ impl Parse for RegisterDefinition {
                 content.parse::<Token![=]>()?;
                 let value: Expr = content.parse()?;
 
-                attrs.push(DefaultEntry { name: attr_name, value });
+                attrs.push(Attr { name: attr_name, value });
 
                 if content.peek(Token![,]) {
                     content.parse::<Token![,]>()?;

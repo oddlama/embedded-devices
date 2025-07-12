@@ -14,12 +14,12 @@ pub struct RegistersDefinition {
 /// Values can be any expression (literals, identifiers, paths, etc.)
 #[derive(Debug, Clone)]
 pub struct DefaultsBlock {
-    pub defaults: Vec<DefaultEntry>,
+    pub defaults: Vec<Attr>,
 }
 
 /// A single default entry
 #[derive(Debug, Clone)]
-pub struct DefaultEntry {
+pub struct Attr {
     pub name: Ident,
     pub value: Expr,
 }
@@ -35,7 +35,7 @@ pub struct DevicesBlock {
 pub struct RegisterDefinition {
     pub attributes: Vec<Attribute>,
     pub name: Ident,
-    pub register_attrs: Vec<DefaultEntry>, // Reuse the same structure
+    pub register_attrs: Vec<Attr>, // Reuse the same structure
     pub fields: Vec<FieldDefinition>,
 }
 
@@ -73,7 +73,7 @@ pub struct UnitsBlock {
 impl RegistersDefinition {
     /// Get all register attributes including defaults
     /// This method validates that only allowed attributes are used for registers
-    pub fn get_effective_attrs(&self, register: &RegisterDefinition) -> syn::Result<Vec<DefaultEntry>> {
+    pub fn get_effective_attrs(&self, register: &RegisterDefinition) -> syn::Result<Vec<Attr>> {
         let mut attrs = Vec::new();
         const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
 

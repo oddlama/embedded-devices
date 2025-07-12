@@ -3,6 +3,7 @@
 //! This module handles the consolidation, normalization, and validation of bit patterns
 //! for packed struct fields.
 
+use proc_macro2::Ident;
 use syn::Type;
 
 use crate::parser::{BitPattern, BitRange, FieldDefinition};
@@ -58,6 +59,7 @@ pub struct ProcessedField {
 
 /// Process and validate all fields' bit patterns
 pub fn process_field_bit_patterns(
+    parent: &Ident,
     fields: &[FieldDefinition],
     total_size_bits: u32,
 ) -> syn::Result<Vec<ProcessedField>> {
@@ -71,7 +73,7 @@ pub fn process_field_bit_patterns(
     }
 
     // Second pass: validate no overlaps and complete coverage
-    validate_bit_coverage(&processed_fields, total_size_bits)?;
+    validate_bit_coverage(parent, &processed_fields, total_size_bits)?;
 
     Ok(processed_fields)
 }
@@ -196,7 +198,7 @@ fn infer_field_size_bits(field_type: &Type) -> syn::Result<u32> {
 }
 
 /// Validate that all bits are covered exactly once and match the expected size
-fn validate_bit_coverage(processed_fields: &[ProcessedField], total_size_bits: u32) -> syn::Result<()> {
+fn validate_bit_coverage(parent: &Ident, processed_fields: &[ProcessedField], total_size_bits: u32) -> syn::Result<()> {
     let mut all_ranges = Vec::new();
 
     // Collect all ranges from all fields
@@ -212,8 +214,8 @@ fn validate_bit_coverage(processed_fields: &[ProcessedField], total_size_bits: u
     // Check for overlaps
     for i in 1..all_ranges.len() {
         if all_ranges[i - 1].overlaps(&all_ranges[i]) {
-            return Err(syn::Error::new(
-                proc_macro2::Span::call_site(),
+            return Err(syn::Error::new_spanned(
+                parent,
                 format!(
                     "Bit range overlap detected: {}..{} and {}..{}",
                     all_ranges[i - 1].start,
@@ -241,8 +243,8 @@ fn validate_bit_coverage(processed_fields: &[ProcessedField], total_size_bits: u
 
     // Check for complete coverage
     if merged.len() != 1 {
-        return Err(syn::Error::new(
-            proc_macro2::Span::call_site(),
+        return Err(syn::Error::new_spanned(
+            parent,
             format!(
                 "Bit coverage is not contiguous. Found {} separate ranges when exactly one is expected.",
                 merged.len()
@@ -252,8 +254,8 @@ fn validate_bit_coverage(processed_fields: &[ProcessedField], total_size_bits: u
 
     let coverage = &merged[0];
     if coverage.start != 0 {
-        return Err(syn::Error::new(
-            proc_macro2::Span::call_site(),
+        return Err(syn::Error::new_spanned(
+            parent,
             format!(
                 "Bit coverage does not start at 0. Found start at bit {}.",
                 coverage.start
@@ -262,8 +264,8 @@ fn validate_bit_coverage(processed_fields: &[ProcessedField], total_size_bits: u
     }
 
     if coverage.end != total_size_bits {
-        return Err(syn::Error::new(
-            proc_macro2::Span::call_site(),
+        return Err(syn::Error::new_spanned(
+            parent,
             format!(
                 "Bit coverage does not match expected size. Expected {} bits, found {} bits.",
                 total_size_bits, coverage.end
