@@ -7,6 +7,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{Attribute, Ident};
 
+use super::bit_pattern::{generate_bit_pattern_doc, process_field_bit_patterns};
 use crate::parser::FieldDefinition;
 
 /// Generate a pair of packed and unpacked structs with conversion implementations
@@ -20,7 +21,11 @@ pub fn generate_packed_struct_pair(
     doc_attrs: &[Attribute],
     size: usize,
 ) -> syn::Result<TokenStream2> {
-    let unpacked_struct = generate_unpacked_struct(fields, unpacked_name, doc_attrs)?;
+    // Process and validate bit patterns
+    let total_size_bits = (size * 8) as u32;
+    let processed_fields = process_field_bit_patterns(fields, total_size_bits)?;
+
+    let unpacked_struct = generate_unpacked_struct(&processed_fields, unpacked_name, doc_attrs)?;
     let packed_struct = generate_packed_struct(packed_name, unpacked_name, size, doc_attrs)?;
     let conversions = generate_struct_conversions(packed_name, unpacked_name)?;
 
@@ -33,14 +38,16 @@ pub fn generate_packed_struct_pair(
 
 /// Generate the unpacked struct with individual fields
 fn generate_unpacked_struct(
-    fields: &[FieldDefinition],
+    processed_fields: &[super::bit_pattern::ProcessedField],
     unpacked_name: &Ident,
     doc_attrs: &[Attribute],
 ) -> syn::Result<TokenStream2> {
     let mut struct_fields = Vec::new();
     let mut default_values = Vec::new();
 
-    for field in fields {
+    for processed in processed_fields {
+        let field = &processed.field;
+
         // Skip reserved fields (fields without names)
         if let Some(field_name) = &field.name {
             let field_type = &field.field_type;
@@ -53,10 +60,15 @@ fn generate_unpacked_struct(
                 quote! { #[doc = "Default: not specified"] }
             };
 
+            // Generate bit pattern documentation
+            let bit_pattern_doc = generate_bit_pattern_doc(&processed.normalized_ranges);
+            let bit_doc = quote! { #[doc = #bit_pattern_doc] };
+
             struct_fields.push(quote! {
                 #(#field_attrs)*
                 #[doc = ""]
                 #default_doc
+                #bit_doc
                 pub #field_name: #field_type
             });
 

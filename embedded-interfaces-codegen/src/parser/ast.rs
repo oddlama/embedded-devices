@@ -1,6 +1,6 @@
 //! Abstract Syntax Tree definitions
 
-use syn::{Attribute, Expr, Ident, LitInt, LitStr, Type};
+use syn::{Attribute, Expr, Ident, Type};
 
 /// Top-level structure for the entire registers! block
 #[derive(Debug, Clone)]
@@ -10,10 +10,18 @@ pub struct RegistersDefinition {
     pub registers: Vec<RegisterDefinition>,
 }
 
-/// Defaults block: defaults { key = value, ... }
+/// Generic defaults block: defaults { key = value, ... }
+/// Values can be any expression (literals, identifiers, paths, etc.)
 #[derive(Debug, Clone)]
 pub struct DefaultsBlock {
-    pub defaults: Vec<RegisterAttr>,
+    pub defaults: Vec<DefaultEntry>,
+}
+
+/// A single default entry
+#[derive(Debug, Clone)]
+pub struct DefaultEntry {
+    pub name: Ident,
+    pub value: Expr,
 }
 
 /// Devices block: devices [ DeviceA, DeviceB, ... ]
@@ -27,22 +35,8 @@ pub struct DevicesBlock {
 pub struct RegisterDefinition {
     pub attributes: Vec<Attribute>,
     pub name: Ident,
-    pub register_attrs: Vec<RegisterAttr>,
+    pub register_attrs: Vec<DefaultEntry>, // Reuse the same structure
     pub fields: Vec<FieldDefinition>,
-}
-
-/// Register attributes like addr, mode, size, etc.
-#[derive(Debug, Clone)]
-pub struct RegisterAttr {
-    pub name: Ident,
-    pub value: RegisterAttrValue,
-}
-
-#[derive(Debug, Clone)]
-pub enum RegisterAttrValue {
-    Int(LitInt),
-    String(LitStr),
-    Ident(Ident),
 }
 
 /// Field definition within a register
@@ -78,23 +72,48 @@ pub struct UnitsBlock {
 
 impl RegistersDefinition {
     /// Get all register attributes including defaults
-    pub fn get_effective_attrs(&self, register: &RegisterDefinition) -> Vec<RegisterAttr> {
+    /// This method validates that only allowed attributes are used for registers
+    pub fn get_effective_attrs(&self, register: &RegisterDefinition) -> syn::Result<Vec<DefaultEntry>> {
         let mut attrs = Vec::new();
+        const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
 
-        // Add defaults first
+        // Add defaults first, validating each one
         if let Some(defaults) = &self.defaults {
             for attr in &defaults.defaults {
+                let attr_name = attr.name.to_string();
+                if !ALLOWED_REGISTER_ATTRS.contains(&attr_name.as_str()) {
+                    return Err(syn::Error::new_spanned(
+                        &attr.name,
+                        format!(
+                            "Unknown register attribute '{}'. Allowed attributes are: {}",
+                            attr_name,
+                            ALLOWED_REGISTER_ATTRS.join(", ")
+                        ),
+                    ));
+                }
                 attrs.push(attr.clone());
             }
         }
 
-        // Add register-specific attributes (these override defaults)
+        // Add register-specific attributes (these override defaults), validating each one
         for attr in &register.register_attrs {
+            let attr_name = attr.name.to_string();
+            if !ALLOWED_REGISTER_ATTRS.contains(&attr_name.as_str()) {
+                return Err(syn::Error::new_spanned(
+                    &attr.name,
+                    format!(
+                        "Unknown register attribute '{}'. Allowed attributes are: {}",
+                        attr_name,
+                        ALLOWED_REGISTER_ATTRS.join(", ")
+                    ),
+                ));
+            }
+
             // Remove any existing attribute with the same name
             attrs.retain(|a| a.name != attr.name);
             attrs.push(attr.clone());
         }
 
-        attrs
+        Ok(attrs)
     }
 }

@@ -2,7 +2,7 @@
 
 use super::ast::*;
 use syn::{
-    Attribute, Ident, LitInt, LitStr, Token, Type,
+    Attribute, Expr, Ident, LitInt, Token, Type,
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
     token::{Brace, Bracket},
@@ -22,7 +22,7 @@ impl Parse for RegistersDefinition {
                     let ident: Ident = input.fork().parse()?;
                     if ident == "defaults" {
                         if defaults.is_some() {
-                            return Err(input.error("Multiple defaults blocks not allowed"));
+                            return Err(input.error("Multiple defaults blocks are not allowed"));
                         }
                         defaults = Some(input.parse()?);
                         continue;
@@ -37,7 +37,7 @@ impl Parse for RegistersDefinition {
                     let ident: Ident = input.fork().parse()?;
                     if ident == "devices" {
                         if devices.is_some() {
-                            return Err(input.error("Multiple devices blocks not allowed"));
+                            return Err(input.error("Multiple devices blocks are not allowed"));
                         }
                         devices = Some(input.parse()?);
                         continue;
@@ -67,16 +67,9 @@ impl Parse for DefaultsBlock {
         while !content.is_empty() {
             let attr_name: Ident = content.parse()?;
             content.parse::<Token![=]>()?;
+            let value: Expr = content.parse()?;
 
-            let value = if content.peek(LitInt) {
-                RegisterAttrValue::Int(content.parse()?)
-            } else if content.peek(LitStr) {
-                RegisterAttrValue::String(content.parse()?)
-            } else {
-                RegisterAttrValue::Ident(content.parse()?)
-            };
-
-            defaults.push(RegisterAttr { name: attr_name, value });
+            defaults.push(DefaultEntry { name: attr_name, value });
 
             // Optional comma
             if content.peek(Token![,]) {
@@ -116,16 +109,9 @@ impl Parse for RegisterDefinition {
             while !content.is_empty() {
                 let attr_name: Ident = content.parse()?;
                 content.parse::<Token![=]>()?;
+                let value: Expr = content.parse()?;
 
-                let value = if content.peek(LitInt) {
-                    RegisterAttrValue::Int(content.parse()?)
-                } else if content.peek(LitStr) {
-                    RegisterAttrValue::String(content.parse()?)
-                } else {
-                    RegisterAttrValue::Ident(content.parse()?)
-                };
-
-                attrs.push(RegisterAttr { name: attr_name, value });
+                attrs.push(DefaultEntry { name: attr_name, value });
 
                 if content.peek(Token![,]) {
                     content.parse::<Token![,]>()?;

@@ -2,10 +2,11 @@
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::Ident;
+use syn::Expr;
 
 use crate::parser::*;
 
+mod bit_pattern;
 mod packed_struct;
 mod register_traits;
 
@@ -29,7 +30,7 @@ fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDef
     let unpacked_name = format_ident!("{}Unpacked", register_name);
 
     // Get effective attributes (defaults + register-specific)
-    let attrs = registers_def.get_effective_attrs(register);
+    let attrs = registers_def.get_effective_attrs(register)?;
 
     // Extract register attributes
     let (addr, mode, size) = extract_register_attrs(&attrs)?;
@@ -62,7 +63,7 @@ fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDef
     })
 }
 
-fn extract_register_attrs(attrs: &[RegisterAttr]) -> syn::Result<(TokenStream2, String, usize)> {
+fn extract_register_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, String, usize)> {
     let mut addr = None;
     let mut mode = None;
     let mut size = None;
@@ -70,68 +71,48 @@ fn extract_register_attrs(attrs: &[RegisterAttr]) -> syn::Result<(TokenStream2, 
     for attr in attrs {
         match attr.name.to_string().as_str() {
             "addr" => {
-                if let RegisterAttrValue::Int(lit_int) = &attr.value {
-                    addr = Some(quote! { #lit_int });
-                }
+                let attr_value = &attr.value;
+                addr = Some(quote! { #attr_value });
             }
             "mode" => {
-                if let RegisterAttrValue::Ident(ident) = &attr.value {
-                    mode = Some(ident.to_string());
-                }
+                // Extract mode string from expression
+                mode = Some(extract_mode_string(&attr.value)?);
             }
             "size" => {
-                if let RegisterAttrValue::Int(lit_int) = &attr.value {
-                    size = Some(lit_int.base10_parse::<usize>()?);
-                }
+                // Extract size integer from expression
+                size = Some(extract_size_integer(&attr.value)?);
             }
             _ => {}
         }
     }
 
-    let addr = addr.ok_or_else(|| syn::Error::new_spanned(&attrs[0].name, "Missing addr attribute"))?;
-    let mode = mode.ok_or_else(|| syn::Error::new_spanned(&attrs[0].name, "Missing mode attribute"))?;
-    let size = size.ok_or_else(|| syn::Error::new_spanned(&attrs[0].name, "Missing size attribute"))?;
+    let addr =
+        addr.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'addr' attribute"))?;
+    let mode =
+        mode.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'mode' attribute"))?;
+    let size =
+        size.ok_or_else(|| syn::Error::new_spanned(&attrs.first().unwrap().name, "Missing required 'size' attribute"))?;
 
     Ok((addr, mode, size))
 }
 
-fn extract_codec_attrs(attrs: &[RegisterAttr]) -> syn::Result<(TokenStream2, TokenStream2, TokenStream2)> {
+fn extract_codec_attrs(attrs: &[DefaultEntry]) -> syn::Result<(TokenStream2, TokenStream2, TokenStream2)> {
     let mut codec_error = None;
     let mut i2c_codec = None;
     let mut spi_codec = None;
 
     for attr in attrs {
+        let attr_value = &attr.value;
         match attr.name.to_string().as_str() {
-            "codec_error" => match &attr.value {
-                RegisterAttrValue::Ident(ident) => {
-                    codec_error = Some(quote! { #ident });
-                }
-                RegisterAttrValue::String(lit_str) => {
-                    let ident: Ident = syn::parse_str(&lit_str.value())?;
-                    codec_error = Some(quote! { #ident });
-                }
-                _ => {}
-            },
-            "i2c_codec" => match &attr.value {
-                RegisterAttrValue::Ident(ident) => {
-                    i2c_codec = Some(quote! { #ident });
-                }
-                RegisterAttrValue::String(lit_str) => {
-                    let ident: Ident = syn::parse_str(&lit_str.value())?;
-                    i2c_codec = Some(quote! { #ident });
-                }
-                _ => {}
-            },
-            "spi_codec" => match &attr.value {
-                RegisterAttrValue::Ident(ident) => {
-                    spi_codec = Some(quote! { #ident });
-                }
-                RegisterAttrValue::String(lit_str) => {
-                    let ident: Ident = syn::parse_str(&lit_str.value())?;
-                    spi_codec = Some(quote! { #ident });
-                }
-                _ => {}
-            },
+            "codec_error" => {
+                codec_error = Some(quote! { #attr_value });
+            }
+            "i2c_codec" => {
+                i2c_codec = Some(quote! { #attr_value });
+            }
+            "spi_codec" => {
+                spi_codec = Some(quote! { #attr_value });
+            }
             _ => {}
         }
     }
@@ -141,4 +122,39 @@ fn extract_codec_attrs(attrs: &[RegisterAttr]) -> syn::Result<(TokenStream2, Tok
     let spi_codec = spi_codec.unwrap_or_else(|| quote! { () });
 
     Ok((codec_error, i2c_codec, spi_codec))
+}
+
+/// Extract a mode string from an expression
+fn extract_mode_string(expr: &Expr) -> syn::Result<String> {
+    match expr {
+        Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit_str),
+            ..
+        }) => Ok(lit_str.value()),
+        Expr::Path(path) => {
+            if let Some(ident) = path.path.get_ident() {
+                Ok(ident.to_string())
+            } else {
+                Err(syn::Error::new_spanned(
+                    expr,
+                    "Mode must be a string literal or identifier (e.g., \"rw\", r, rw)",
+                ))
+            }
+        }
+        _ => Err(syn::Error::new_spanned(
+            expr,
+            "Mode must be a string literal or identifier (e.g., \"rw\", r, rw)",
+        )),
+    }
+}
+
+/// Extract a size integer from an expression
+fn extract_size_integer(expr: &Expr) -> syn::Result<usize> {
+    match expr {
+        Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(lit_int),
+            ..
+        }) => lit_int.base10_parse::<usize>(),
+        _ => Err(syn::Error::new_spanned(expr, "Size must be an integer literal")),
+    }
 }
