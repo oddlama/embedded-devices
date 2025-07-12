@@ -7,10 +7,12 @@ use syn::Expr;
 
 use crate::parser::*;
 
-mod bit_manipulation;
+mod bit_helpers;
 mod bit_pattern;
+mod pack;
 mod packed_struct;
 mod register_traits;
+mod unpack;
 
 pub use packed_struct::*;
 pub use register_traits::*;

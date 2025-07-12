@@ -85,7 +85,7 @@ fn generate_unpacked_struct(
     }
 
     // Generate the byte conversion method
-    let pack_body = super::bit_manipulation::generate_pack_body(packed_name, processed_fields, size)?;
+    let pack_body = super::pack::generate_pack_body(packed_name, processed_fields, size)?;
 
     Ok(quote! {
         #(#doc_attrs)*
@@ -121,7 +121,7 @@ fn generate_packed_struct(
     doc_attrs: &[Attribute],
 ) -> syn::Result<TokenStream2> {
     // Generate the byte conversion method
-    let unpack_body = super::bit_manipulation::generate_unpack_body(unpacked_name, processed_fields)?;
+    let unpack_body = super::unpack::generate_unpack_body(unpacked_name, processed_fields)?;
 
     Ok(quote! {
         #(#doc_attrs)*
