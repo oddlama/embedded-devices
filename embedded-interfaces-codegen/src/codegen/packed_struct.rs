@@ -36,7 +36,6 @@ pub fn generate_packed_struct_pair(
     })
 }
 
-/// Generate the unpacked struct with individual fields
 fn generate_unpacked_struct(
     processed_fields: &[super::bit_pattern::ProcessedField],
     unpacked_name: &Ident,

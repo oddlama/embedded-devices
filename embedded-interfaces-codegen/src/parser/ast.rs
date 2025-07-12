@@ -35,7 +35,7 @@ pub struct DevicesBlock {
 pub struct RegisterDefinition {
     pub attributes: Vec<Attribute>,
     pub name: Ident,
-    pub register_attrs: Vec<Attr>, // Reuse the same structure
+    pub register_attrs: Vec<Attr>,
     pub fields: Vec<FieldDefinition>,
 }
 
@@ -46,6 +46,7 @@ pub struct FieldDefinition {
     pub name: Option<Ident>, // None for reserved fields like _
     pub field_type: Type,
     pub bit_pattern: Option<BitPattern>,
+    pub size_constraint: Option<u32>,
     pub default_value: Option<Expr>,
     pub units: Option<UnitsBlock>,
 }

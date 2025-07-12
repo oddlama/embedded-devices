@@ -31,7 +31,7 @@ fn test_bit_pattern_consolidation() {
             // Should be assigned [8..9]
             field2: bool,
             // Should be assigned [9..16]
-            field3: u8,
+            field3: u8{7},
         }
 
         // Test mixed explicit and automatic

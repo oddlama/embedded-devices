@@ -78,7 +78,7 @@ pub fn process_field_bit_patterns(
     Ok(processed_fields)
 }
 
-/// Process a single field's bit pattern
+/// Process a single field's bit pattern (updated to handle size constraints)
 fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn::Result<ProcessedField> {
     let normalized_ranges = if let Some(bit_pattern) = &field.bit_pattern {
         // Explicit bit pattern provided
@@ -90,8 +90,18 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn
         }
 
         ranges
+    } else if let Some(size_constraint) = field.size_constraint {
+        // Size constraint syntax e.g. u8{3} - use constraint size instead of inferred size
+        let start_bit = *next_auto_bit;
+        let end_bit = start_bit + size_constraint;
+
+        // Validate that the constraint makes sense for the field type
+        validate_size_constraint(&field.field_type, size_constraint)?;
+
+        *next_auto_bit = end_bit;
+        vec![NormalizedRange::new(start_bit, end_bit)?]
     } else {
-        // Auto-generate bit pattern
+        // Auto-generate bit pattern using inferred size
         let field_size = infer_field_size_bits(&field.field_type)?;
         let start_bit = *next_auto_bit;
         let end_bit = start_bit + field_size;
@@ -104,6 +114,80 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn
         field: field.clone(),
         normalized_ranges,
     })
+}
+/// Validate that a size constraint makes sense for the given field type
+fn validate_size_constraint(field_type: &Type, size_constraint: u32) -> syn::Result<()> {
+    match field_type {
+        Type::Path(type_path) => {
+            if let Some(ident) = type_path.path.get_ident() {
+                let type_name = ident.to_string();
+                let max_size = match type_name.as_str() {
+                    "bool" => 1,
+                    "u8" | "i8" => 8,
+                    "u16" | "i16" => 16,
+                    "u32" | "i32" | "f32" => 32,
+                    "u64" | "i64" | "f64" => 64,
+                    "u128" | "i128" => 128,
+                    "usize" | "isize" => 32, // Assume 32-bit for embedded
+                    _ => {
+                        // For unknown types, we can't validate - assume it's valid
+                        return Ok(());
+                    }
+                };
+
+                if size_constraint > max_size {
+                    return Err(syn::Error::new_spanned(
+                        field_type,
+                        format!(
+                            "Size constraint {} bits exceeds maximum size {} bits for type '{}'",
+                            size_constraint, max_size, type_name
+                        ),
+                    ));
+                }
+
+                if size_constraint == 0 {
+                    return Err(syn::Error::new_spanned(
+                        field_type,
+                        "Size constraint must be greater than 0",
+                    ));
+                }
+            }
+        }
+        Type::Array(array_type) => {
+            let element_size = infer_field_size_bits(&array_type.elem)?;
+            if let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(lit_int),
+                ..
+            }) = &array_type.len
+            {
+                let array_len = lit_int.base10_parse::<u32>()?;
+                let max_size = element_size * array_len;
+
+                if size_constraint > max_size {
+                    return Err(syn::Error::new_spanned(
+                        field_type,
+                        format!(
+                            "Size constraint {} bits exceeds maximum size {} bits for array type",
+                            size_constraint, max_size
+                        ),
+                    ));
+                }
+
+                if size_constraint == 0 {
+                    return Err(syn::Error::new_spanned(
+                        field_type,
+                        "Size constraint must be greater than 0",
+                    ));
+                }
+            }
+        }
+        _ => {
+            // For other types, we can't validate - assume it's valid
+            // This includes custom types that might have their own size semantics
+        }
+    }
+
+    Ok(())
 }
 
 /// Normalize a bit pattern by consolidating adjacent ranges

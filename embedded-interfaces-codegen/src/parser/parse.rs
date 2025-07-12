@@ -156,8 +156,21 @@ impl Parse for FieldDefinition {
         input.parse::<Token![:]>()?;
         let field_type: Type = input.parse()?;
 
-        // Optional bit pattern
+        // Check for size constraint syntax: {size}
+        let size_constraint = if input.peek(syn::token::Brace) {
+            let content;
+            syn::braced!(content in input);
+            let size_lit: LitInt = content.parse()?;
+            Some(size_lit.base10_parse::<u32>()?)
+        } else {
+            None
+        };
+
+        // Optional bit pattern (mutually exclusive with size constraint)
         let bit_pattern = if input.peek(syn::token::Bracket) {
+            if size_constraint.is_some() {
+                return Err(input.error("Cannot specify both size constraint {n} and bit pattern [n..m]"));
+            }
             Some(input.parse()?)
         } else {
             None
@@ -172,7 +185,7 @@ impl Parse for FieldDefinition {
         };
 
         // Optional units block (placeholder)
-        let units = if input.peek(syn::token::Brace) {
+        let units = if input.peek(syn::token::Brace) && size_constraint.is_none() {
             let _content;
             syn::braced!(_content in input);
             // TODO: Parse units block content
@@ -191,6 +204,7 @@ impl Parse for FieldDefinition {
             name,
             field_type,
             bit_pattern,
+            size_constraint,
             default_value,
             units,
         })
