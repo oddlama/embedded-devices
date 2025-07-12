@@ -145,12 +145,14 @@ impl Parse for FieldDefinition {
         let attributes = input.call(Attribute::parse_outer)?;
 
         // Field name (or _ for reserved)
-        let name = if input.peek(Token![_]) {
-            input.parse::<Token![_]>()?;
-            // Check if it's a named reserved field like _reserved1
-            if input.peek(Ident) { Some(input.parse()?) } else { None }
+        let name = if input.peek(Ident) {
+            // A named field like field1 or _reserved
+            input.parse()?
+        } else if input.peek(Token![_]) {
+            let underscore = input.parse::<Token![_]>()?;
+            Ident::new("_reserved_auto", underscore.span)
         } else {
-            Some(input.parse()?)
+            return Err(input.error("Missing field identifier or _ for reserved field"));
         };
 
         input.parse::<Token![:]>()?;
@@ -240,6 +242,9 @@ impl Parse for BitPattern {
             }
         }
 
-        Ok(BitPattern { ranges })
+        Ok(BitPattern {
+            ranges,
+            span: input.span(),
+        })
     }
 }

@@ -1,7 +1,5 @@
 use embedded_interfaces::codegen::registers;
 
-// FIXME: ensure error on overlap or bit reuse
-// FIXME: ensure error if size mismatch
 // FIXME: allow _: [2..4] short reserved syntax
 // FIXME: allow x: u8[7..=0] reverse ranges
 // FIXME: allow read write annotatation per field? then dont generate write_f1 read_f1 with_f1 ?? not sure
@@ -75,10 +73,6 @@ registers! {
     /// Large register with 40-bit field
     Energy(addr = 0x9, mode = r, size = 5) {
         /// 40-bit energy accumulation
-        raw_value: u64[0..40] = 0,
+        raw_value: u64{40} = 0,
     }
-}
-
-fn main() {
-    println!("Register macro parsing successful!");
 }

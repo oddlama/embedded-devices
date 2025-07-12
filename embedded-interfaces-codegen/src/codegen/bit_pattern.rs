@@ -16,11 +16,17 @@ pub struct NormalizedRange {
 }
 
 impl NormalizedRange {
-    pub fn new(start: u32, end: u32) -> syn::Result<Self> {
+    pub fn new(start: u32, end: u32) -> Result<Self, String> {
+        if start == end {
+            return Err(format!(
+                "Invalid empty bit pattern: {}..{} (must cover at least 1 bit)",
+                start, end
+            ));
+        }
         if start >= end {
-            return Err(syn::Error::new(
-                proc_macro2::Span::call_site(),
-                format!("Invalid bit range: {}..{} (start must be less than end)", start, end),
+            return Err(format!(
+                "Invalid bit range: {}..{} (start must be less than end)",
+                start, end
             ));
         }
         Ok(NormalizedRange { start, end })
@@ -82,7 +88,7 @@ pub fn process_field_bit_patterns(
 fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn::Result<ProcessedField> {
     let normalized_ranges = if let Some(bit_pattern) = &field.bit_pattern {
         // Explicit bit pattern provided
-        let ranges = normalize_bit_pattern(bit_pattern)?;
+        let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
 
         // Update next_auto_bit to be after the highest bit used
         if let Some(max_end) = ranges.iter().map(|r| r.end).max() {
@@ -99,7 +105,7 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn
         validate_size_constraint(&field.field_type, size_constraint)?;
 
         *next_auto_bit = end_bit;
-        vec![NormalizedRange::new(start_bit, end_bit)?]
+        vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(field.size_constraint, e))?]
     } else {
         // Auto-generate bit pattern using inferred size
         let field_size = infer_field_size_bits(&field.field_type)?;
@@ -107,7 +113,7 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn
         let end_bit = start_bit + field_size;
 
         *next_auto_bit = end_bit;
-        vec![NormalizedRange::new(start_bit, end_bit)?]
+        vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(&field.field_type, e))?]
     };
 
     Ok(ProcessedField {
@@ -191,7 +197,7 @@ fn validate_size_constraint(field_type: &Type, size_constraint: u32) -> syn::Res
 }
 
 /// Normalize a bit pattern by consolidating adjacent ranges
-fn normalize_bit_pattern(bit_pattern: &BitPattern) -> syn::Result<Vec<NormalizedRange>> {
+fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange>, String> {
     let mut ranges = Vec::new();
 
     // Convert all bit ranges to normalized ranges
@@ -242,7 +248,6 @@ fn infer_field_size_bits(field_type: &Type) -> syn::Result<u32> {
                     "u32" | "i32" | "f32" => Ok(32),
                     "u64" | "i64" | "f64" => Ok(64),
                     "u128" | "i128" => Ok(128),
-                    "usize" | "isize" => Ok(32), // Assume 32-bit for embedded
                     _ => Err(syn::Error::new_spanned(
                         field_type,
                         format!(
@@ -326,6 +331,20 @@ fn validate_bit_coverage(parent: &Ident, processed_fields: &[ProcessedField], to
     }
 
     // Check for complete coverage
+    if merged.is_empty() {
+        if total_size_bits != 0 {
+            return Err(syn::Error::new_spanned(
+                parent,
+                format!(
+                    "Bit coverage does not match expected size. Expected {} bits, found 0 bits.",
+                    total_size_bits
+                ),
+            ));
+        }
+
+        return Ok(());
+    }
+
     if merged.len() != 1 {
         return Err(syn::Error::new_spanned(
             parent,

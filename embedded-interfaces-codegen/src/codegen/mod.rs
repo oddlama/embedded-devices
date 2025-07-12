@@ -7,6 +7,7 @@ use syn::Expr;
 
 use crate::parser::*;
 
+mod bit_manipulation;
 mod bit_pattern;
 mod packed_struct;
 mod register_traits;

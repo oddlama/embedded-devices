@@ -1,5 +1,6 @@
 //! Abstract Syntax Tree definitions
 
+use proc_macro2::Span;
 use syn::{Attribute, Expr, Ident, Type};
 
 /// Top-level structure for the entire registers! block
@@ -43,7 +44,7 @@ pub struct RegisterDefinition {
 #[derive(Debug, Clone)]
 pub struct FieldDefinition {
     pub attributes: Vec<Attribute>,
-    pub name: Option<Ident>, // None for reserved fields like _
+    pub name: Ident, // Reserved fields will start with _
     pub field_type: Type,
     pub bit_pattern: Option<BitPattern>,
     pub size_constraint: Option<u32>,
@@ -55,6 +56,7 @@ pub struct FieldDefinition {
 #[derive(Debug, Clone)]
 pub struct BitPattern {
     pub ranges: Vec<BitRange>,
+    pub span: Span,
 }
 
 /// Individual bit range
@@ -116,5 +118,12 @@ impl RegistersDefinition {
         }
 
         Ok(attrs)
+    }
+}
+
+impl FieldDefinition {
+    /// Check if this field is reserved
+    pub fn is_reserved(&self) -> bool {
+        self.name.to_string().starts_with('_')
     }
 }

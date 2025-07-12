@@ -1,6 +1,19 @@
 use embedded_interfaces::codegen::registers;
 
 #[test]
+fn test_empty() {
+    registers! {
+        defaults {
+            i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+            spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
+            codec_error = (),
+        }
+
+        EmptyTest(addr = 0x0, mode = rw, size = 0) {}
+    }
+}
+
+#[test]
 fn test_bit_pattern_consolidation() {
     // This should compile and generate proper bit patterns
     registers! {
@@ -63,17 +76,18 @@ fn test_array_types() {
 }
 
 // These tests should fail to compile with good error messages
+// FIXME: test_errors what?
 #[cfg(test_errors)]
 mod error_tests {
-    use register_macro_lib::registers;
+    use embedded_interfaces::codegen::registers;
 
     #[test]
     fn test_size_mismatch() {
         // Should fail: only 15 bits defined but size is 2 bytes (16 bits)
         registers! {
             defaults {
-                i2c_codec = DummyCodec,
-                spi_codec = DummyCodec,
+                i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+                spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
                 codec_error = (),
             }
 
@@ -89,8 +103,8 @@ mod error_tests {
         // Should fail: overlapping bit ranges
         registers! {
             defaults {
-                i2c_codec = DummyCodec,
-                spi_codec = DummyCodec,
+                i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+                spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
                 codec_error = (),
             }
 
@@ -106,8 +120,8 @@ mod error_tests {
         // Should fail: empty range
         registers! {
             defaults {
-                i2c_codec = DummyCodec,
-                spi_codec = DummyCodec,
+                i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+                spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
                 codec_error = (),
             }
 
@@ -122,8 +136,8 @@ mod error_tests {
         // Should fail: cannot infer size for custom type
         registers! {
             defaults {
-                i2c_codec = DummyCodec,
-                spi_codec = DummyCodec,
+                i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+                spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
                 codec_error = (),
             }
 
@@ -138,8 +152,8 @@ mod error_tests {
         // Should fail: gap in bit coverage
         registers! {
             defaults {
-                i2c_codec = DummyCodec,
-                spi_codec = DummyCodec,
+                i2c_codec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec::<()>,
+                spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
                 codec_error = (),
             }
 
