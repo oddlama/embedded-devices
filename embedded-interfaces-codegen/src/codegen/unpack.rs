@@ -58,12 +58,12 @@ fn generate_unpack_expression(field_type: &Type, ranges: &[NormalizedRange]) -> 
                     _ => Err(format!("Unknown primitive type '{}' for bit manipulation", type_name)),
                 }
             } else {
-                Err("Complex path types are not yet supported for bit manipulation".to_string())
+                Err("Complex path types are not supported for bit manipulation".to_string())
             }
         }
         Type::Array(array_type) => generate_array_unpack(array_type, ranges),
         Type::Tuple(_) => Err("Tuple types are not supported for bit manipulation".to_string()),
-        _ => Err("This type is not yet supported for bit manipulation".to_string()),
+        _ => Err("This type is not supported for bit manipulation".to_string()),
     }
 }
 
@@ -74,7 +74,7 @@ fn generate_bool_unpack(ranges: &[NormalizedRange]) -> Result<TokenStream2, Stri
     }
 
     let bit_offset = ranges[0].start;
-    let byte_index = bit_offset / 8;
+    let byte_index = (bit_offset / 8) as usize;
     let bit_index = bit_offset % 8;
 
     Ok(quote! {
@@ -140,7 +140,7 @@ fn generate_signed_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result
     // General case: extract bits, handle sign extension
     let bit_extractions = generate_bit_extractions(ranges)?;
     let sign_bit_offset = ranges[0].start;
-    let sign_byte_index = sign_bit_offset / 8;
+    let sign_byte_index = (sign_bit_offset / 8) as usize;
     let sign_bit_index = sign_bit_offset % 8;
 
     Ok(quote! {
@@ -229,7 +229,11 @@ fn generate_array_unpack(array_type: &syn::TypeArray, ranges: &[NormalizedRange]
 
     for _ in 0..array_len {
         let element_ranges = extract_element_ranges(ranges, current_bit_offset, element_bits)?;
-        let element_unpack = generate_unpack_expression(element_type, &element_ranges)?;
+        let absolute_ranges: Vec<NormalizedRange> = element_ranges
+            .iter()
+            .map(|r| NormalizedRange::new(r.start + current_bit_offset, r.end + current_bit_offset).unwrap())
+            .collect();
+        let element_unpack = generate_unpack_expression(element_type, &absolute_ranges)?;
         element_unpacks.push(element_unpack);
         current_bit_offset += element_bits;
     }

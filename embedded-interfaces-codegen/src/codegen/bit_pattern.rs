@@ -349,8 +349,9 @@ fn validate_bit_coverage(parent: &Ident, processed_fields: &[ProcessedField], to
         return Err(syn::Error::new_spanned(
             parent,
             format!(
-                "Bit coverage is not contiguous. Found {} separate ranges when exactly one is expected.",
-                merged.len()
+                "Bit coverage is not contiguous. Found {} separate ranges when exactly one is expected. {:#?}",
+                merged.len(),
+                merged
             ),
         ));
     }
