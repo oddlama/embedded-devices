@@ -1,5 +1,4 @@
-- rename embedded-registers to embedded-interfaces
-- rename embedded registers stuff to add registers:: mod in between
+- check doc comments in embedded-interfaces and embedded-interfaces-codegen
 
 - all defmt derives only if defmt feature is enabled
 - workspace dependencies for stuff that is needed all the time, bondrewd, embedded-hal, maybe-async-cfg, ...
