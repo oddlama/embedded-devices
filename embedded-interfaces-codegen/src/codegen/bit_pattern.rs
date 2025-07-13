@@ -4,6 +4,7 @@
 //! for packed struct fields.
 
 use proc_macro2::Ident;
+use std::collections::VecDeque;
 use syn::Type;
 
 use crate::parser::{BitPattern, BitRange, FieldDefinition};
@@ -11,12 +12,12 @@ use crate::parser::{BitPattern, BitRange, FieldDefinition};
 /// A normalized bit range (always exclusive end)
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalizedRange {
-    pub start: u32,
-    pub end: u32, // exclusive
+    pub start: usize,
+    pub end: usize, // exclusive
 }
 
 impl NormalizedRange {
-    pub fn new(start: u32, end: u32) -> Result<Self, String> {
+    pub fn new(start: usize, end: usize) -> Result<Self, String> {
         if start == end {
             return Err(format!(
                 "Invalid empty bit pattern: {}..{} (must cover at least 1 bit)",
@@ -32,7 +33,7 @@ impl NormalizedRange {
         Ok(NormalizedRange { start, end })
     }
 
-    pub fn size(&self) -> u32 {
+    pub fn size(&self) -> usize {
         self.end - self.start
     }
 
@@ -56,6 +57,104 @@ impl NormalizedRange {
     }
 }
 
+/// A tiny conversion trait so both NormalizedRange and &NormalizedRange work.
+pub trait IntoNormalizedRange {
+    fn into_normalized(self) -> NormalizedRange;
+}
+
+impl IntoNormalizedRange for NormalizedRange {
+    #[inline]
+    fn into_normalized(self) -> NormalizedRange {
+        self
+    }
+}
+
+impl IntoNormalizedRange for &NormalizedRange {
+    #[inline]
+    fn into_normalized(self) -> NormalizedRange {
+        self.clone()
+    }
+}
+
+pub trait IterChunksExactBits: Iterator + Sized {
+    fn chunks_exact_bits(self, bits: usize) -> ChunksExactBits<Self>
+    where
+        Self::Item: IntoNormalizedRange;
+}
+
+impl<I> IterChunksExactBits for I
+where
+    I: Iterator,
+    I::Item: IntoNormalizedRange,
+{
+    fn chunks_exact_bits(self, bits: usize) -> ChunksExactBits<Self> {
+        ChunksExactBits::new(self, bits)
+    }
+}
+
+pub struct ChunksExactBits<I> {
+    inner: I,
+    buf: VecDeque<NormalizedRange>,
+    bits: usize,
+}
+
+impl<I> ChunksExactBits<I>
+where
+    I: Iterator,
+    I::Item: IntoNormalizedRange,
+{
+    fn new(inner: I, bits: usize) -> Self {
+        assert!(bits > 0);
+        Self {
+            inner,
+            buf: VecDeque::new(),
+            bits,
+        }
+    }
+}
+
+impl<I> Iterator for ChunksExactBits<I>
+where
+    I: Iterator,
+    I::Item: IntoNormalizedRange,
+{
+    type Item = Vec<NormalizedRange>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let needed = self.bits;
+        let mut taken = Vec::new();
+        let mut remaining = needed;
+
+        while remaining > 0 {
+            if self.buf.is_empty() {
+                if let Some(next) = self.inner.next() {
+                    // convert into NormalizedRange
+                    self.buf.push_back(next.into_normalized());
+                } else {
+                    break;
+                }
+            }
+
+            let mut cur = self.buf.pop_front().unwrap();
+            if cur.size() <= remaining {
+                remaining -= cur.size();
+                taken.push(cur);
+            } else {
+                let split = cur.start + remaining;
+                taken.push(NormalizedRange {
+                    start: cur.start,
+                    end: split,
+                });
+                cur.start = split;
+                self.buf.push_front(cur);
+                remaining = 0;
+            }
+        }
+
+        if taken.is_empty() { None } else { Some(taken) }
+    }
+}
+
 /// Processed field information with normalized bit patterns
 #[derive(Debug, Clone)]
 pub struct ProcessedField {
@@ -67,10 +166,10 @@ pub struct ProcessedField {
 pub fn process_field_bit_patterns(
     parent: &Ident,
     fields: &[FieldDefinition],
-    total_size_bits: u32,
+    total_size_bits: usize,
 ) -> syn::Result<Vec<ProcessedField>> {
     let mut processed_fields = Vec::new();
-    let mut next_auto_bit = 0u32;
+    let mut next_auto_bit = 0usize;
 
     // First pass: process each field's bit pattern
     for field in fields {
@@ -85,7 +184,7 @@ pub fn process_field_bit_patterns(
 }
 
 /// Process a single field's bit pattern (updated to handle size constraints)
-fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn::Result<ProcessedField> {
+fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut usize) -> syn::Result<ProcessedField> {
     let normalized_ranges = if let Some(bit_pattern) = &field.bit_pattern {
         // Explicit bit pattern provided
         let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
@@ -122,7 +221,7 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut u32) -> syn
     })
 }
 /// Validate that a size constraint makes sense for the given field type
-fn validate_size_constraint(field_type: &Type, size_constraint: u32) -> syn::Result<()> {
+fn validate_size_constraint(field_type: &Type, size_constraint: usize) -> syn::Result<()> {
     match field_type {
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
@@ -166,7 +265,7 @@ fn validate_size_constraint(field_type: &Type, size_constraint: u32) -> syn::Res
                 ..
             }) = &array_type.len
             {
-                let array_len = lit_int.base10_parse::<u32>()?;
+                let array_len = lit_int.base10_parse::<usize>()?;
                 let max_size = element_size * array_len;
 
                 if size_constraint > max_size {
@@ -236,7 +335,7 @@ fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange
 }
 
 /// Infer the size in bits for a field type
-fn infer_field_size_bits(field_type: &Type) -> syn::Result<u32> {
+fn infer_field_size_bits(field_type: &Type) -> syn::Result<usize> {
     match field_type {
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
@@ -270,7 +369,7 @@ fn infer_field_size_bits(field_type: &Type) -> syn::Result<u32> {
                 ..
             }) = &array_type.len
             {
-                let array_len = lit_int.base10_parse::<u32>()?;
+                let array_len = lit_int.base10_parse::<usize>()?;
                 Ok(element_size * array_len)
             } else {
                 Err(syn::Error::new_spanned(
@@ -287,7 +386,11 @@ fn infer_field_size_bits(field_type: &Type) -> syn::Result<u32> {
 }
 
 /// Validate that all bits are covered exactly once and match the expected size
-fn validate_bit_coverage(parent: &Ident, processed_fields: &[ProcessedField], total_size_bits: u32) -> syn::Result<()> {
+fn validate_bit_coverage(
+    parent: &Ident,
+    processed_fields: &[ProcessedField],
+    total_size_bits: usize,
+) -> syn::Result<()> {
     let mut all_ranges = Vec::new();
 
     // Collect all ranges from all fields

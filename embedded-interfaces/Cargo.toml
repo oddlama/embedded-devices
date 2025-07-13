@@ -12,6 +12,7 @@ categories.workspace = true
 license.workspace = true
 
 [dependencies]
+bitvec = { version = "1.0.1", default-features = false }
 bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 crc = "3.3.0"
 defmt = "1.0.1"
@@ -27,4 +28,4 @@ default = ["sync", "async"]
 
 sync = []
 async = ["dep:embedded-hal-async"]
-std = ["thiserror/std"]
+std = ["thiserror/std", "bitvec/std"]

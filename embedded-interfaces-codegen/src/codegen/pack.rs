@@ -4,12 +4,12 @@
 //! to packed bytes.
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{Ident, Type};
 
 use super::{
-    bit_helpers::{extract_element_ranges, get_element_bits, get_type_bits},
-    bit_pattern::{NormalizedRange, ProcessedField},
+    bit_helpers::{generate_copy_to_normalized_ranges, get_element_bits, get_type_bits},
+    bit_pattern::{IterChunksExactBits, NormalizedRange, ProcessedField},
 };
 
 /// Generate the body of the pack method
@@ -26,30 +26,36 @@ pub fn generate_pack_body(
         let ranges = &processed.normalized_ranges;
 
         // Skip reserved fields
-        if processed.field.is_reserved() {
-            // TODO: reserved fields must be serialized into the byte array! They have defaults!
-            continue;
-        }
+        let value_expr = if processed.field.is_reserved() {
+            if let Some(default) = processed.field.default_value.as_ref() {
+                quote! { { let default: #field_type = #default; default } }
+            } else {
+                // Value is guaranteed to be 0 initialized, so we can skip
+                // reserved values without a default.
+                continue;
+            }
+        } else {
+            quote! { self.#field_name }
+        };
 
-        let value_expr = quote! { self.#field_name };
-        let pack_statements = generate_pack_statements(value_expr, field_type, ranges)
+        let pack_statement = generate_pack_statement(value_expr, field_type, ranges)
             .map_err(|e| syn::Error::new_spanned(field_name, e))?;
-        field_packings.extend(pack_statements);
+        field_packings.push(pack_statement);
     }
 
     Ok(quote! {
-        let mut bytes = [0u8; #size];
+        let mut dst = [0u8; #size];
         #(#field_packings)*
-        #packed_name(bytes)
+        #packed_name(dst)
     })
 }
 
 /// Generate statements to pack a value into bytes
-fn generate_pack_statements(
+fn generate_pack_statement(
     value_expr: TokenStream2,
     field_type: &Type,
     ranges: &[NormalizedRange],
-) -> Result<Vec<TokenStream2>, String> {
+) -> Result<TokenStream2, String> {
     match field_type {
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
@@ -75,42 +81,20 @@ fn generate_pack_statements(
 }
 
 /// Generate bool pack statements
-fn generate_bool_pack(value_expr: TokenStream2, ranges: &[NormalizedRange]) -> Result<Vec<TokenStream2>, String> {
+fn generate_bool_pack(value_expr: TokenStream2, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
     if ranges.len() != 1 || ranges[0].size() != 1 {
         return Err("bool fields must have exactly 1 bit".to_string());
     }
 
-    let bit_offset = ranges[0].start;
-    let byte_index = (bit_offset / 8) as usize;
-    let bit_index = bit_offset % 8;
+    let byte_index = ranges[0].start / 8;
+    let bit_index = ranges[0].start as u8 % 8;
+    let bit_lsb_index = 7 - bit_index;
+    let keep_mask = !(1u8 << bit_lsb_index);
 
-    Ok(vec![quote! {
-        if #value_expr {
-            bytes[#byte_index] |= 1 << (7 - #bit_index);
-        }
-    }])
-}
-
-/// Try to generate optimized byte-aligned pack code
-fn try_generate_byte_aligned_pack(
-    value_expr: TokenStream2,
-    ranges: &[NormalizedRange],
-    type_bytes: u32,
-) -> Option<TokenStream2> {
-    // Check if we have exactly one range that is byte-aligned and full-width
-    if ranges.len() == 1 {
-        let range = &ranges[0];
-        if range.start % 8 == 0 && range.size() == type_bytes * 8 {
-            let start_byte = (range.start / 8) as usize;
-            let end_byte = start_byte + type_bytes as usize;
-
-            return Some(quote! {
-                bytes[#start_byte..#end_byte].copy_from_slice(&(#value_expr).to_be_bytes());
-            });
-        }
-    }
-
-    None
+    Ok(quote! {{
+        dst[#byte_index] = (dst[#byte_index] & #keep_mask)
+            | ((#value_expr as u8) << #bit_lsb_index);
+    }})
 }
 
 /// Generate unsigned integer pack statements
@@ -118,8 +102,8 @@ fn generate_unsigned_pack(
     value_expr: TokenStream2,
     type_name: &str,
     ranges: &[NormalizedRange],
-) -> Result<Vec<TokenStream2>, String> {
-    let total_bits: u32 = ranges.iter().map(|r| r.size()).sum();
+) -> Result<TokenStream2, String> {
+    let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
     let type_bits = get_type_bits(type_name);
 
     if total_bits > type_bits {
@@ -129,17 +113,18 @@ fn generate_unsigned_pack(
         ));
     }
 
-    let type_bytes = type_bits / 8;
+    let copy_ranges = generate_copy_to_normalized_ranges(
+        type_bits,
+        total_bits,
+        &format_ident!("src"),
+        &format_ident!("dst"),
+        ranges,
+    )?;
 
-    // Check for byte-aligned optimization
-    if let Some(optimized) = try_generate_byte_aligned_pack(value_expr.clone(), ranges, type_bytes) {
-        return Ok(vec![optimized]);
-    }
-
-    // General case: convert to bytes and extract bits
-    let bit_insertions = generate_bit_insertions(value_expr, ranges)?;
-
-    Ok(bit_insertions)
+    Ok(quote! {
+        let src = #value_expr.to_be_bytes();
+        #copy_ranges
+    })
 }
 
 /// Generate signed integer pack statements
@@ -147,8 +132,8 @@ fn generate_signed_pack(
     value_expr: TokenStream2,
     type_name: &str,
     ranges: &[NormalizedRange],
-) -> Result<Vec<TokenStream2>, String> {
-    let total_bits: u32 = ranges.iter().map(|r| r.size()).sum();
+) -> Result<TokenStream2, String> {
+    let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
     let type_bits = get_type_bits(type_name);
 
     if total_bits > type_bits {
@@ -158,17 +143,33 @@ fn generate_signed_pack(
         ));
     }
 
-    let type_bytes = type_bits / 8;
+    let mut statements = vec![];
+    let src_range_start = type_bits - total_bits;
+    if src_range_start == 0 {
+        // We copy the full type so the sign bit is already at the correct position
+        statements.push(quote! {
+            let src = #value_expr.to_be_bytes();
+        });
+    } else {
+        // Sign bit must be moved to another location
+        let sign_byte_index = (type_bits - total_bits) / 8;
+        let sign_bit_lsb_index = 7 - ((type_bits - total_bits) % 8);
 
-    // Check for byte-aligned optimization
-    if let Some(optimized) = try_generate_byte_aligned_pack(value_expr.clone(), ranges, type_bytes) {
-        return Ok(vec![optimized]);
+        statements.push(quote! {
+            let mut src = #value_expr.to_be_bytes();
+            src[#sign_byte_index] |= (src[0] >> 7) << #sign_bit_lsb_index;
+        });
     }
 
-    // General case: convert to bytes and extract bits
-    let bit_insertions = generate_bit_insertions(value_expr, ranges)?;
+    statements.push(generate_copy_to_normalized_ranges(
+        type_bits,
+        total_bits,
+        &format_ident!("src"),
+        &format_ident!("dst"),
+        ranges,
+    )?);
 
-    Ok(bit_insertions)
+    Ok(quote! {{ #(#statements)* }})
 }
 
 /// Generate float pack statements
@@ -176,8 +177,8 @@ fn generate_float_pack(
     value_expr: TokenStream2,
     type_name: &str,
     ranges: &[NormalizedRange],
-) -> Result<Vec<TokenStream2>, String> {
-    let total_bits: u32 = ranges.iter().map(|r| r.size()).sum();
+) -> Result<TokenStream2, String> {
+    let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
     let type_bits = get_type_bits(type_name);
 
     if total_bits != type_bits {
@@ -187,17 +188,18 @@ fn generate_float_pack(
         ));
     }
 
-    let type_bytes = type_bits / 8;
+    let copy_ranges = generate_copy_to_normalized_ranges(
+        type_bits,
+        total_bits,
+        &format_ident!("src"),
+        &format_ident!("dst"),
+        ranges,
+    )?;
 
-    // Check for byte-aligned optimization
-    if let Some(optimized) = try_generate_byte_aligned_pack(value_expr.clone(), ranges, type_bytes) {
-        return Ok(vec![optimized]);
-    }
-
-    // General case: convert to bytes and extract bits
-    let bit_insertions = generate_bit_insertions(value_expr, ranges)?;
-
-    Ok(bit_insertions)
+    Ok(quote! {
+        let src = #value_expr.to_be_bytes();
+        #copy_ranges
+    })
 }
 
 /// Generate array pack statements
@@ -205,7 +207,7 @@ fn generate_array_pack(
     value_expr: TokenStream2,
     array_type: &syn::TypeArray,
     ranges: &[NormalizedRange],
-) -> Result<Vec<TokenStream2>, String> {
+) -> Result<TokenStream2, String> {
     let element_type = &array_type.elem;
     let array_len = if let syn::Expr::Lit(syn::ExprLit {
         lit: syn::Lit::Int(lit_int),
@@ -218,67 +220,26 @@ fn generate_array_pack(
     };
 
     let element_bits = get_element_bits(element_type)?;
-    let total_expected_bits = element_bits * array_len as u32;
-    let total_actual_bits: u32 = ranges.iter().map(|r| r.size()).sum();
+    let total_expected_bits = element_bits * array_len;
+    let total_actual_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
 
     if total_actual_bits != total_expected_bits {
         return Err(format!(
-            "Array requires {} bits but {} bits were provided",
+            "This array requires {} bits but {} bits were provided",
             total_expected_bits, total_actual_bits
         ));
     }
 
     // Generate pack statements for each array element
-    let mut statements = Vec::new();
-    let mut current_bit_offset = 0u32;
+    let element_pack_statements = ranges
+        .iter()
+        .chunks_exact_bits(element_bits)
+        .enumerate()
+        .map(|(i, element_ranges)| {
+            let element_value_expr = quote! { (#value_expr)[#i] };
+            generate_pack_statement(element_value_expr, element_type, &element_ranges)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    for i in 0..array_len {
-        let element_ranges = extract_element_ranges(ranges, current_bit_offset, element_bits)?;
-
-        // Adjust element ranges to absolute positions
-        let absolute_ranges: Vec<NormalizedRange> = element_ranges
-            .iter()
-            .map(|r| NormalizedRange::new(r.start + current_bit_offset, r.end + current_bit_offset).unwrap())
-            .collect();
-
-        let element_value_expr = quote! { (#value_expr)[#i] };
-        let element_pack_statements = generate_pack_statements(element_value_expr, element_type, &absolute_ranges)?;
-
-        statements.extend(element_pack_statements);
-        current_bit_offset += element_bits;
-    }
-
-    Ok(statements)
-}
-
-/// Generate bit insertion statements for general case
-fn generate_bit_insertions(value_expr: TokenStream2, ranges: &[NormalizedRange]) -> Result<Vec<TokenStream2>, String> {
-    let mut insertions = vec![quote! {
-        let source_bytes = (#value_expr).to_be_bytes();
-        let mut bit_pos = 0u32;
-    }];
-
-    for range in ranges {
-        let start_bit = range.start;
-        let num_bits = range.size();
-
-        for bit_offset in 0..num_bits {
-            let target_bit = start_bit + bit_offset;
-            let target_byte = (target_bit / 8) as usize;
-            let target_bit_in_byte = target_bit % 8;
-
-            insertions.push(quote! {
-                {
-                    let source_byte = (bit_pos / 8) as usize;
-                    let source_bit = bit_pos % 8;
-                    if (source_bytes[source_byte] & (1 << (7 - source_bit))) != 0 {
-                        bytes[#target_byte] |= 1 << (7 - #target_bit_in_byte);
-                    }
-                    bit_pos += 1;
-                }
-            });
-        }
-    }
-
-    Ok(insertions)
+    Ok(quote! { #({ #element_pack_statements })* })
 }

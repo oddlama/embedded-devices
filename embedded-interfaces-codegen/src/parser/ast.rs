@@ -47,7 +47,7 @@ pub struct FieldDefinition {
     pub name: Ident, // Reserved fields will start with _
     pub field_type: Type,
     pub bit_pattern: Option<BitPattern>,
-    pub size_constraint: Option<u32>,
+    pub size_constraint: Option<usize>,
     pub default_value: Option<Expr>,
     pub units: Option<UnitsBlock>,
 }
@@ -62,9 +62,9 @@ pub struct BitPattern {
 /// Individual bit range
 #[derive(Debug, Clone)]
 pub enum BitRange {
-    Single(u32),              // [5]
-    Range(u32, u32),          // [5..8]
-    RangeInclusive(u32, u32), // [5..=8]
+    Single(usize),                // [5]
+    Range(usize, usize),          // [5..8]
+    RangeInclusive(usize, usize), // [5..=8]
 }
 
 /// Units block (placeholder for now)

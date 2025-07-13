@@ -3,6 +3,7 @@
 compile_error!("You must enable at least one of the create features `sync` or `async`");
 
 // Re-exports for codegen macro
+pub use bitvec;
 pub use bytemuck;
 
 pub mod commands;

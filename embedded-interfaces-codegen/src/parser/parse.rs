@@ -163,7 +163,7 @@ impl Parse for FieldDefinition {
             let content;
             syn::braced!(content in input);
             let size_lit: LitInt = content.parse()?;
-            Some(size_lit.base10_parse::<u32>()?)
+            Some(size_lit.base10_parse::<usize>()?)
         } else {
             None
         };
@@ -221,17 +221,17 @@ impl Parse for BitPattern {
         let mut ranges = Vec::new();
         while !content.is_empty() {
             let start: LitInt = content.parse()?;
-            let start_val = start.base10_parse::<u32>()?;
+            let start_val = start.base10_parse::<usize>()?;
 
             if content.peek(Token![..=]) {
                 content.parse::<Token![..=]>()?;
                 let end: LitInt = content.parse()?;
-                let end_val = end.base10_parse::<u32>()?;
+                let end_val = end.base10_parse::<usize>()?;
                 ranges.push(BitRange::RangeInclusive(start_val, end_val));
             } else if content.peek(Token![..]) {
                 content.parse::<Token![..]>()?;
                 let end: LitInt = content.parse()?;
-                let end_val = end.base10_parse::<u32>()?;
+                let end_val = end.base10_parse::<usize>()?;
                 ranges.push(BitRange::Range(start_val, end_val));
             } else {
                 ranges.push(BitRange::Single(start_val));
