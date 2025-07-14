@@ -5,9 +5,11 @@ compile_error!("You must enable at least one of the create features `sync` or `a
 // Re-exports for codegen macro
 pub use bitvec;
 pub use bytemuck;
+pub use const_format;
 
 pub mod commands;
 pub mod i2c;
+pub mod packable;
 pub mod registers;
 pub mod spi;
 

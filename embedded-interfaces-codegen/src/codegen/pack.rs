@@ -4,7 +4,7 @@
 //! to packed bytes.
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Ident, Type};
 
 use super::{
@@ -30,8 +30,7 @@ pub fn generate_pack_body(
             if let Some(default) = processed.field.default_value.as_ref() {
                 quote! { { let default: #field_type = #default; default } }
             } else {
-                // Value is guaranteed to be 0 initialized, so we can skip
-                // reserved values without a default.
+                // Reserved values without defaults will never be altered.
                 continue;
             }
         } else {
@@ -44,8 +43,13 @@ pub fn generate_pack_body(
     }
 
     Ok(quote! {
+        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+
         let mut dst = [0u8; #size];
-        #(#field_packings)*
+        {
+            let dst_bits = dst.view_bits_mut::<Msb0>();
+            #(#field_packings)*
+        }
         #packed_name(dst)
     })
 }
@@ -68,10 +72,10 @@ fn generate_pack_statement(
                     "usize" | "isize" | "char" => {
                         Err(format!("Type '{}' is not supported for bit manipulation", type_name))
                     }
-                    _ => Err(format!("Unknown primitive type '{}' for bit manipulation", type_name)),
+                    _ => generate_custom_type_pack(value_expr, field_type, ranges),
                 }
             } else {
-                Err("Complex path types are not supported for bit manipulation".to_string())
+                generate_custom_type_pack(value_expr, field_type, ranges)
             }
         }
         Type::Array(array_type) => generate_array_pack(value_expr, array_type, ranges),
@@ -86,14 +90,9 @@ fn generate_bool_pack(value_expr: TokenStream2, ranges: &[NormalizedRange]) -> R
         return Err("bool fields must have exactly 1 bit".to_string());
     }
 
-    let byte_index = ranges[0].start / 8;
-    let bit_index = ranges[0].start as u8 % 8;
-    let bit_lsb_index = 7 - bit_index;
-    let keep_mask = !(1u8 << bit_lsb_index);
-
+    let bit = ranges[0].start;
     Ok(quote! {{
-        dst[#byte_index] = (dst[#byte_index] & #keep_mask)
-            | ((#value_expr as u8) << #bit_lsb_index);
+        dst_bits.replace(#bit, (#value_expr) as bool);
     }})
 }
 
@@ -116,13 +115,14 @@ fn generate_unsigned_pack(
     let copy_ranges = generate_copy_to_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?;
 
     Ok(quote! {
         let src = #value_expr.to_be_bytes();
+        let src_bits = src.view_bits::<Msb0>();
         #copy_ranges
     })
 }
@@ -144,28 +144,29 @@ fn generate_signed_pack(
     }
 
     let mut statements = vec![];
-    let src_range_start = type_bits - total_bits;
-    if src_range_start == 0 {
+    if total_bits == type_bits {
         // We copy the full type so the sign bit is already at the correct position
         statements.push(quote! {
             let src = #value_expr.to_be_bytes();
+            let src_bits = src.view_bits::<Msb0>();
         });
     } else {
         // Sign bit must be moved to another location
         let sign_byte_index = (type_bits - total_bits) / 8;
-        let sign_bit_lsb_index = 7 - ((type_bits - total_bits) % 8);
+        let sign_bit_in_byte_index = 7 - ((type_bits - total_bits) % 8);
 
         statements.push(quote! {
             let mut src = #value_expr.to_be_bytes();
-            src[#sign_byte_index] |= (src[0] >> 7) << #sign_bit_lsb_index;
+            src[#sign_byte_index] |= (src[0] >> 7) << #sign_bit_in_byte_index;
+            let src_bits = src.view_bits::<Msb0>();
         });
     }
 
     statements.push(generate_copy_to_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?);
 
@@ -191,13 +192,14 @@ fn generate_float_pack(
     let copy_ranges = generate_copy_to_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?;
 
     Ok(quote! {
         let src = #value_expr.to_be_bytes();
+        let src_bits = src.view_bits::<Msb0>();
         #copy_ranges
     })
 }
@@ -242,4 +244,39 @@ fn generate_array_pack(
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(quote! { #({ #element_pack_statements })* })
+}
+
+/// Generate custom type pack statements
+fn generate_custom_type_pack(
+    value_expr: TokenStream2,
+    custom_type: &Type,
+    ranges: &[NormalizedRange],
+) -> Result<TokenStream2, String> {
+    let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
+    let min_error = format!(
+        "The type {} requires at least {{MIN_BITS}} bits, but only {} were provided",
+        custom_type.to_token_stream(),
+        total_bits
+    );
+    let max_error = format!(
+        "The type {} requires at most {{MAX_BITS}} bits, but {} were provided",
+        custom_type.to_token_stream(),
+        total_bits
+    );
+
+    let dst_bit_ranges: Vec<_> = ranges
+        .iter()
+        .map(|x| (x.start, x.end))
+        .map(|(a, b)| quote! { (#a, #b) })
+        .collect();
+
+    Ok(quote! {
+        const MIN_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MIN_BITS;
+        const MAX_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MAX_BITS;
+        embedded_interfaces::const_format::assertcp!(MIN_BITS <= #total_bits, #min_error);
+        embedded_interfaces::const_format::assertcp!(MAX_BITS >= #total_bits, #max_error);
+
+        let dst_ranges = [#(#dst_bit_ranges),*];
+        <#custom_type as embedded_interfaces::packable::Packable>::pack(&(#value_expr), dst_bits, &dst_ranges, #total_bits);
+    })
 }

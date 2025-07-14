@@ -48,46 +48,39 @@ pub fn get_element_bits(element_type: &Type) -> Result<usize, String> {
 /// Generates code that copies a range of bits from the source to the destination.
 ///
 /// # Arguments
-/// * `src_ident` - The identifier for the source byte array
-/// * `dst_ident` - The identifier for the destination byte array
+/// * `src_bits_ident` - The identifier for the source bitslice
+/// * `dst_bits_ident` - The identifier for the destination bitslice
 /// * `src_range` - The bit range in the source (start..end)
 /// * `dst_range` - The bit range in the destination (start..end)
 pub fn generate_bit_range_copy(
-    src_ident: &Ident,
-    dst_ident: &Ident,
+    src_bits_ident: &Ident,
+    dst_bits_ident: &Ident,
     (src_start, src_end): (usize, usize),
     (dst_start, dst_end): (usize, usize),
 ) -> TokenStream {
     quote! {{
-        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-        let src_bits = #src_ident.view_bits::<Msb0>();
-        let dst_bits = #dst_ident.view_bits_mut::<Msb0>();
-        let src_range = &src_bits[#src_start..#src_end];
-        let dst_range = &mut dst_bits[#dst_start..#dst_end];
-        dst_range.copy_from_bitslice(src_range);
+        #dst_bits_ident[#dst_start..#dst_end].copy_from_bitslice(&#src_bits_ident[#src_start..#src_end]);
     }}
 }
 
 pub fn generate_copy_from_normalized_ranges(
     type_bits: usize,
     total_bits: usize,
-    src_ident: &Ident,
-    dst_ident: &Ident,
+    src_bits_ident: &Ident,
+    dst_bits_ident: &Ident,
     ranges: &[NormalizedRange],
 ) -> Result<TokenStream, String> {
     let mut statements = vec![];
 
-    let dst_range_start = type_bits - total_bits;
-    let mut bits_copied = 0usize;
+    let mut dst_range_start = type_bits - total_bits;
     for range in ranges {
-        let start = dst_range_start + bits_copied;
         statements.push(generate_bit_range_copy(
-            src_ident,
-            dst_ident,
+            src_bits_ident,
+            dst_bits_ident,
             (range.start, range.end),
-            (start, start + range.size()),
+            (dst_range_start, dst_range_start + range.size()),
         ));
-        bits_copied += range.size();
+        dst_range_start += range.size();
     }
 
     Ok(quote! {{ #(#statements)* }})
@@ -96,23 +89,21 @@ pub fn generate_copy_from_normalized_ranges(
 pub fn generate_copy_to_normalized_ranges(
     type_bits: usize,
     total_bits: usize,
-    src_ident: &Ident,
-    dst_ident: &Ident,
+    src_bits_ident: &Ident,
+    dst_bits_ident: &Ident,
     ranges: &[NormalizedRange],
 ) -> Result<TokenStream, String> {
     let mut statements = vec![];
 
-    let src_range_start = type_bits - total_bits;
-    let mut bits_copied = 0usize;
+    let mut src_range_start = type_bits - total_bits;
     for range in ranges {
-        let start = src_range_start + bits_copied;
         statements.push(generate_bit_range_copy(
-            src_ident,
-            dst_ident,
-            (start, start + range.size()),
+            src_bits_ident,
+            dst_bits_ident,
+            (src_range_start, src_range_start + range.size()),
             (range.start, range.end),
         ));
-        bits_copied += range.size();
+        src_range_start += range.size();
     }
 
     Ok(quote! {{ #(#statements)* }})

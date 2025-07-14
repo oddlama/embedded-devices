@@ -4,7 +4,7 @@
 //! to unpacked field structs.
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Ident, Type};
 
 use super::{
@@ -34,7 +34,11 @@ pub fn generate_unpack_body(unpacked_name: &Ident, processed_fields: &[Processed
     }
 
     Ok(quote! {
+        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+
         let src = self.0;
+        let src_bits = src.view_bits::<Msb0>();
+
         #unpacked_name {
             #(#field_extractions,)*
         }
@@ -55,10 +59,10 @@ fn generate_unpack_expression(field_type: &Type, ranges: &[NormalizedRange]) -> 
                     "usize" | "isize" | "char" => {
                         Err(format!("Type '{}' is not supported for bit manipulation", type_name))
                     }
-                    _ => Err(format!("Unknown primitive type '{}' for bit manipulation", type_name)),
+                    _ => generate_custom_type_unpack(field_type, ranges),
                 }
             } else {
-                Err("Complex path types are not supported for bit manipulation".to_string())
+                generate_custom_type_unpack(field_type, ranges)
             }
         }
         Type::Array(array_type) => generate_array_unpack(array_type, ranges),
@@ -73,14 +77,8 @@ fn generate_bool_unpack(ranges: &[NormalizedRange]) -> Result<TokenStream2, Stri
         return Err("bool fields must have exactly 1 bit".to_string());
     }
 
-    let byte_index = ranges[0].start / 8;
-    let bit_index = ranges[0].start as u8 % 8;
-    let bit_lsb_index = 7 - bit_index;
-    let bit_mask = 1u8 << bit_lsb_index;
-
-    Ok(quote! {
-        (src[#byte_index] & #bit_mask) != 0
-    })
+    let bit = ranges[0].start;
+    Ok(quote! { src_bits[#bit] })
 }
 
 /// Generate unsigned integer unpack expression
@@ -101,14 +99,15 @@ fn generate_unsigned_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Resu
     let copy_ranges = generate_copy_from_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?;
 
     Ok(quote! {
         {
             let mut dst = [0u8; #type_bytes];
+            let dst_bits = dst.view_bits_mut::<Msb0>();
             #copy_ranges
             #type_ident::from_be_bytes(dst)
         }
@@ -133,26 +132,23 @@ fn generate_signed_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result
     let copy_ranges = generate_copy_from_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?;
 
-    let sign_byte_index = ranges[0].start / 8;
-    let sign_bit_index = ranges[0].start as u8 % 8;
-    let sign_bit_lsb_index = 7 - sign_bit_index;
-    let sign_bit_mask = 1u8 << sign_bit_lsb_index;
+    let sign_bit = ranges[0].start;
 
     // To do sign extension we initialize the array with the sign bit
     Ok(quote! {
         {
             let mut dst;
-            let sign_bit = (src[#sign_byte_index] & #sign_bit_mask) != 0;
-            if sign_bit {
+            if src_bits[#sign_bit] {
                 dst = [0xffu8; #type_bytes];
             }  else {
                 dst = [0u8; #type_bytes];
             }
+            let dst_bits = dst.view_bits_mut::<Msb0>();
             #copy_ranges
             #type_ident::from_be_bytes(dst)
         }
@@ -177,14 +173,15 @@ fn generate_float_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result<
     let copy_ranges = generate_copy_from_normalized_ranges(
         type_bits,
         total_bits,
-        &format_ident!("src"),
-        &format_ident!("dst"),
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
         ranges,
     )?;
 
     Ok(quote! {
         {
             let mut dst = [0u8; #type_bytes];
+            let dst_bits = dst.view_bits_mut::<Msb0>();
             #copy_ranges
             #type_ident::from_be_bytes(dst)
         }
@@ -224,5 +221,38 @@ fn generate_array_unpack(array_type: &syn::TypeArray, ranges: &[NormalizedRange]
 
     Ok(quote! {
         [#(#element_unpacks,)*]
+    })
+}
+
+/// Generate array unpack expression
+fn generate_custom_type_unpack(custom_type: &Type, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
+    let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
+    let min_error = format!(
+        "The type {} requires at least {{MIN_BITS}} bits, but only {} were provided",
+        custom_type.to_token_stream(),
+        total_bits
+    );
+    let max_error = format!(
+        "The type {} requires at most {{MAX_BITS}} bits, but {} were provided",
+        custom_type.to_token_stream(),
+        total_bits
+    );
+
+    let src_bit_ranges: Vec<_> = ranges
+        .iter()
+        .map(|x| (x.start, x.end))
+        .map(|(a, b)| quote! { (#a, #b) })
+        .collect();
+
+    Ok(quote! {
+        {
+            const MIN_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MIN_BITS;
+            const MAX_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MAX_BITS;
+            embedded_interfaces::const_format::assertcp!(MIN_BITS <= #total_bits, #min_error);
+            embedded_interfaces::const_format::assertcp!(MAX_BITS >= #total_bits, #max_error);
+
+            let src_ranges = [#(#src_bit_ranges),*];
+            <#custom_type as embedded_interfaces::packable::Packable>::unpack(src_bits, &src_ranges, #total_bits)
+        }
     })
 }
