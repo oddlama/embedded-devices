@@ -718,7 +718,7 @@ fn test_deeply_nested() {
         }
     }
 
-    // Test 4D hypercube
+    // Test 4D hypercube (what am I doing here??)
     let packed = HyperCubeUnpacked::default().pack();
     let expected: [u8; 32] = (1..=32).collect::<Vec<_>>().try_into().unwrap();
     assert_eq!(packed.0, expected);

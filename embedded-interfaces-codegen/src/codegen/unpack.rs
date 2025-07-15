@@ -84,6 +84,7 @@ fn generate_bool_unpack(ranges: &[NormalizedRange]) -> Result<TokenStream2, Stri
 /// Generate unsigned integer unpack expression
 fn generate_unsigned_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
     let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
+    let type_ident = format_ident!("{}", type_name);
     let type_bits = get_type_bits(type_name);
 
     if total_bits > type_bits {
@@ -93,9 +94,7 @@ fn generate_unsigned_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Resu
         ));
     }
 
-    let type_ident = format_ident!("{}", type_name);
     let type_bytes = type_bits / 8;
-
     let copy_ranges = generate_copy_from_normalized_ranges(
         type_bits,
         total_bits,
@@ -117,6 +116,7 @@ fn generate_unsigned_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Resu
 /// Generate signed integer unpack expression
 fn generate_signed_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
     let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
+    let type_ident = format_ident!("{}", type_name);
     let type_bits = get_type_bits(type_name);
 
     if total_bits > type_bits {
@@ -126,9 +126,7 @@ fn generate_signed_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result
         ));
     }
 
-    let type_ident = format_ident!("{}", type_name);
     let type_bytes = type_bits / 8;
-
     let copy_ranges = generate_copy_from_normalized_ranges(
         type_bits,
         total_bits,
@@ -158,6 +156,7 @@ fn generate_signed_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result
 /// Generate float unpack expression
 fn generate_float_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
     let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
+    let type_ident = format_ident!("{}", type_name);
     let type_bits = get_type_bits(type_name);
 
     if total_bits != type_bits {
@@ -167,7 +166,6 @@ fn generate_float_unpack(type_name: &str, ranges: &[NormalizedRange]) -> Result<
         ));
     }
 
-    let type_ident = format_ident!("{}", type_name);
     let type_bytes = type_bits / 8;
 
     let copy_ranges = generate_copy_from_normalized_ranges(
@@ -227,32 +225,47 @@ fn generate_array_unpack(array_type: &syn::TypeArray, ranges: &[NormalizedRange]
 /// Generate array unpack expression
 fn generate_custom_type_unpack(custom_type: &Type, ranges: &[NormalizedRange]) -> Result<TokenStream2, String> {
     let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
-    let min_error = format!(
-        "The type {} requires at least {{MIN_BITS}} bits, but only {} were provided",
-        custom_type.to_token_stream(),
-        total_bits
-    );
-    let max_error = format!(
-        "The type {} requires at most {{MAX_BITS}} bits, but {} were provided",
+    let size_error = format!(
+        "The type {} requires exactly {{BITS}} bits, but {} were provided",
         custom_type.to_token_stream(),
         total_bits
     );
 
-    let src_bit_ranges: Vec<_> = ranges
-        .iter()
-        .map(|x| (x.start, x.end))
-        .map(|(a, b)| quote! { (#a, #b) })
-        .collect();
+    let type_name = match total_bits {
+        1..=8 => "u8",
+        9..=16 => "u16",
+        17..=32 => "u32",
+        33..=64 => "u64",
+        65..=128 => "u128",
+        _ => {
+            return Err(format!(
+                "Custom types occupying {} bits are not supported. It needs to have at most 128 bits.",
+                total_bits
+            ));
+        }
+    };
+
+    let type_ident = format_ident!("{}", type_name);
+    let type_bits = get_type_bits(type_name);
+    let type_bytes = type_bits / 8;
+    let copy_ranges = generate_copy_from_normalized_ranges(
+        type_bits,
+        total_bits,
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
+        ranges,
+    )?;
 
     Ok(quote! {
         {
-            const MIN_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MIN_BITS;
-            const MAX_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MAX_BITS;
-            embedded_interfaces::const_format::assertcp!(MIN_BITS <= #total_bits, #min_error);
-            embedded_interfaces::const_format::assertcp!(MAX_BITS >= #total_bits, #max_error);
+            const BITS: usize = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::BITS;
+            embedded_interfaces::const_format::assertcp_eq!(BITS, #total_bits, #size_error);
 
-            let src_ranges = [#(#src_bit_ranges),*];
-            <#custom_type as embedded_interfaces::packable::Packable>::unpack(src_bits, &src_ranges, #total_bits)
+            let mut dst = [0u8; #type_bytes];
+            let dst_bits = dst.view_bits_mut::<Msb0>();
+            #copy_ranges
+            let value = #type_ident::from_be_bytes(dst);
+            <#custom_type as embedded_interfaces::packable::UnsignedPackable>::from_unsigned(value.into())
         }
     })
 }

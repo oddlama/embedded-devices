@@ -253,30 +253,43 @@ fn generate_custom_type_pack(
     ranges: &[NormalizedRange],
 ) -> Result<TokenStream2, String> {
     let total_bits: usize = ranges.iter().map(NormalizedRange::size).sum();
-    let min_error = format!(
-        "The type {} requires at least {{MIN_BITS}} bits, but only {} were provided",
-        custom_type.to_token_stream(),
-        total_bits
-    );
-    let max_error = format!(
-        "The type {} requires at most {{MAX_BITS}} bits, but {} were provided",
+    let size_error = format!(
+        "The type {} requires exactly {{BITS}} bits, but {} were provided",
         custom_type.to_token_stream(),
         total_bits
     );
 
-    let dst_bit_ranges: Vec<_> = ranges
-        .iter()
-        .map(|x| (x.start, x.end))
-        .map(|(a, b)| quote! { (#a, #b) })
-        .collect();
+    let type_name = match total_bits {
+        1..=8 => "u8",
+        9..=16 => "u16",
+        17..=32 => "u32",
+        33..=64 => "u64",
+        65..=128 => "u128",
+        _ => {
+            return Err(format!(
+                "Custom types occupying {} bits are not supported. It needs to have at most 128 bits.",
+                total_bits
+            ));
+        }
+    };
+
+    let type_ident = format_ident!("{}", type_name);
+    let type_bits = get_type_bits(type_name);
+    let copy_ranges = generate_copy_to_normalized_ranges(
+        type_bits,
+        total_bits,
+        &format_ident!("src_bits"),
+        &format_ident!("dst_bits"),
+        ranges,
+    )?;
 
     Ok(quote! {
-        const MIN_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MIN_BITS;
-        const MAX_BITS: usize = <#custom_type as embedded_interfaces::packable::Packable>::MAX_BITS;
-        embedded_interfaces::const_format::assertcp!(MIN_BITS <= #total_bits, #min_error);
-        embedded_interfaces::const_format::assertcp!(MAX_BITS >= #total_bits, #max_error);
+        const BITS: usize = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::BITS;
+        embedded_interfaces::const_format::assertcp_eq!(BITS, #total_bits, #size_error);
 
-        let dst_ranges = [#(#dst_bit_ranges),*];
-        <#custom_type as embedded_interfaces::packable::Packable>::pack(&(#value_expr), dst_bits, &dst_ranges, #total_bits);
+        let src = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::to_unsigned(&(#value_expr)) as #type_ident;
+        let src = src.to_be_bytes();
+        let src_bits = src.view_bits::<Msb0>();
+        #copy_ranges
     })
 }
