@@ -1,18 +1,9 @@
-use embedded_interfaces::codegen::registers;
-
-type DummyI2cCodec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec<()>;
-type DummySpiCodec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec<()>;
+use embedded_interfaces::codegen::interface_objects;
 
 #[test]
 fn test_empty() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Struct(addr = 0x0, mode = rw, size = 0) {}
+    interface_objects! {
+        struct Struct(size = 0) {}
     }
 
     let packed = StructUnpacked::default().pack();
@@ -21,14 +12,8 @@ fn test_empty() {
 
 #[test]
 fn test_bool() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Struct(addr = 0x0, mode = rw, size = 1) {
+    interface_objects! {
+        struct Struct(size = 1) {
             f1: bool = false,
             f2: bool = true,
             f3: bool[4],
@@ -59,19 +44,13 @@ fn test_bool() {
 
 #[test]
 fn test_unsigned() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Struct(addr = 0x0, mode = rw, size = 2) {
+    interface_objects! {
+        struct Struct(size = 2) {
             f1: u8,
             f2: u8 = 0x49,
         }
 
-        Narrow(addr = 0x0, mode = rw, size = 1) {
+        struct Narrow(size = 1) {
             f1: u8{3} = 0b010,
             f2: u8{5} = 0b11011,
         }
@@ -88,14 +67,8 @@ fn test_unsigned() {
 
 #[test]
 fn test_unsigned_shifted() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Struct(addr = 0x0, mode = rw, size = 2) {
+    interface_objects! {
+        struct Struct(size = 2) {
             f1: u8,
             f2: u8{7} = 0x49,
             _: bool,
@@ -111,27 +84,21 @@ fn test_unsigned_shifted() {
 
 #[test]
 fn test_unsigned_various_sizes() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Small(addr = 0x0, mode = rw, size = 1) {
+    interface_objects! {
+        struct Small(size = 1) {
             f1: u8{4} = 0b1010,
             f2: u8{4} = 0b0101,
         }
 
-        Medium(addr = 0x0, mode = rw, size = 2) {
+        struct Medium(size = 2) {
             f1: u16 = 0x1234,
         }
 
-        Large(addr = 0x0, mode = rw, size = 4) {
+        struct Large(size = 4) {
             f1: u32 = 0x12345678,
         }
 
-        Mixed(addr = 0x0, mode = rw, size = 3) {
+        struct Mixed(size = 3) {
             f1: u8{4} = 0b1100,
             f2: u16 = 0xABCD,
             f3: u8{4} = 0b0011,
@@ -160,14 +127,8 @@ fn test_unsigned_various_sizes() {
 
 #[test]
 fn test_unsigned_cross_byte_boundary() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        CrossBoundary(addr = 0x0, mode = rw, size = 2) {
+    interface_objects! {
+        struct CrossBoundary(size = 2) {
             f1: u8{4} = 0b1010,
             f2: u8{8} = 0xFF,
             f3: u8{4} = 0b0101,
@@ -184,31 +145,25 @@ fn test_unsigned_cross_byte_boundary() {
 
 #[test]
 fn test_signed_integers() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Signed8(addr = 0x0, mode = rw, size = 1) {
+    interface_objects! {
+        struct Signed8(size = 1) {
             f1: i8 = -1,
         }
 
-        Signed16(addr = 0x0, mode = rw, size = 2) {
+        struct Signed16(size = 2) {
             f1: i16 = -1,
         }
 
-        Signed32(addr = 0x0, mode = rw, size = 4) {
+        struct Signed32(size = 4) {
             f1: i32 = -1,
         }
 
-        SignedNarrow(addr = 0x0, mode = rw, size = 1) {
+        struct SignedNarrow(size = 1) {
             f1: i8{4} = -1,  // 0b1111 in 4 bits
             f2: i8{4} = 3,   // 0b0011 in 4 bits
         }
 
-        SignedMixed(addr = 0x0, mode = rw, size = 2) {
+        struct SignedMixed(size = 2) {
             f1: i8{6} = -2,  // 0b111110 in 6 bits
             f2: i16{10} = -1, // 0b1111111111 in 10 bits
         }
@@ -239,14 +194,8 @@ fn test_signed_integers() {
 
 #[test]
 fn test_signed_edge_cases() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        SignedEdge(addr = 0x0, mode = rw, size = 2) {
+    interface_objects! {
+        struct SignedEdge(size = 2) {
             f1: i8{4} = 7,   // Max positive for 4 bits
             f2: i8{4} = -8,  // Max negative for 4 bits
             f3: i8{4} = 0,   // Zero
@@ -262,22 +211,16 @@ fn test_signed_edge_cases() {
 
 #[test]
 fn test_float_types() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Float32(addr = 0x0, mode = rw, size = 4) {
+    interface_objects! {
+        struct Float32(size = 4) {
             f1: f32 = 1.0,
         }
 
-        Float64(addr = 0x0, mode = rw, size = 8) {
+        struct Float64(size = 8) {
             f1: f64 = 1.0,
         }
 
-        MixedFloat(addr = 0x0, mode = rw, size = 5) {
+        struct MixedFloat(size = 5) {
             f1: f32 = 1.0,
             f2: u8 = 0xFF,
         }
@@ -301,30 +244,24 @@ fn test_float_types() {
 
 #[test]
 fn test_u8_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Array4(addr = 0x0, mode = rw, size = 4) {
+    interface_objects! {
+        struct Array4(size = 4) {
             data: [u8; 4] = [0x01, 0x02, 0x03, 0x05],
         }
 
-        ArrayShifted(addr = 0x0, mode = rw, size = 5) {
+        struct ArrayShifted(size = 5) {
             prefix: bool = true,
             data: [u8; 4] = [0x01, 0x02, 0x03, 0x05],
             _: u8{7}
         }
 
-        ArrayShifted2(addr = 0x0, mode = rw, size = 5) {
+        struct ArrayShifted2(size = 5) {
             _: u8{2} = 0b11
             data: [u8; 4] = [0x01, 0x02, 0x03, 0x05],
             _: u8{6}
         }
 
-        ArrayMixed(addr = 0x0, mode = rw, size = 5) {
+        struct ArrayMixed(size = 5) {
             prefix: u8{4} = 0xa,
             data: [u8; 4] = [0x01, 0x02, 0x03, 0x05],
             suffix: u8{4} = 0xb,
@@ -357,18 +294,12 @@ fn test_u8_arrays() {
 
 #[test]
 fn test_u16_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Array2(addr = 0x0, mode = rw, size = 4) {
+    interface_objects! {
+        struct Array2(size = 4) {
             data: [u16; 2] = [0x1234, 0x5678],
         }
 
-        ArrayShifted(addr = 0x0, mode = rw, size = 5) {
+        struct ArrayShifted(size = 5) {
             prefix: bool = true,
             data: [u16; 2] = [0x1234, 0x5678],
             _: u8{7}
@@ -388,18 +319,12 @@ fn test_u16_arrays() {
 
 #[test]
 fn test_bool_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        BoolArray8(addr = 0x0, mode = rw, size = 1) {
+    interface_objects! {
+        struct BoolArray8(size = 1) {
             flags: [bool; 8] = [true, false, true, false, true, false, true, false],
         }
 
-        BoolArrayShifted(addr = 0x0, mode = rw, size = 2) {
+        struct BoolArrayShifted(size = 2) {
             prefix: u8{4} = 0xF,
             flags: [bool; 8] = [true, false, true, false, true, false, true, false],
             suffix: u8{4} = 0xA,
@@ -420,14 +345,8 @@ fn test_bool_arrays() {
 
 #[test]
 fn test_signed_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        SignedArray(addr = 0x0, mode = rw, size = 4) {
+    interface_objects! {
+        struct SignedArray(size = 4) {
             data: [i16; 2] = [-1, 1000],
         }
     }
@@ -439,14 +358,8 @@ fn test_signed_arrays() {
 
 #[test]
 fn test_float_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        FloatArray(addr = 0x0, mode = rw, size = 8) {
+    interface_objects! {
+        struct FloatArray(size = 8) {
             data: [f32; 2] = [1.0, -1.0],
         }
     }
@@ -461,14 +374,8 @@ fn test_float_arrays() {
 
 #[test]
 fn test_complex_mixed_layout() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Complex(addr = 0x0, mode = rw, size = 7) {
+    interface_objects! {
+        struct Complex(size = 7) {
             header: u8{4} = 0xA,
             flags: [bool; 4] = [true, false, true, false],
             id: u16 = 0x1234,
@@ -489,14 +396,8 @@ fn test_complex_mixed_layout() {
 
 #[test]
 fn test_roundtrip_consistency() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        RoundTrip(addr = 0x0, mode = rw, size = 4) {
+    interface_objects! {
+        struct RoundTrip(size = 4) {
             f1: u8{4} = 0b1010,
             f2: i8{4} = -2,
             f3: bool = true,
@@ -535,14 +436,8 @@ fn test_roundtrip_consistency() {
 
 #[test]
 fn test_edge_case_bit_patterns() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        EdgeCase(addr = 0x0, mode = rw, size = 2) {
+    interface_objects! {
+        struct EdgeCase(size = 2) {
             f1: u8{1} = 1,      // Single bit
             f2: u8{7} = 0x7F,   // 7 bits
             f3: u8{1} = 0,      // Single bit
@@ -561,14 +456,8 @@ fn test_edge_case_bit_patterns() {
 
 #[test]
 fn test_large_values() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
-        Large(addr = 0x0, mode = rw, size = 16) {
+    interface_objects! {
+        struct Large(size = 16) {
             f1: u64 = 0x123456789ABCDEF0,
             f2: u64 = 0xFEDCBA9876543210,
         }
@@ -584,37 +473,31 @@ fn test_large_values() {
 
 #[test]
 fn test_nested_arrays() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
+    interface_objects! {
         // Array of arrays of u8
-        U8Matrix(addr = 0x0, mode = rw, size = 12) {
+        struct U8Matrix(size = 12) {
             matrix: [[u8; 3]; 4] = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
         }
 
         // Array of arrays of bool
-        BoolMatrix(addr = 0x0, mode = rw, size = 4) {
+        struct BoolMatrix(size = 4) {
             flags: [[bool; 8]; 4] = [[true; 8]; 4],
         }
 
         // Array of arrays of signed integers
-        I16Matrix(addr = 0x0, mode = rw, size = 24) {
+        struct I16Matrix(size = 24) {
             temps: [[i16; 3]; 4] = [[-10, 0, 10], [-20, 0, 20], [-30, 0, 30], [-40, 0, 40]],
         }
 
         // Mixed nested arrays
-        MixedNested(addr = 0x0, mode = rw, size = 15) {
+        struct MixedNested(size = 15) {
             header: u8 = 0xAA,
             data: [[u8; 2]; 3] = [[0x11, 0x22], [0x33, 0x44], [0x55, 0x66]],
             checksums: [u16; 4] = [0x1234, 0x5678, 0x9ABC, 0xDEF0],
         }
 
         // 3D array
-        Cube(addr = 0x0, mode = rw, size = 8) {
+        struct Cube(size = 8) {
             cube: [[[u8; 2]; 2]; 2] = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
         }
     }
@@ -686,15 +569,9 @@ fn test_nested_arrays() {
 
 #[test]
 fn test_deeply_nested() {
-    registers! {
-        defaults {
-            i2c_codec = DummyI2cCodec,
-            spi_codec = DummySpiCodec,
-            codec_error = (),
-        }
-
+    interface_objects! {
         // 4D array - array of 3D cubes
-        HyperCube(addr = 0x0, mode = rw, size = 32) {
+        struct HyperCube(size = 32) {
             hyper: [[[[u8; 2]; 2]; 2]; 4] = [
                 [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
                 [[[9, 10], [11, 12]], [[13, 14], [15, 16]]],
@@ -704,7 +581,7 @@ fn test_deeply_nested() {
         }
 
         // Array of arrays of arrays of bool
-        BoolTensor(addr = 0x0, mode = rw, size = 4) {
+        struct BoolTensor(size = 4) {
             tensor: [[[bool; 2]; 2]; 8] = [
                 [[true, false], [false, true]],
                 [[false, true], [true, false]],

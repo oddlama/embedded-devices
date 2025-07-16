@@ -1,39 +1,14 @@
-use embedded_interfaces::{codegen::registers, packable::UnsignedPackable};
+use embedded_interfaces::{codegen::interface_objects, packable::UnsignedPackable};
 
 // FIXME: allow _: _[2..4] short reserved syntax
 // FIXME: allow _: _{4} short reserved syntax
 // FIXME: allow x: u8[7..=0] reverse ranges
 // FIXME: allow read write annotatation per field? then dont generate write_f1 read_f1 with_f1 ?? not sure
+// TODO: remove Enum{3} necessity since we know the bit size anyway in the same macro at least,
+// same for custom structs
 
 type DummyI2cCodec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec<()>;
 type DummySpiCodec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec<()>;
-
-/// Operating mode.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[repr(u8)]
-pub enum OperatingMode {
-    PowerDown = 0b000,
-    Continuous = 0b101,
-}
-
-impl UnsignedPackable for OperatingMode {
-    type Base = u8;
-    const BITS: usize = 3;
-
-    fn from_unsigned(value: Self::Base) -> Self {
-        match value {
-            0b101 => Self::Continuous,
-            _ => Self::PowerDown,
-        }
-    }
-
-    fn to_unsigned(&self) -> Self::Base {
-        match self {
-            OperatingMode::PowerDown => 0b000,
-            OperatingMode::Continuous => 0b101,
-        }
-    }
-}
 
 /// Measurement conversion time
 #[derive(Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
@@ -97,8 +72,8 @@ impl AverageCount {
     }
 }
 
-registers! {
-    defaults {
+interface_objects! {
+    register_defaults {
         codec_error = (),
         i2c_codec = DummyI2cCodec,
         spi_codec = DummySpiCodec,
@@ -108,8 +83,14 @@ registers! {
         INA228,
     ]
 
+    /// Operating mode.
+    enum OperatingMode: u8{3} {
+        0b000 PowerDown,
+        0b101 Continuous,
+    }
+
     // /// Multi-byte register with single field
-    // Temperature(addr = 0x6, mode = r, size = 2) {
+    // register Temperature(addr = 0x6, mode = r, size = 2) {
     //     /// Internal die temperature. Resolution 7.8125 m°C/LSB
     //     raw_value: i16 = 0 {
     //         quantity: ThermodynamicTemperature,
@@ -117,8 +98,8 @@ registers! {
     //         scale: 1 / 128,
     //     },
     // }
-
-    // Range(addr = 0x0, mode = rw, size = 2) {
+    //
+    // register Range(addr = 0x0, mode = rw, size = 2) {
     //     // Single bit
     //     f0: u8[0],
     //     // Exclusive range
@@ -129,7 +110,7 @@ registers! {
     //     f3: u8[8, 9, 10, 11..=14, 15],
     // }
     //
-    // Reserved(addr = 0x0, mode = rw, size = 4) {
+    // register Reserved(addr = 0x0, mode = rw, size = 4) {
     //     // Reserved, no default implies Default::default()
     //     _: u8,
     //     // Reserved again, with default
@@ -141,7 +122,7 @@ registers! {
     // }
 
     /// Register with mixed field types
-    AdcConfiguration(addr = 0x1, mode = rw, size = 2) {
+    register AdcConfiguration(addr = 0x1, mode = rw, size = 2) {
         /// Operating mode
         operating_mode: OperatingMode[0..3] = OperatingMode::Continuous,
         _: u16{13}
@@ -162,7 +143,7 @@ registers! {
     }
 
     // /// Large register with 40-bit field
-    // Energy(addr = 0x9, mode = r, size = 5) {
+    // register Energy(addr = 0x9, mode = r, size = 5) {
     //     /// 40-bit energy accumulation
     //     raw_value: u64{40} = 0,
     // }

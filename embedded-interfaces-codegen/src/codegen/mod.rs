@@ -1,4 +1,4 @@
-//! Code generation for register definitions
+//! Code generation for interface objects
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream as TokenStream2;
@@ -9,6 +9,7 @@ use crate::parser::*;
 
 mod bit_helpers;
 mod bit_pattern;
+mod enum_gen;
 mod pack;
 mod packed_struct;
 mod register_traits;
@@ -17,24 +18,39 @@ mod unpack;
 pub use packed_struct::*;
 pub use register_traits::*;
 
-pub fn generate_registers(registers_def: &RegistersDefinition) -> syn::Result<TokenStream2> {
+pub fn generate_interface_objects(interface_def: &InterfaceObjectsDefinition) -> syn::Result<TokenStream2> {
     let mut generated = TokenStream2::new();
 
-    // Generate code for each register
-    for register in &registers_def.registers {
-        let register_code = generate_register(registers_def, register)?;
-        generated.extend(register_code);
+    // Generate code for each definition
+    for definition in &interface_def.definitions {
+        match definition {
+            Definition::Register(register) => {
+                let register_code = generate_register(interface_def, register)?;
+                generated.extend(register_code);
+            }
+            Definition::Struct(struct_def) => {
+                let struct_code = generate_struct(interface_def, struct_def)?;
+                generated.extend(struct_code);
+            }
+            Definition::Enum(enum_def) => {
+                let enum_code = enum_gen::generate_enum(enum_def)?;
+                generated.extend(enum_code);
+            }
+        }
     }
 
     Ok(generated)
 }
 
-fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDefinition) -> syn::Result<TokenStream2> {
+fn generate_register(
+    interface_def: &InterfaceObjectsDefinition,
+    register: &RegisterDefinition,
+) -> syn::Result<TokenStream2> {
     let register_name = &register.name;
     let unpacked_name = format_ident!("{}Unpacked", register_name);
 
     // Get effective attributes (defaults + register-specific)
-    let attrs = registers_def.get_effective_attrs(register)?;
+    let attrs = interface_def.get_effective_register_attrs(register)?;
 
     // Extract register attributes
     let (addr, mode, size) = extract_register_attrs(&register.name, &attrs)?;
@@ -67,6 +83,31 @@ fn generate_register(registers_def: &RegistersDefinition, register: &RegisterDef
     })
 }
 
+fn generate_struct(
+    interface_def: &InterfaceObjectsDefinition,
+    struct_def: &StructDefinition,
+) -> syn::Result<TokenStream2> {
+    let struct_name = &struct_def.name;
+    let unpacked_name = format_ident!("{}Unpacked", struct_name);
+
+    // Get effective attributes (only size is allowed for structs)
+    let attrs = interface_def.get_effective_struct_attrs(struct_def)?;
+
+    // Extract size attribute
+    let size = extract_struct_size(&struct_def.name, &attrs)?;
+
+    // Generate the packed/unpacked struct pair (reusable part)
+    let packed_structs = generate_packed_struct_pair(
+        struct_name,
+        &unpacked_name,
+        &struct_def.fields,
+        &struct_def.attributes,
+        size,
+    )?;
+
+    Ok(packed_structs)
+}
+
 fn extract_register_attrs(register_name: &Ident, attrs: &[Attr]) -> syn::Result<(TokenStream2, String, usize)> {
     let mut addr = None;
     let mut mode = None;
@@ -95,6 +136,18 @@ fn extract_register_attrs(register_name: &Ident, attrs: &[Attr]) -> syn::Result<
     let size = size.ok_or_else(|| syn::Error::new_spanned(register_name, "Missing required 'size' attribute"))?;
 
     Ok((addr, mode, size))
+}
+
+fn extract_struct_size(struct_name: &Ident, attrs: &[Attr]) -> syn::Result<usize> {
+    for attr in attrs {
+        if attr.name.to_string().as_str() == "size" {
+            return extract_size_integer(&attr.value);
+        }
+    }
+    Err(syn::Error::new_spanned(
+        struct_name,
+        "Missing required 'size' attribute",
+    ))
 }
 
 fn extract_codec_attrs(

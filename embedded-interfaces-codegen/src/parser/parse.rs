@@ -5,26 +5,26 @@ use syn::{
     Attribute, Expr, Ident, LitInt, Token, Type,
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
-    token::{Brace, Bracket},
+    token::{Brace, Bracket, Paren},
 };
 
-impl Parse for RegistersDefinition {
+impl Parse for InterfaceObjectsDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut defaults = None;
+        let mut register_defaults = None;
         let mut devices = None;
-        let mut registers = Vec::new();
+        let mut definitions = Vec::new();
 
         while !input.is_empty() {
-            // Check for defaults block
+            // Check for register_defaults block
             if input.peek(Ident) && input.peek2(Brace) {
                 let lookahead = input.lookahead1();
                 if lookahead.peek(Ident) {
                     let ident: Ident = input.fork().parse()?;
-                    if ident == "defaults" {
-                        if defaults.is_some() {
-                            return Err(input.error("Multiple defaults blocks are not allowed"));
+                    if ident == "register_defaults" {
+                        if register_defaults.is_some() {
+                            return Err(input.error("Multiple register_defaults blocks are not allowed"));
                         }
-                        defaults = Some(input.parse()?);
+                        register_defaults = Some(input.parse()?);
                         continue;
                     }
                 }
@@ -45,19 +45,65 @@ impl Parse for RegistersDefinition {
                 }
             }
 
-            // Parse register definition
-            registers.push(input.parse()?);
+            // Parse definition (register, struct, or enum)
+            definitions.push(input.parse()?);
         }
 
-        Ok(RegistersDefinition {
-            defaults,
+        Ok(InterfaceObjectsDefinition {
+            register_defaults,
             devices,
-            registers,
+            definitions,
         })
     }
 }
 
-impl Parse for DefaultsBlock {
+impl Parse for Definition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attributes = input.call(Attribute::parse_outer)?;
+
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Ident) {
+            let ident: Ident = input.fork().parse()?;
+            match ident.to_string().as_str() {
+                "register" => {
+                    input.parse::<Ident>()?; // consume "register"
+                    let mut register_def: RegisterDefinition = input.parse()?;
+                    register_def.attributes = attributes;
+                    Ok(Definition::Register(register_def))
+                }
+                _ => Err(input.error("Expected 'register', 'struct', or 'enum'")),
+            }
+        } else if lookahead.peek(Token![enum]) {
+            input.parse::<Token![enum]>()?; // consume "enum"
+            let mut enum_def: EnumDefinition = input.parse()?;
+            enum_def.attributes = attributes;
+
+            // Process variants to check whether it is exhaustive and non-overlapping. Also
+            // determine the representative element for each variant.
+
+            // TODO: the wildcard variant (if present) will be skipped in determining representative. It will
+            // take the first non-captured value. If a wildcard variant is present, it must capture
+            // at least one value.
+            //
+            // TODO: create function EnumPattern::ranges(&self) which returns the captured elements as &[(u128, u128)].
+            // Wildcard returns empty range.
+            for variant in enum_def.variants.iter_mut() {
+                // TODO:
+            }
+
+            Ok(Definition::Enum(enum_def))
+        } else if lookahead.peek(Token![struct]) {
+            input.parse::<Token![struct]>()?; // consume "struct"
+            let mut struct_def: StructDefinition = input.parse()?;
+            struct_def.attributes = attributes;
+            Ok(Definition::Struct(struct_def))
+        } else {
+            Err(input.error("Expected 'register', 'struct', or 'enum'"))
+        }
+    }
+}
+
+impl Parse for RegisterDefaultsBlock {
     fn parse(input: ParseStream) -> Result<Self> {
         let _defaults_token: Ident = input.parse()?;
         let content;
@@ -77,7 +123,7 @@ impl Parse for DefaultsBlock {
             }
         }
 
-        Ok(DefaultsBlock { defaults })
+        Ok(RegisterDefaultsBlock { defaults })
     }
 }
 
@@ -97,11 +143,10 @@ impl Parse for DevicesBlock {
 
 impl Parse for RegisterDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
-        let attributes = input.call(Attribute::parse_outer)?;
         let name: Ident = input.parse()?;
 
         // Parse register attributes in parentheses
-        let register_attrs = if input.peek(syn::token::Paren) {
+        let register_attrs = if input.peek(Paren) {
             let content;
             syn::parenthesized!(content in input);
             let mut attrs = Vec::new();
@@ -132,11 +177,161 @@ impl Parse for RegisterDefinition {
         }
 
         Ok(RegisterDefinition {
-            attributes,
+            attributes: Vec::new(), // Will be set by Definition::parse
             name,
             register_attrs,
             fields,
         })
+    }
+}
+
+impl Parse for StructDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let name: Ident = input.parse()?;
+
+        // Parse struct attributes in parentheses
+        let struct_attrs = if input.peek(Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            let mut attrs = Vec::new();
+
+            while !content.is_empty() {
+                let attr_name: Ident = content.parse()?;
+                content.parse::<Token![=]>()?;
+                let value: Expr = content.parse()?;
+
+                attrs.push(Attr { name: attr_name, value });
+
+                if content.peek(Token![,]) {
+                    content.parse::<Token![,]>()?;
+                }
+            }
+            attrs
+        } else {
+            Vec::new()
+        };
+
+        // Parse fields block
+        let field_content;
+        syn::braced!(field_content in input);
+
+        let mut fields = Vec::new();
+        while !field_content.is_empty() {
+            fields.push(field_content.parse()?);
+        }
+
+        Ok(StructDefinition {
+            attributes: Vec::new(), // Will be set by Definition::parse
+            name,
+            struct_attrs,
+            fields,
+        })
+    }
+}
+
+impl Parse for EnumDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let name: Ident = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let underlying_type: Type = input.parse()?;
+
+        // Optional size constraint
+        let size_constraint = if input.peek(Brace) {
+            let content;
+            syn::braced!(content in input);
+            let size_lit: LitInt = content.parse()?;
+            Some(size_lit.base10_parse::<usize>()?)
+        } else {
+            None
+        };
+
+        // Parse variants block
+        let variant_content;
+        syn::braced!(variant_content in input);
+
+        let mut variants = Vec::new();
+        while !variant_content.is_empty() {
+            variants.push(variant_content.parse()?);
+        }
+
+        Ok(EnumDefinition {
+            attributes: Vec::new(), // Will be set by Definition::parse
+            name,
+            underlying_type,
+            size_constraint,
+            variants,
+        })
+    }
+}
+
+impl Parse for EnumVariant {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attributes = input.call(Attribute::parse_outer)?;
+
+        let pattern: EnumPattern = input.parse()?;
+        let name: Ident = input.parse()?;
+
+        // Check for capture syntax (underlying)
+        let capture_value = if input.peek(Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            let _underlying_type: Type = content.parse()?;
+            true
+        } else {
+            false
+        };
+
+        // Optional comma
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+
+        Ok(EnumVariant {
+            attributes,
+            pattern,
+            name,
+            capture_value,
+            representative: LitInt::new("invalid_representative_element", input.span()),
+        })
+    }
+}
+
+impl Parse for EnumPattern {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(Token![_]) {
+            input.parse::<Token![_]>()?;
+            return Ok(EnumPattern::Wildcard);
+        }
+
+        fn parse_pattern_item(input: ParseStream) -> Result<EnumPattern> {
+            let start: LitInt = input.parse()?;
+            if input.peek(Token![..=]) {
+                input.parse::<Token![..=]>()?;
+                let end: LitInt = input.parse()?;
+                Ok(EnumPattern::RangeInclusive(start, end))
+            } else if input.peek(Token![..]) {
+                input.parse::<Token![..]>()?;
+                let end: LitInt = input.parse()?;
+                Ok(EnumPattern::Range(start, end))
+            } else {
+                Ok(EnumPattern::Single(start))
+            }
+        }
+
+        // Parse the first pattern item
+        let first_item = parse_pattern_item(input)?;
+
+        // Check if there are more items separated by |
+        if input.peek(Token![|]) {
+            let mut items = vec![first_item];
+            while input.peek(Token![|]) {
+                input.parse::<Token![|]>()?;
+                items.push(parse_pattern_item(input)?);
+            }
+            Ok(EnumPattern::Multiple(items))
+        } else {
+            Ok(first_item)
+        }
     }
 }
 
@@ -159,7 +354,7 @@ impl Parse for FieldDefinition {
         let field_type: Type = input.parse()?;
 
         // Check for size constraint syntax: {size}
-        let size_constraint = if input.peek(syn::token::Brace) {
+        let size_constraint = if input.peek(Brace) {
             let content;
             syn::braced!(content in input);
             let size_lit: LitInt = content.parse()?;
@@ -169,7 +364,7 @@ impl Parse for FieldDefinition {
         };
 
         // Optional bit pattern (mutually exclusive with size constraint)
-        let bit_pattern = if input.peek(syn::token::Bracket) {
+        let bit_pattern = if input.peek(Bracket) {
             if size_constraint.is_some() {
                 return Err(input.error("Cannot specify both size constraint {n} and bit pattern [n..m]"));
             }
@@ -187,7 +382,7 @@ impl Parse for FieldDefinition {
         };
 
         // Optional units block (placeholder)
-        let units = if input.peek(syn::token::Brace) && size_constraint.is_none() {
+        let units = if input.peek(Brace) && size_constraint.is_none() {
             let _content;
             syn::braced!(_content in input);
             // TODO: Parse units block content

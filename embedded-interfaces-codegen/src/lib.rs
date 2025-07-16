@@ -6,22 +6,22 @@ use proc_macro2::TokenStream as TokenStream2;
 mod codegen;
 mod parser;
 
-use parser::RegistersDefinition;
+use parser::InterfaceObjectsDefinition;
 
 /// Main macro for defining registers
 #[proc_macro]
-pub fn registers(input: TokenStream) -> TokenStream {
+pub fn interface_objects(input: TokenStream) -> TokenStream {
     let input2 = TokenStream2::from(input);
 
-    match registers_impl(input2) {
+    match interface_objects_impl(input2) {
         Ok(output) => output.into(),
         Err(err) => err.to_compile_error().into(),
     }
 }
 
-fn registers_impl(input: TokenStream2) -> syn::Result<TokenStream2> {
-    let registers_def = syn::parse2::<RegistersDefinition>(input)?;
-    let out = codegen::generate_registers(&registers_def)?;
+fn interface_objects_impl(input: TokenStream2) -> syn::Result<TokenStream2> {
+    let registers_def = syn::parse2::<InterfaceObjectsDefinition>(input)?;
+    let out = codegen::generate_interface_objects(&registers_def)?;
 
     // DEBUG: write to file for inspection, will be removed later (TODO)
     let syn_tree: syn::File = syn::parse_str(&out.to_string()).expect("Failed to parse generated code");
