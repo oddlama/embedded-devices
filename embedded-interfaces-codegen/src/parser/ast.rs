@@ -197,7 +197,215 @@ impl FieldDefinition {
     }
 }
 
+impl EnumPattern {
+    /// Returns the ranges of values captured by this pattern as (start, end) inclusive pairs
+    pub fn captured_ranges(&self) -> syn::Result<Vec<(u128, u128)>> {
+        match self {
+            EnumPattern::Single(lit) => {
+                let value = lit.base10_parse::<u128>()?;
+                Ok(vec![(value, value)])
+            }
+            EnumPattern::Range(start, end) => {
+                let start_val = start.base10_parse::<u128>()?;
+                let end_val = end.base10_parse::<u128>()?;
+                if start_val < end_val {
+                    Ok(vec![(start_val, end_val - 1)])
+                } else {
+                    Err(syn::Error::new_spanned(
+                        start,
+                        "The start of a range must be smaller than its end",
+                    ))
+                }
+            }
+            EnumPattern::RangeInclusive(start, end) => {
+                let start_val = start.base10_parse::<u128>().unwrap_or(0);
+                let end_val = end.base10_parse::<u128>().unwrap_or(0);
+                if start_val <= end_val {
+                    Ok(vec![(start_val, end_val)])
+                } else {
+                    Err(syn::Error::new_spanned(
+                        start,
+                        "The start of an inclusive range must be smaller than or equal to its end",
+                    ))
+                }
+            }
+            EnumPattern::Multiple(patterns) => {
+                let mut ranges = Vec::new();
+                for pattern in patterns {
+                    ranges.extend(pattern.captured_ranges()?);
+                }
+                Ok(merge_ranges(ranges))
+            }
+            EnumPattern::Wildcard => {
+                // Wildcard doesn't capture specific values - it's determined by exclusion
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// Returns a representative value for this pattern
+    pub fn representative(&self) -> Option<u128> {
+        match self {
+            EnumPattern::Single(lit) => lit.base10_parse::<u128>().ok(),
+            EnumPattern::Range(start, _) => start.base10_parse::<u128>().ok(),
+            EnumPattern::RangeInclusive(start, _) => start.base10_parse::<u128>().ok(),
+            EnumPattern::Multiple(patterns) => {
+                // Return the representative of the first pattern
+                patterns.first().and_then(|p| p.representative())
+            }
+            EnumPattern::Wildcard => None, // Will be set later based on available values
+        }
+    }
+}
+
+/// Merge overlapping ranges and sort them
+fn merge_ranges(mut ranges: Vec<(u128, u128)>) -> Vec<(u128, u128)> {
+    if ranges.is_empty() {
+        return ranges;
+    }
+
+    // Sort ranges by start value
+    ranges.sort_by_key(|&(start, _)| start);
+
+    let mut merged = Vec::new();
+    let mut current = ranges[0];
+
+    for &(start, end) in &ranges[1..] {
+        if start <= current.1 + 1 {
+            // Ranges overlap or are adjacent, merge them
+            current.1 = current.1.max(end);
+        } else {
+            // No overlap, push current and start new range
+            merged.push(current);
+            current = (start, end);
+        }
+    }
+    merged.push(current);
+    merged
+}
+
+/// Checks if two lists of ranges overlap. Both input lists must be sorted by range start
+fn ranges_overlap(ranges1: &[(u128, u128)], ranges2: &[(u128, u128)]) -> Option<u128> {
+    let mut i = 0;
+    let mut j = 0;
+
+    while i < ranges1.len() && j < ranges2.len() {
+        let (start1, end1) = ranges1[i];
+        let (start2, end2) = ranges2[j];
+
+        // Check for overlap
+        if start1 <= end2 && start2 <= end1 {
+            return Some(start1.max(start2));
+        }
+
+        // Move the pointer that ends first
+        if end1 < end2 {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+
+    None
+}
+
+/// Calculate the complement of ranges within [0, max_value]
+fn complement_ranges(ranges: &[(u128, u128)], max_value: u128) -> Vec<(u128, u128)> {
+    if ranges.is_empty() {
+        return vec![(0, max_value)];
+    }
+
+    let mut complement = Vec::new();
+    let mut current = 0;
+
+    for &(start, end) in ranges {
+        if current < start {
+            complement.push((current, start - 1));
+        }
+        current = end + 1;
+    }
+
+    if current <= max_value {
+        complement.push((current, max_value));
+    }
+
+    complement
+}
+
 impl EnumDefinition {
+    /// Process variants to validate non-overlapping patterns and set representatives
+    pub fn process_variants(&mut self) -> syn::Result<()> {
+        let max_value = (1u128 << self.get_effective_bit_size()?) - 1;
+        let mut all_captured_ranges = Vec::new();
+        let mut wildcard_variant_index = None;
+
+        // First pass: collect all explicitly captured ranges and find wildcard
+        for (i, variant) in self.variants.iter().enumerate() {
+            if matches!(variant.pattern, EnumPattern::Wildcard) {
+                if wildcard_variant_index.is_some() {
+                    return Err(syn::Error::new_spanned(
+                        &variant.name,
+                        "Multiple wildcard variants are not allowed",
+                    ));
+                }
+                wildcard_variant_index = Some(i);
+            } else {
+                let captured_ranges = variant.pattern.captured_ranges()?;
+
+                // Check for overlaps with previously captured ranges
+                if let Some(overlap_value) = ranges_overlap(&all_captured_ranges, &captured_ranges) {
+                    return Err(syn::Error::new_spanned(
+                        &variant.name,
+                        format!("Value {} is captured by multiple variants", overlap_value),
+                    ));
+                }
+
+                all_captured_ranges.extend(captured_ranges);
+            }
+        }
+
+        // Merge all captured ranges
+        all_captured_ranges = merge_ranges(all_captured_ranges);
+
+        // Calculate wildcard ranges (complement of captured ranges)
+        let wildcard_ranges = complement_ranges(&all_captured_ranges, max_value);
+
+        if let Some(wildcard_idx) = wildcard_variant_index {
+            // Validate wildcard captures at least one value
+            if wildcard_ranges.is_empty() {
+                return Err(syn::Error::new_spanned(
+                    &self.variants[wildcard_idx].name,
+                    "Wildcard variant must capture at least one value",
+                ));
+            }
+        } else {
+            // No wildcard: Ensure there are no unmatched values
+            if !wildcard_ranges.is_empty() {
+                return Err(syn::Error::new_spanned(
+                    &self.name,
+                    format!(
+                        "An enum without wildcard variant must cover all values. Uncovered values: {wildcard_ranges:?}"
+                    ),
+                ));
+            }
+        }
+
+        // Second pass: set representatives
+        for variant in self.variants.iter_mut() {
+            let representative_value = if matches!(variant.pattern, EnumPattern::Wildcard) {
+                // Use the first available wildcard value
+                wildcard_ranges.first().map(|&(start, _)| start).unwrap_or(0)
+            } else {
+                variant.pattern.representative().unwrap_or(0)
+            };
+
+            // Create a LitInt for the representative value
+            variant.representative = LitInt::new(&representative_value.to_string(), variant.name.span());
+        }
+
+        Ok(())
+    }
+
     /// Get the default bit size for the underlying type
     pub fn get_default_bit_size(&self) -> syn::Result<usize> {
         // Extract the bit size from the underlying type

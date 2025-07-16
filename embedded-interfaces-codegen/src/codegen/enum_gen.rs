@@ -38,7 +38,7 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
 
             // For to_unsigned, just return the captured value
             to_unsigned_arms.push(quote! {
-                Self::#variant_name(val) => *val
+                Self::#variant_name(v) => *v
             });
         } else {
             // Variant doesn't capture the value
@@ -56,7 +56,7 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
             // For to_unsigned, return the representative value
             let representative = &variant.representative;
             to_unsigned_arms.push(quote! {
-                Self::#variant_name => #representative as #underlying_type
+                Self::#variant_name => #representative
             });
         }
     }
@@ -132,7 +132,7 @@ fn generate_pattern(pattern: &EnumPattern) -> TokenStream2 {
             quote! { #(#checks)|* }
         }
         EnumPattern::Wildcard => {
-            quote! { true }
+            quote! { _ }
         }
     }
 }

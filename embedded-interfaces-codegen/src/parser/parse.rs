@@ -78,18 +78,8 @@ impl Parse for Definition {
             let mut enum_def: EnumDefinition = input.parse()?;
             enum_def.attributes = attributes;
 
-            // Process variants to check whether it is exhaustive and non-overlapping. Also
-            // determine the representative element for each variant.
-
-            // TODO: the wildcard variant (if present) will be skipped in determining representative. It will
-            // take the first non-captured value. If a wildcard variant is present, it must capture
-            // at least one value.
-            //
-            // TODO: create function EnumPattern::ranges(&self) which returns the captured elements as &[(u128, u128)].
-            // Wildcard returns empty range.
-            for variant in enum_def.variants.iter_mut() {
-                // TODO:
-            }
+            // Process variants to validate and set representatives
+            enum_def.process_variants()?;
 
             Ok(Definition::Enum(enum_def))
         } else if lookahead.peek(Token![struct]) {
@@ -291,7 +281,7 @@ impl Parse for EnumVariant {
             pattern,
             name,
             capture_value,
-            representative: LitInt::new("invalid_representative_element", input.span()),
+            representative: LitInt::new("0", input.span()),
         })
     }
 }

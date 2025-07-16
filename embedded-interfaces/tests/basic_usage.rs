@@ -1,4 +1,4 @@
-use embedded_interfaces::{codegen::interface_objects, packable::UnsignedPackable};
+use embedded_interfaces::codegen::interface_objects;
 
 // FIXME: allow _: _[2..4] short reserved syntax
 // FIXME: allow _: _{4} short reserved syntax
@@ -86,7 +86,8 @@ interface_objects! {
     /// Operating mode.
     enum OperatingMode: u8{3} {
         0b000 PowerDown,
-        0b101 Continuous,
+        0b001..=0b101 Continuous(u8),
+        _ Invalid,
     }
 
     // /// Multi-byte register with single field
@@ -124,7 +125,7 @@ interface_objects! {
     /// Register with mixed field types
     register AdcConfiguration(addr = 0x1, mode = rw, size = 2) {
         /// Operating mode
-        operating_mode: OperatingMode[0..3] = OperatingMode::Continuous,
+        operating_mode: OperatingMode[0..3] = OperatingMode::Continuous(1),
         _: u16{13}
         // /// Enable temperature conversion
         // enable_temperature: bool[1] = true,
