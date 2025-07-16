@@ -86,7 +86,6 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
         quote! {
             match value {
                 #(#from_unsigned_arms,)*
-                _ => unreachable!("UnsignedPackable::from_unsigned must handle all possible values")
             }
         }
     };

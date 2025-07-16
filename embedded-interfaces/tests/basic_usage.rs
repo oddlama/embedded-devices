@@ -125,7 +125,7 @@ interface_objects! {
     /// Register with mixed field types
     register AdcConfiguration(addr = 0x1, mode = rw, size = 2) {
         /// Operating mode
-        operating_mode: OperatingMode[0..3] = OperatingMode::Continuous(1),
+        operating_mode: OperatingMode = OperatingMode::Continuous(1),
         _: u16{13}
         // /// Enable temperature conversion
         // enable_temperature: bool[1] = true,

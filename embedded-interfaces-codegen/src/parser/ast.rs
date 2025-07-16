@@ -445,3 +445,25 @@ impl EnumDefinition {
         }
     }
 }
+
+pub fn get_effective_size(belongs_to: &Ident, attrs: &[Attr]) -> syn::Result<usize> {
+    let size_attr = attrs.iter().find(|x| x.name == "size").ok_or_else(|| {
+        syn::Error::new_spanned(
+            &belongs_to,
+            "A size= attribute is required because the effective size must be known to the macro in advance",
+        )
+    })?;
+
+    if let syn::Expr::Lit(syn::ExprLit {
+        lit: syn::Lit::Int(lit_int),
+        ..
+    }) = &size_attr.value
+    {
+        lit_int.base10_parse::<usize>()
+    } else {
+        Err(syn::Error::new_spanned(
+            &size_attr.value,
+            "This expression must be a literal value because the effective size must be known to the macro in advance",
+        ))
+    }
+}

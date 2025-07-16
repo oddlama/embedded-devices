@@ -8,13 +8,14 @@ use quote::quote;
 use syn::{Attribute, Ident};
 
 use super::bit_pattern::{generate_bit_pattern_doc, process_field_bit_patterns};
-use crate::parser::FieldDefinition;
+use crate::parser::{FieldDefinition, InterfaceObjectsDefinition};
 
 /// Generate a pair of packed and unpacked structs with conversion implementations
 ///
 /// This function is generic and can be used for registers or any other structures
 /// that need packed/unpacked representations.
 pub fn generate_packed_struct_pair(
+    interface_def: &InterfaceObjectsDefinition,
     packed_name: &Ident,
     unpacked_name: &Ident,
     fields: &[FieldDefinition],
@@ -23,7 +24,7 @@ pub fn generate_packed_struct_pair(
 ) -> syn::Result<TokenStream2> {
     // Process and validate bit patterns
     let total_size_bits = size * 8;
-    let processed_fields = process_field_bit_patterns(packed_name, fields, total_size_bits)?;
+    let processed_fields = process_field_bit_patterns(interface_def, packed_name, fields, total_size_bits)?;
 
     let unpacked_struct = generate_unpacked_struct(&processed_fields, packed_name, unpacked_name, doc_attrs, size)?; // Pass size
     let packed_struct = generate_packed_struct(&processed_fields, packed_name, unpacked_name, size, doc_attrs)?;

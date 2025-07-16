@@ -7,7 +7,9 @@ use proc_macro2::Ident;
 use std::collections::VecDeque;
 use syn::Type;
 
-use crate::parser::{BitPattern, BitRange, FieldDefinition};
+use crate::parser::{
+    BitPattern, BitRange, Definition, FieldDefinition, InterfaceObjectsDefinition, get_effective_size,
+};
 
 /// A normalized bit range (always exclusive end)
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -164,6 +166,7 @@ pub struct ProcessedField {
 
 /// Process and validate all fields' bit patterns
 pub fn process_field_bit_patterns(
+    interface_def: &InterfaceObjectsDefinition,
     parent: &Ident,
     fields: &[FieldDefinition],
     total_size_bits: usize,
@@ -173,7 +176,7 @@ pub fn process_field_bit_patterns(
 
     // First pass: process each field's bit pattern
     for field in fields {
-        let processed = process_single_field(field, &mut next_auto_bit)?;
+        let processed = process_single_field(interface_def, field, &mut next_auto_bit)?;
         processed_fields.push(processed);
     }
 
@@ -184,7 +187,11 @@ pub fn process_field_bit_patterns(
 }
 
 /// Process a single field's bit pattern (updated to handle size constraints)
-fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut usize) -> syn::Result<ProcessedField> {
+fn process_single_field(
+    interface_def: &InterfaceObjectsDefinition,
+    field: &FieldDefinition,
+    next_auto_bit: &mut usize,
+) -> syn::Result<ProcessedField> {
     let normalized_ranges = if let Some(bit_pattern) = &field.bit_pattern {
         // Explicit bit pattern provided
         let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
@@ -201,13 +208,13 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut usize) -> s
         let end_bit = start_bit + size_constraint;
 
         // Validate that the constraint makes sense for the field type
-        validate_size_constraint(&field.field_type, size_constraint)?;
+        validate_size_constraint(interface_def, &field.field_type, size_constraint)?;
 
         *next_auto_bit = end_bit;
         vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(field.size_constraint, e))?]
     } else {
         // Auto-generate bit pattern using inferred size
-        let field_size = infer_field_size_bits(&field.field_type)?;
+        let field_size = infer_field_size_bits(interface_def, &field.field_type)?;
         let start_bit = *next_auto_bit;
         let end_bit = start_bit + field_size;
 
@@ -220,8 +227,13 @@ fn process_single_field(field: &FieldDefinition, next_auto_bit: &mut usize) -> s
         normalized_ranges,
     })
 }
+
 /// Validate that a size constraint makes sense for the given field type
-fn validate_size_constraint(field_type: &Type, size_constraint: usize) -> syn::Result<()> {
+fn validate_size_constraint(
+    interface_def: &InterfaceObjectsDefinition,
+    field_type: &Type,
+    size_constraint: usize,
+) -> syn::Result<()> {
     match field_type {
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
@@ -259,7 +271,7 @@ fn validate_size_constraint(field_type: &Type, size_constraint: usize) -> syn::R
             }
         }
         Type::Array(array_type) => {
-            let element_size = infer_field_size_bits(&array_type.elem)?;
+            let element_size = infer_field_size_bits(interface_def, &array_type.elem)?;
             if let syn::Expr::Lit(syn::ExprLit {
                 lit: syn::Lit::Int(lit_int),
                 ..
@@ -335,25 +347,45 @@ fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange
 }
 
 /// Infer the size in bits for a field type
-fn infer_field_size_bits(field_type: &Type) -> syn::Result<usize> {
+fn infer_field_size_bits(interface_def: &InterfaceObjectsDefinition, field_type: &Type) -> syn::Result<usize> {
     match field_type {
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
                 let type_name = ident.to_string();
-                match type_name.as_str() {
-                    "bool" => Ok(1),
-                    "u8" | "i8" => Ok(8),
-                    "u16" | "i16" => Ok(16),
-                    "u32" | "i32" | "f32" => Ok(32),
-                    "u64" | "i64" | "f64" => Ok(64),
-                    "u128" | "i128" => Ok(128),
-                    _ => Err(syn::Error::new_spanned(
-                        field_type,
-                        format!(
-                            "Cannot infer bit size for type '{}'. Please specify an explicit bit pattern.",
-                            type_name
-                        ),
-                    )),
+                let custom_type = interface_def.definitions.iter().find(|x| match x {
+                    Definition::Register(register_definition) => register_definition.name == type_name,
+                    Definition::Struct(struct_definition) => struct_definition.name == type_name,
+                    Definition::Enum(enum_definition) => enum_definition.name == type_name,
+                });
+
+                if let Some(custom_type) = custom_type {
+                    match custom_type {
+                        Definition::Register(register_definition) => Ok(8 * get_effective_size(
+                            &register_definition.name,
+                            &interface_def.get_effective_register_attrs(register_definition)?,
+                        )?),
+                        Definition::Struct(struct_definition) => Ok(8 * get_effective_size(
+                            &struct_definition.name,
+                            &interface_def.get_effective_struct_attrs(struct_definition)?,
+                        )?),
+                        Definition::Enum(enum_definition) => enum_definition.get_effective_bit_size(),
+                    }
+                } else {
+                    match type_name.as_str() {
+                        "bool" => Ok(1),
+                        "u8" | "i8" => Ok(8),
+                        "u16" | "i16" => Ok(16),
+                        "u32" | "i32" | "f32" => Ok(32),
+                        "u64" | "i64" | "f64" => Ok(64),
+                        "u128" | "i128" => Ok(128),
+                        _ => Err(syn::Error::new_spanned(
+                            field_type,
+                            format!(
+                                "Cannot infer bit size for type '{}'. Please specify an explicit bit pattern.",
+                                type_name
+                            ),
+                        )),
+                    }
                 }
             } else {
                 Err(syn::Error::new_spanned(
@@ -363,7 +395,7 @@ fn infer_field_size_bits(field_type: &Type) -> syn::Result<usize> {
             }
         }
         Type::Array(array_type) => {
-            let element_size = infer_field_size_bits(&array_type.elem)?;
+            let element_size = infer_field_size_bits(interface_def, &array_type.elem)?;
             if let syn::Expr::Lit(syn::ExprLit {
                 lit: syn::Lit::Int(lit_int),
                 ..

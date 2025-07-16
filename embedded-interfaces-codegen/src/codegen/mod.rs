@@ -58,6 +58,7 @@ fn generate_register(
 
     // Generate the packed/unpacked struct pair (reusable part)
     let packed_structs = generate_packed_struct_pair(
+        interface_def,
         register_name,
         &unpacked_name,
         &register.fields,
@@ -98,6 +99,7 @@ fn generate_struct(
 
     // Generate the packed/unpacked struct pair (reusable part)
     let packed_structs = generate_packed_struct_pair(
+        interface_def,
         struct_name,
         &unpacked_name,
         &struct_def.fields,
