@@ -59,7 +59,6 @@ impl NormalizedRange {
     }
 }
 
-/// A tiny conversion trait so both NormalizedRange and &NormalizedRange work.
 pub trait IntoNormalizedRange {
     fn into_normalized(self) -> NormalizedRange;
 }
@@ -326,6 +325,10 @@ fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange
         }
     }
 
+    Ok(normalize_ranges(ranges))
+}
+
+fn normalize_ranges(mut ranges: Vec<NormalizedRange>) -> Vec<NormalizedRange> {
     // Sort ranges by start position
     ranges.sort();
 
@@ -343,7 +346,7 @@ fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange
         }
     }
 
-    Ok(merged)
+    merged
 }
 
 /// Infer the size in bits for a field type
@@ -352,13 +355,12 @@ fn infer_field_size_bits(interface_def: &InterfaceObjectsDefinition, field_type:
         Type::Path(type_path) => {
             if let Some(ident) = type_path.path.get_ident() {
                 let type_name = ident.to_string();
-                let custom_type = interface_def.definitions.iter().find(|x| match x {
-                    Definition::Register(register_definition) => register_definition.name == type_name,
-                    Definition::Struct(struct_definition) => struct_definition.name == type_name,
-                    Definition::Enum(enum_definition) => enum_definition.name == type_name,
-                });
 
-                if let Some(custom_type) = custom_type {
+                if let Some(custom_type) = type_name
+                    .strip_suffix("Unpacked")
+                    .and_then(|x| interface_def.get_definition(x))
+                    .or_else(|| interface_def.get_definition(&type_name))
+                {
                     match custom_type {
                         Definition::Register(register_definition) => Ok(8 * get_effective_size(
                             &register_definition.name,
@@ -529,4 +531,157 @@ pub fn generate_bit_pattern_doc(ranges: &[NormalizedRange]) -> String {
         .collect();
 
     format!("Bits: [{}]", range_strs.join(", "))
+}
+
+pub fn extract_bits(xs: &[NormalizedRange], ys: &[NormalizedRange]) -> Vec<NormalizedRange> {
+    // Expand xs into individual bit indices with their logical positions
+    let mut x_bits_with_positions = Vec::new();
+    let mut logical_pos = 0;
+
+    for range in xs {
+        for bit in range.start..range.end {
+            x_bits_with_positions.push((logical_pos, bit));
+            logical_pos += 1;
+        }
+    }
+
+    // Expand ys into the logical positions we want to extract
+    let mut y_positions = Vec::new();
+    for range in ys {
+        for pos in range.start..range.end {
+            y_positions.push(pos);
+        }
+    }
+
+    // Extract the actual bit indices that correspond to the requested logical positions
+    let mut result_bits = Vec::new();
+    for &wanted_pos in &y_positions {
+        if let Some(&(_, actual_bit)) = x_bits_with_positions
+            .iter()
+            .find(|(logical_pos, _)| *logical_pos == wanted_pos)
+        {
+            result_bits.push(actual_bit);
+        }
+    }
+
+    // Convert back to ranges
+    let mut result = Vec::new();
+    if result_bits.is_empty() {
+        return result;
+    }
+
+    // Sort to ensure we can create proper ranges
+    result_bits.sort_unstable();
+
+    let mut start = result_bits[0];
+    let mut end = start + 1;
+
+    for &bit in result_bits.iter().skip(1) {
+        if bit == end {
+            // Extend current range
+            end += 1;
+        } else {
+            // Start new range
+            result.push(NormalizedRange { start, end });
+            start = bit;
+            end = bit + 1;
+        }
+    }
+
+    // Don't forget the last range
+    result.push(NormalizedRange { start, end });
+    // Renormalize
+    normalize_ranges(result)
+}
+
+#[cfg(test)]
+mod extract_tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_from_s1_example() {
+        // S1 layout: [(20,24),(16,20),(12,16),(8,12),(4,8),(0,4)] - 24 bits total
+        // This represents logical positions 0-23 mapped to actual bit positions
+        let xs = vec![
+            NormalizedRange::new(20, 24).unwrap(), // logical 0-3 -> actual 20-23
+            NormalizedRange::new(16, 20).unwrap(), // logical 4-7 -> actual 16-19
+            NormalizedRange::new(12, 16).unwrap(), // logical 8-11 -> actual 12-15
+            NormalizedRange::new(8, 12).unwrap(),  // logical 12-15 -> actual 8-11
+            NormalizedRange::new(4, 8).unwrap(),   // logical 16-19 -> actual 4-7
+            NormalizedRange::new(0, 4).unwrap(),   // logical 20-23 -> actual 0-3
+        ];
+
+        // S1::b occupies logical positions [(16,24),(8,16)] = [16-23, 8-15]
+        let ys = vec![
+            NormalizedRange::new(16, 24).unwrap(), // logical 16-23
+            NormalizedRange::new(8, 16).unwrap(),  // logical 8-15
+        ];
+
+        let result = extract_bits(&xs, &ys);
+
+        // logical 16-23 maps to actual 4-7, 0-3
+        // logical 8-15 maps to actual 12-15, 8-11
+        // So we should get actual bits: 4-7, 0-3, 12-15, 8-11
+        // Sorted: 0-3, 4-7, 8-11, 12-15
+        let expected = normalize_ranges(vec![
+            NormalizedRange::new(0, 4).unwrap(),
+            NormalizedRange::new(4, 8).unwrap(),
+            NormalizedRange::new(8, 12).unwrap(),
+            NormalizedRange::new(12, 16).unwrap(),
+        ]);
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_extract_simple() {
+        // Simple case: extract middle bits
+        let xs = vec![
+            NormalizedRange::new(10, 15).unwrap(), // logical 0-4 -> actual 10-14
+            NormalizedRange::new(20, 25).unwrap(), // logical 5-9 -> actual 20-24
+        ];
+
+        let ys = vec![
+            NormalizedRange::new(2, 7).unwrap(), // logical 2-6
+        ];
+
+        let result = extract_bits(&xs, &ys);
+
+        // logical 2-4 maps to actual 12-14
+        // logical 5-6 maps to actual 20-21
+        let expected = vec![
+            NormalizedRange::new(12, 15).unwrap(),
+            NormalizedRange::new(20, 22).unwrap(),
+        ];
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_extract_single_bits() {
+        let xs = vec![
+            NormalizedRange::new(0, 4).unwrap(), // logical 0-3 -> actual 0-3
+        ];
+
+        let ys = vec![
+            NormalizedRange::new(1, 2).unwrap(), // logical 1
+            NormalizedRange::new(3, 4).unwrap(), // logical 3
+        ];
+
+        let result = extract_bits(&xs, &ys);
+
+        // logical 1 -> actual 1, logical 3 -> actual 3
+        let expected = vec![NormalizedRange::new(1, 2).unwrap(), NormalizedRange::new(3, 4).unwrap()];
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_extract_empty() {
+        let xs = vec![NormalizedRange::new(0, 4).unwrap()];
+        let ys: Vec<NormalizedRange> = vec![];
+
+        let result = extract_bits(&xs, &ys);
+        assert_eq!(result, vec![]);
+    }
 }

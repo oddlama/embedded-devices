@@ -226,11 +226,28 @@ impl Parse for EnumDefinition {
         let underlying_type: Type = input.parse()?;
 
         // Optional size constraint
+        // Optional size constraint - use lookahead to check if it's a size constraint
         let size_constraint = if input.peek(Brace) {
-            let content;
-            syn::braced!(content in input);
-            let size_lit: LitInt = content.parse()?;
-            Some(size_lit.base10_parse::<usize>()?)
+            // Fork the input to look ahead without consuming
+            let lookahead = input.fork();
+            let lookahead_content;
+            syn::braced!(lookahead_content in lookahead);
+
+            // Try to parse as a LitInt - if this succeeds and the content is empty after,
+            // it's likely a size constraint
+            if let Ok(_lit) = lookahead_content.parse::<LitInt>() {
+                if lookahead_content.is_empty() {
+                    // It's a size constraint, now consume from the real input
+                    let content;
+                    syn::braced!(content in input);
+                    let size_lit: LitInt = content.parse()?;
+                    Some(size_lit.base10_parse::<usize>()?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -245,7 +262,7 @@ impl Parse for EnumDefinition {
         }
 
         Ok(EnumDefinition {
-            attributes: Vec::new(), // Will be set by Definition::parse
+            attributes: Vec::new(), // Will be set later by Definition::parse
             name,
             underlying_type,
             size_constraint,

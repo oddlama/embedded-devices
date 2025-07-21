@@ -3,6 +3,9 @@
 use proc_macro2::Span;
 use syn::{Attribute, Expr, Ident, LitInt, Type};
 
+pub(crate) const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
+pub(crate) const ALLOWED_STRUCT_ATTRS: &[&str] = &["size"];
+
 /// Top-level structure for the entire interface_objects! block
 #[derive(Debug, Clone)]
 pub struct InterfaceObjectsDefinition {
@@ -121,12 +124,35 @@ pub struct UnitsBlock {
     // TODO: Parse quantity, unit, scale, etc.
 }
 
+impl From<RegisterDefinition> for StructDefinition {
+    fn from(value: RegisterDefinition) -> Self {
+        StructDefinition {
+            attributes: value.attributes,
+            name: value.name,
+            struct_attrs: value
+                .register_attrs
+                .into_iter()
+                .filter(|x| ALLOWED_STRUCT_ATTRS.contains(&x.name.to_string().as_str()))
+                .collect(),
+            fields: value.fields,
+        }
+    }
+}
+
 impl InterfaceObjectsDefinition {
+    /// Get a definition by name if it exists.
+    pub fn get_definition(&self, name: &str) -> Option<&Definition> {
+        self.definitions.iter().find(|x| match x {
+            Definition::Register(register_definition) => register_definition.name == name,
+            Definition::Struct(struct_definition) => struct_definition.name == name,
+            Definition::Enum(enum_definition) => enum_definition.name == name,
+        })
+    }
+
     /// Get all register attributes including defaults
     /// This method validates that only allowed attributes are used for registers
     pub fn get_effective_register_attrs(&self, register: &RegisterDefinition) -> syn::Result<Vec<Attr>> {
         let mut attrs = Vec::new();
-        const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
 
         // Add defaults first, validating each one
         if let Some(defaults) = &self.register_defaults {
@@ -170,8 +196,6 @@ impl InterfaceObjectsDefinition {
 
     /// Get all struct attributes (only size is allowed)
     pub fn get_effective_struct_attrs(&self, struct_def: &StructDefinition) -> syn::Result<Vec<Attr>> {
-        const ALLOWED_STRUCT_ATTRS: &[&str] = &["size"];
-
         for attr in &struct_def.struct_attrs {
             let attr_name = attr.name.to_string();
             if !ALLOWED_STRUCT_ATTRS.contains(&attr_name.as_str()) {
@@ -384,7 +408,7 @@ impl EnumDefinition {
                 return Err(syn::Error::new_spanned(
                     &self.name,
                     format!(
-                        "An enum without wildcard variant must cover all values. Uncovered values: {wildcard_ranges:?}"
+                        "An enum without wildcard variant must cover all values. Uncovered value ranges: {wildcard_ranges:?}"
                     ),
                 ));
             }
@@ -449,7 +473,7 @@ impl EnumDefinition {
 pub fn get_effective_size(belongs_to: &Ident, attrs: &[Attr]) -> syn::Result<usize> {
     let size_attr = attrs.iter().find(|x| x.name == "size").ok_or_else(|| {
         syn::Error::new_spanned(
-            &belongs_to,
+            belongs_to,
             "A size= attribute is required because the effective size must be known to the macro in advance",
         )
     })?;

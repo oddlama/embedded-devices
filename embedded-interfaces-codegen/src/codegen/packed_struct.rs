@@ -26,8 +26,22 @@ pub fn generate_packed_struct_pair(
     let total_size_bits = size * 8;
     let processed_fields = process_field_bit_patterns(interface_def, packed_name, fields, total_size_bits)?;
 
-    let unpacked_struct = generate_unpacked_struct(&processed_fields, packed_name, unpacked_name, doc_attrs, size)?; // Pass size
-    let packed_struct = generate_packed_struct(&processed_fields, packed_name, unpacked_name, size, doc_attrs)?;
+    let unpacked_struct = generate_unpacked_struct(
+        interface_def,
+        &processed_fields,
+        packed_name,
+        unpacked_name,
+        doc_attrs,
+        size,
+    )?;
+    let packed_struct = generate_packed_struct(
+        interface_def,
+        &processed_fields,
+        packed_name,
+        unpacked_name,
+        size,
+        doc_attrs,
+    )?;
     let conversions = generate_struct_conversions(packed_name, unpacked_name)?;
 
     Ok(quote! {
@@ -38,11 +52,12 @@ pub fn generate_packed_struct_pair(
 }
 
 fn generate_unpacked_struct(
+    interface_def: &InterfaceObjectsDefinition,
     processed_fields: &[super::bit_pattern::ProcessedField],
     packed_name: &Ident,
     unpacked_name: &Ident,
     doc_attrs: &[Attribute],
-    size: usize, // Add size parameter
+    size: usize,
 ) -> syn::Result<TokenStream2> {
     let mut struct_fields = Vec::new();
     let mut default_values = Vec::new();
@@ -86,7 +101,7 @@ fn generate_unpacked_struct(
     }
 
     // Generate the byte conversion method
-    let pack_body = super::pack::generate_pack_body(packed_name, processed_fields, size)?;
+    let pack_body = super::pack::generate_pack_body(interface_def, packed_name, processed_fields, size)?;
 
     Ok(quote! {
         #(#doc_attrs)*
@@ -115,6 +130,7 @@ fn generate_unpacked_struct(
 
 /// Generate the packed struct with byte array representation
 fn generate_packed_struct(
+    interface_def: &InterfaceObjectsDefinition,
     processed_fields: &[super::bit_pattern::ProcessedField],
     packed_name: &Ident,
     unpacked_name: &Ident,
@@ -122,7 +138,7 @@ fn generate_packed_struct(
     doc_attrs: &[Attribute],
 ) -> syn::Result<TokenStream2> {
     // Generate the byte conversion method
-    let unpack_body = super::unpack::generate_unpack_body(unpacked_name, processed_fields)?;
+    let unpack_body = super::unpack::generate_unpack_body(interface_def, unpacked_name, processed_fields)?;
 
     Ok(quote! {
         #(#doc_attrs)*

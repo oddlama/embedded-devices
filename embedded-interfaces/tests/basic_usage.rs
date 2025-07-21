@@ -4,9 +4,8 @@ use embedded_interfaces::codegen::interface_objects;
 // FIXME: allow _: _{4} short reserved syntax
 // FIXME: allow x: u8[7..=0] reverse ranges
 // FIXME: allow read write annotatation per field? then dont generate write_f1 read_f1 with_f1 ?? not sure
-// TODO: remove Enum{3} necessity since we know the bit size anyway in the same macro at least,
-// same for custom structs
-
+// FIXME: prevent infinite recursion in types referencing each other?
+// FIXME: allow #[transparent] annotation on nested structs to skip outerfield in fns like read_outerfield_innerfield.
 type DummyI2cCodec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec<()>;
 type DummySpiCodec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec<()>;
 
@@ -122,11 +121,18 @@ interface_objects! {
     //     _reserved1: u8,
     // }
 
+    struct Test(size = 2) {
+        a: u8{3}
+        b: u16{9}
+        c: u8{4}
+    }
+
     /// Register with mixed field types
-    register AdcConfiguration(addr = 0x1, mode = rw, size = 2) {
+    register AdcConfiguration(addr = 0x1, mode = rw, size = 4) {
         /// Operating mode
         operating_mode: OperatingMode = OperatingMode::Continuous(1),
         _: u16{13}
+        other: TestUnpacked,
         // /// Enable temperature conversion
         // enable_temperature: bool[1] = true,
         // /// Enable shunt voltage conversion

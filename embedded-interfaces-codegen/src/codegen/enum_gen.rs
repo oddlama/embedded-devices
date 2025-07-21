@@ -72,20 +72,25 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
 
     // Check if we have a wildcard pattern to handle unreachable case
     let has_wildcard = variants.iter().any(|v| matches!(v.pattern, EnumPattern::Wildcard));
+    // Check if we use all bits in the underlying type. We only require the enum to exhaust the N
+    // given bits and need to adjust the match accordingly.
+    let uses_all_bits = bit_size == enum_def.get_default_bit_size()?;
 
-    let from_unsigned_match = if has_wildcard {
-        // If we have a wildcard, the match should be exhaustive
+    let from_unsigned_match = if has_wildcard || uses_all_bits {
+        // If we have a wildcard or our match is fully exhaustive, don't add a default arm
         quote! {
             match value {
                 #(#from_unsigned_arms,)*
             }
         }
     } else {
-        // If no wildcard, we need to add a default case (this should not happen in practice
-        // since the trait says the function must succeed for any value, but we'll add it for safety)
+        // If there is no wildcard and our matches are not exhausting the underlying type, we need
+        // to add a default case (this should not happen in practice since the trait says the
+        // function must succeed for any bit value, but we'll add it for safety)
         quote! {
             match value {
                 #(#from_unsigned_arms,)*
+                _ => panic!("Unused bits in packed enum values must not be used! This shouldn't have happened, please file a bug report in embedded-interfaces."),
             }
         }
     };
