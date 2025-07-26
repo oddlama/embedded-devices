@@ -1,3 +1,6 @@
+//! A comprehensive framework for building type-safe and ergonomic embedded device drivers.
+//!
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #[cfg(not(any(feature = "sync", feature = "async")))]
 compile_error!("You must enable at least one of the create features `sync` or `async`");
