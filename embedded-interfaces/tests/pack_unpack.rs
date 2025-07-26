@@ -1,4 +1,5 @@
 #![allow(clippy::bool_assert_comparison)]
+
 use embedded_interfaces::codegen::interface_objects;
 
 #[test]
@@ -370,8 +371,8 @@ fn test_float_types() {
     assert_eq!(packed.read_f2(), 0xFF);
 
     // Test write accessors for floats
-    let packed = MixedFloatUnpacked::default().pack().with_f1(3.14f32).with_f2(0x42);
-    assert_eq!(packed.read_f1(), 3.14f32);
+    let packed = MixedFloatUnpacked::default().pack().with_f1(1.23f32).with_f2(0x42);
+    assert_eq!(packed.read_f1(), 1.23f32);
     assert_eq!(packed.read_f2(), 0x42);
 }
 
@@ -562,8 +563,8 @@ fn test_float_arrays() {
     assert_eq!(packed.read_data(), [1.0, -1.0]);
 
     // Test write accessors
-    let packed = FloatArrayUnpacked::default().pack().with_data([3.14, 2.71]);
-    assert_eq!(packed.read_data(), [3.14, 2.71]);
+    let packed = FloatArrayUnpacked::default().pack().with_data([1.23, 2.71]);
+    assert_eq!(packed.read_data(), [1.23, 2.71]);
 }
 
 #[test]
