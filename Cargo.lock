@@ -225,7 +225,7 @@ dependencies = [
  "maybe-async-cfg",
  "paste",
  "thiserror",
- "uom",
+ "uom 0.37.0 (git+https://github.com/iliekturtles/uom?rev=b64af636bdff2119e5f1e0e5ad5206a326403e79)",
 ]
 
 [[package]]
@@ -271,6 +271,7 @@ dependencies = [
  "maybe-async-cfg",
  "thiserror",
  "trybuild",
+ "uom 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -777,6 +778,16 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "uom"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd5cfe7d84f6774726717f358a37f5bca8fca273bed4de40604ad129d1107b49"
+dependencies = [
+ "num-traits",
+ "typenum",
+]
 
 [[package]]
 name = "uom"

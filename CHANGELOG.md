@@ -1,4 +1,4 @@
-# v0.9.14
+# v0.10.0
 
 This release includes several breaking changes.
 

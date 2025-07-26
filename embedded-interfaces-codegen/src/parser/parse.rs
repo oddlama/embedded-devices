@@ -2,7 +2,7 @@
 
 use super::ast::*;
 use syn::{
-    Attribute, Expr, Ident, LitInt, Token, Type,
+    Attribute, Expr, Ident, Lit, LitInt, Token, Type,
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
     token::{Brace, Bracket, Paren},
@@ -476,9 +476,36 @@ impl Parse for UnitsBlock {
                         return Err(content.error("Cannot mix lsb with from_raw/into_raw"));
                     }
                     // Parse lsb as numerator / denominator
-                    let numerator: LitInt = content.parse()?;
+                    let numerator: Lit = content.parse()?;
                     content.parse::<Token![/]>()?;
-                    let denominator: LitInt = content.parse()?;
+                    let denominator: Lit = content.parse()?;
+
+                    macro_rules! check_lit {
+                        ($x:ident) => {{
+                            let ok = match $x {
+                                Lit::Int(ref lit_int) => lit_int.suffix() != "",
+                                Lit::Float(ref lit_float) => lit_float.suffix() != "",
+                                _ => false,
+                            };
+
+                            if ok {
+                                Ok(())
+                            } else {
+                                Err(syn::Error::new_spanned(
+                                    &$x,
+                                    concat!(
+                                        "The lsb ",
+                                        stringify!($x),
+                                        " must be an integer or float literal with explicit type suffix!"
+                                    ),
+                                ))
+                            }
+                        }};
+                    }
+
+                    check_lit!(numerator)?;
+                    check_lit!(denominator)?;
+
                     lsb = Some((numerator, denominator));
                 }
                 "from_raw" => {

@@ -7,7 +7,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote};
 use syn::{Ident, Type};
 
-use crate::parser::{Definition, InterfaceObjectsDefinition, StructDefinition};
+use crate::parser::{Definition, InterfaceObjectsDefinition, ScaleSpec, StructDefinition};
 
 use super::{
     bit_helpers::{generate_copy_to_normalized_ranges, get_element_bits, get_type_bits},
@@ -134,8 +134,7 @@ pub fn generate_accessors(
                                     #[doc = #write_fn_doc]
                                     pub fn #write_fn_name(&mut self, value: #packed_type) {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                                        let mut dst = self.0;
-                                        let dst_bits = dst.view_bits_mut::<Msb0>();
+                                        let dst_bits = self.0.view_bits_mut::<Msb0>();
                                         let src = value.0;
                                         let src_bits = src.view_bits::<Msb0>();
                                         #copy_ranges
@@ -167,8 +166,7 @@ pub fn generate_accessors(
                                     #[doc = #write_fn_doc]
                                     pub fn #write_fn_name(&mut self, value: #field_type) {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                                        let mut dst = self.0;
-                                        let dst_bits = dst.view_bits_mut::<Msb0>();
+                                        let dst_bits = self.0.view_bits_mut::<Msb0>();
                                         #pack_statement
                                     }
 
@@ -217,12 +215,65 @@ pub fn generate_accessors(
         );
         let chainable_doc = format!("Chainable version of [`Self::{write_fn_name}`].");
 
+        let opt_unit_accessor = if let Some(units) = &processed_field.field.units {
+            let raw_name = field_name.to_string();
+            let Some(plain_name) = raw_name.strip_prefix("raw_") else {
+                return Err(syn::Error::new_spanned(field_name, "Unit"));
+            };
+            let write_unit_fn_name = format_ident!("write_{}{}", prefix, plain_name);
+            let with_unit_fn_name = format_ident!("with_{}{}", prefix, plain_name);
+            let write_unit_fn_doc = format!(
+                "Packs and updates the value of the [`{field_name}`]({unpacked_name}::{field_name}) field converted from the associated physical quantity in this packed representation."
+            );
+            let unit_chainable_doc = format!("Chainable version of [`Self::{write_fn_name}`].");
+
+            let ty_quant = &units.quantity;
+            let ty_unit = &units.unit;
+
+            let to_raw = match &units.scale {
+                ScaleSpec::Lsb { numerator, denominator } => {
+                    quote! {
+                        (
+                            value.get::<#ty_unit>() * #denominator / #numerator
+                        ) as #field_type
+                    }
+                }
+                ScaleSpec::Custom { from_raw: _, into_raw } => {
+                    quote! {
+                        (
+                            (#into_raw)(value.get::<#ty_unit>())
+                        ) as #field_type
+                    }
+                }
+            };
+
+            quote! {
+                #[doc = #write_unit_fn_doc]
+                #[inline]
+                pub fn #write_unit_fn_name(&mut self, value: #ty_quant) {
+                    let raw = #to_raw;
+                    self.#write_fn_name(raw);
+                }
+
+                #[doc = #write_unit_fn_doc]
+                #[doc = ""]
+                #[doc = #unit_chainable_doc]
+                #[inline]
+                pub fn #with_unit_fn_name(mut self, value: #ty_quant) -> Self {
+                    let raw = #to_raw;
+                    self.#write_fn_name(raw);
+                    self
+                }
+            }
+        } else {
+            quote! {}
+        };
+
         Ok(quote! {
             #[doc = #write_fn_doc]
             pub fn #write_fn_name(&mut self, value: #field_type) {
                 use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                let mut dst = self.0;
-                let dst_bits = dst.view_bits_mut::<Msb0>();
+                let dst_bits = self.0.view_bits_mut::<Msb0>();
                 #pack_statement
             }
 
@@ -234,6 +285,8 @@ pub fn generate_accessors(
                 self.#write_fn_name(value);
                 self
             }
+
+            #opt_unit_accessor
         })
     }
 }

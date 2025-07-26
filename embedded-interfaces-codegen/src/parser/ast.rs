@@ -1,7 +1,7 @@
 //! Abstract Syntax Tree definitions
 
 use proc_macro2::Span;
-use syn::{Attribute, Expr, Ident, LitInt, Type};
+use syn::{Attribute, Expr, Ident, Lit, LitInt, Type};
 
 pub(crate) const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
 pub(crate) const ALLOWED_STRUCT_ATTRS: &[&str] = &["size"];
@@ -127,10 +127,11 @@ pub struct UnitsBlock {
 }
 
 /// Scale specification - either LSB rational or custom conversion functions
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum ScaleSpec {
     /// LSB specified as numerator/denominator rational number
-    Lsb { numerator: LitInt, denominator: LitInt },
+    Lsb { numerator: Lit, denominator: Lit },
     /// Custom conversion functions
     Custom {
         from_raw: Expr, // |x| expression to convert from raw to scaled

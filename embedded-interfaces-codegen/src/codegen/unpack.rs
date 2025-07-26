@@ -7,7 +7,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote};
 use syn::{Ident, Type};
 
-use crate::parser::{Definition, InterfaceObjectsDefinition, StructDefinition};
+use crate::parser::{Definition, InterfaceObjectsDefinition, ScaleSpec, StructDefinition};
 
 use super::{
     bit_helpers::{generate_copy_from_normalized_ranges, get_element_bits, get_type_bits},
@@ -41,9 +41,7 @@ pub fn generate_unpack_body(
 
     Ok(quote! {
         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-
-        let src = self.0;
-        let src_bits = src.view_bits::<Msb0>();
+        let src_bits = self.0.view_bits::<Msb0>();
 
         #unpacked_name {
             #(#field_extractions,)*
@@ -123,8 +121,7 @@ pub fn generate_accessors(
                                     #[doc = #read_fn_doc]
                                     pub fn #read_fn_name(&self) -> #packed_type {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                                        let src = self.0;
-                                        let src_bits = src.view_bits::<Msb0>();
+                                        let src_bits = self.0.view_bits::<Msb0>();
                                         let mut dst = [0u8; #size];
                                         let dst_bits = dst.view_bits_mut::<Msb0>();
                                         #copy_ranges
@@ -142,8 +139,7 @@ pub fn generate_accessors(
                                     #[doc = #read_fn_doc]
                                     pub fn #read_fn_name(&self) -> #field_type {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                                        let src = self.0;
-                                        let src_bits = src.view_bits::<Msb0>();
+                                        let src_bits = self.0.view_bits::<Msb0>();
                                         #unpack_expr
                                     }
                                 };
@@ -179,14 +175,56 @@ pub fn generate_accessors(
             "Unpacks only the [`{field_name}`]({unpacked_name}::{field_name}) field from this packed representation."
         );
 
+        let opt_unit_accessor = if let Some(units) = &processed_field.field.units {
+            let raw_name = field_name.to_string();
+            let Some(plain_name) = raw_name.strip_prefix("raw_") else {
+                return Err(syn::Error::new_spanned(field_name, "Unit"));
+            };
+            let read_unit_fn_name = format_ident!("read_{}{}", prefix, plain_name);
+            let read_unit_fn_doc = format!(
+                "Unpacks only the [`{field_name}`]({unpacked_name}::{field_name}) field converted to the associated physical quantity from this packed representation."
+            );
+
+            let ty_quant = &units.quantity;
+            let ty_unit = &units.unit;
+
+            let convert = match &units.scale {
+                ScaleSpec::Lsb { numerator, denominator } => {
+                    let lit_type = format_ident!("{}", numerator.suffix());
+                    quote! {
+                        #ty_quant::new::<#ty_unit>(
+                            (raw as #lit_type) * #numerator / #denominator
+                        )
+                    }
+                }
+                ScaleSpec::Custom { from_raw, into_raw: _ } => {
+                    quote! {
+                        #ty_quant::new::<#ty_unit>((#from_raw)(raw))
+                    }
+                }
+            };
+
+            quote! {
+                #[doc = #read_unit_fn_doc]
+                #[inline]
+                pub fn #read_unit_fn_name(&self) -> #ty_quant {
+                    let raw = self.#read_fn_name();
+                    #convert
+                }
+            }
+        } else {
+            quote! {}
+        };
+
         Ok(quote! {
             #[doc = #read_fn_doc]
             pub fn #read_fn_name(&self) -> #field_type {
                 use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
-                let src = self.0;
-                let src_bits = src.view_bits::<Msb0>();
+                let src_bits = self.0.view_bits::<Msb0>();
                 #unpack_expr
             }
+
+            #opt_unit_accessor
         })
     }
 }

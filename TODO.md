@@ -7,8 +7,6 @@ codegen:
 
 - check doc comments in embedded-interfaces and embedded-interfaces-codegen
 
-- write_ read_ with_ methods
 - structs / enums in arrays
-- unit codegen
-- short reserved syntax `_{10}`
 - per field read/write annotation (to skip generating read_ write_ with_ functions) (?)
+- typst output for each register block
