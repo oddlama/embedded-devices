@@ -59,6 +59,7 @@ fn generate_unpacked_struct(
     doc_attrs: &[Attribute],
     size: usize,
 ) -> syn::Result<TokenStream2> {
+    let mut struct_accessors = Vec::new();
     let mut struct_fields = Vec::new();
     let mut default_values = Vec::new();
 
@@ -92,6 +93,14 @@ fn generate_unpacked_struct(
             pub #field_name: #field_type
         });
 
+        if !processed.field.is_reserved() {
+            let ranges = &processed.normalized_ranges;
+            let pack_accessors = super::pack::generate_accessors(interface_def, processed, ranges, "")?;
+            let unpack_accessors = super::unpack::generate_accessors(interface_def, processed, ranges, "")?;
+            struct_accessors.push(pack_accessors);
+            struct_accessors.push(unpack_accessors);
+        }
+
         // Collect default values
         if let Some(default_val) = &field.default_value {
             default_values.push(quote! { #field_name: #default_val });
@@ -116,6 +125,10 @@ fn generate_unpacked_struct(
             pub fn pack(&self) -> #packed_name {
                 #pack_body
             }
+        }
+
+        impl #packed_name {
+            #(#struct_accessors)*
         }
 
         impl Default for #unpacked_name {

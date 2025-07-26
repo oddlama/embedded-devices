@@ -12,6 +12,7 @@ use crate::parser::{Definition, InterfaceObjectsDefinition, StructDefinition};
 use super::{
     bit_helpers::{generate_copy_from_normalized_ranges, get_element_bits, get_type_bits},
     bit_pattern::{IterChunksExactBits, NormalizedRange, ProcessedField, extract_bits, process_field_bit_patterns},
+    extract_struct_size,
 };
 
 /// Generate the body of the unpack method
@@ -48,6 +49,119 @@ pub fn generate_unpack_body(
             #(#field_extractions,)*
         }
     })
+}
+
+/// Generate reading accessors for the packed representation
+pub fn generate_accessors(
+    interface_def: &InterfaceObjectsDefinition,
+    processed_field: &ProcessedField,
+    ranges: &[NormalizedRange],
+    prefix: &str,
+) -> syn::Result<TokenStream2> {
+    let field_name = &processed_field.field.name;
+    let field_type = &processed_field.field.field_type;
+
+    let nested_accessors = match field_type {
+        Type::Path(type_path) => {
+            if let Some(ident) = type_path.path.get_ident() {
+                let type_name = ident.to_string();
+                if let Some(packed_name) = type_name.strip_suffix("Unpacked") {
+                    if let Some(custom_type) = interface_def.get_definition(packed_name) {
+                        let struct_def = match custom_type {
+                            Definition::Register(register_definition) => Some(register_definition.clone().into()),
+                            Definition::Struct(struct_definition) => Some(struct_definition.clone()),
+                            Definition::Enum(_) => None,
+                        };
+
+                        let packed_type = format_ident!("{}", packed_name);
+                        struct_def
+                            .map(|struct_def| -> syn::Result<_> {
+                                // Get effective attributes (only size is allowed for structs)
+                                let attrs = interface_def.get_effective_struct_attrs(&struct_def)?;
+                                // Extract size attribute
+                                let size = extract_struct_size(&struct_def.name, &attrs)?;
+                                let type_bits = size * 8;
+
+                                let mut sub_accessors: Vec<TokenStream2> = Vec::new();
+                                let sub_processed_fields = process_field_bit_patterns(
+                                    interface_def,
+                                    &packed_type,
+                                    &struct_def.fields,
+                                    type_bits,
+                                )?;
+                                for sub_processed in sub_processed_fields {
+                                    let sub_field_ranges = &sub_processed.normalized_ranges;
+                                    let ranges = extract_bits(ranges, sub_field_ranges);
+                                    // Skip reserved fields
+                                    if sub_processed.field.is_reserved() {
+                                        continue;
+                                    }
+
+                                    sub_accessors.push(generate_accessors(
+                                        interface_def,
+                                        &sub_processed,
+                                        &ranges,
+                                        &format!("{}{}_", prefix, field_name),
+                                    )?);
+                                }
+
+                                let read_fn_name = format_ident!("read_{}{}", prefix, field_name);
+                                let read_fn_doc = "Reads the embedded packed field as a whole."; // TODO
+                                let copy_ranges = generate_copy_from_normalized_ranges(
+                                    type_bits,
+                                    type_bits,
+                                    &format_ident!("src_bits"),
+                                    &format_ident!("dst_bits"),
+                                    ranges,
+                                )
+                                .map_err(|e| syn::Error::new_spanned(field_name, e))?;
+
+                                Ok(quote! {
+                                    #[doc = #read_fn_doc]
+                                    pub fn #read_fn_name(&self) -> #packed_type {
+                                        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+                                        let src = self.0;
+                                        let src_bits = src.view_bits::<Msb0>();
+                                        let mut dst = [0u8; #size];
+                                        let dst_bits = dst.view_bits_mut::<Msb0>();
+                                        #copy_ranges
+                                        #packed_type(dst)
+                                    }
+
+                                    #(#sub_accessors)*
+                                })
+                            })
+                            .transpose()?
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    if let Some(accessors) = nested_accessors {
+        Ok(accessors)
+    } else {
+        let unpack_expr = generate_unpack_expression(interface_def, field_name, field_type, ranges)?;
+        let read_fn_name = format_ident!("read_{}{}", prefix, field_name);
+        let read_fn_doc = ""; // TODO
+
+        Ok(quote! {
+            #[doc = #read_fn_doc]
+            pub fn #read_fn_name(&self) -> #field_type {
+                use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+                let src = self.0;
+                let src_bits = src.view_bits::<Msb0>();
+                #unpack_expr
+            }
+        })
+    }
 }
 
 /// Generate an expression to unpack a field from bytes
