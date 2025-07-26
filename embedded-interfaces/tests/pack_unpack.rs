@@ -889,7 +889,7 @@ fn test_enum_different_underlying_types() {
         }
 
         enum Medium: u16{10} {
-            0..=511 Low(u16),
+            0..=511 Low(i32), // Test type widening
             512..=1023 High(u16),
         }
 

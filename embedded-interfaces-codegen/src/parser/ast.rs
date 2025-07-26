@@ -77,8 +77,8 @@ pub struct EnumVariant {
     pub attributes: Vec<Attribute>,
     pub pattern: EnumPattern,
     pub name: Ident,
-    pub capture_value: bool,    // true if variant has Variant(underlying) syntax
-    pub representative: LitInt, // A representative value for this variant
+    pub capture_value: Option<Type>, // Some if variant has Variant(Type) syntax
+    pub representative: LitInt,      // A representative value for this variant
 }
 
 /// Pattern for enum variants

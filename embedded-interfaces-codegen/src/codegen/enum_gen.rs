@@ -23,22 +23,22 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
         let variant_name = &variant.name;
         let variant_attrs = &variant.attributes;
 
-        if variant.capture_value {
+        if let Some(cap_type) = &variant.capture_value {
             // Variant captures the underlying value
             enum_variants.push(quote! {
                 #(#variant_attrs)*
-                #variant_name(#underlying_type)
+                #variant_name(#cap_type)
             });
 
             // For from_unsigned, we need to check if the value matches the pattern
             let pattern = generate_pattern(&variant.pattern);
             from_unsigned_arms.push(quote! {
-                #pattern => Self::#variant_name(value)
+                #pattern => Self::#variant_name(value.into())
             });
 
             // For to_unsigned, just return the captured value
             to_unsigned_arms.push(quote! {
-                Self::#variant_name(v) => *v
+                Self::#variant_name(v) => *v as #underlying_type
             });
         } else {
             // Variant doesn't capture the value

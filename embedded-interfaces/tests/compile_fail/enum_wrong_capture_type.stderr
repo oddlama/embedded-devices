@@ -1,0 +1,17 @@
+error[E0277]: the trait bound `i16: From<u16>` is not satisfied
+ --> tests/compile_fail/enum_wrong_capture_type.rs:2:1
+  |
+2 | / interface_objects! {
+3 | |     enum BadCap: u16{4} {
+4 | |         1..=5 Range(i16), // captures i16 but underlying is u16
+5 | |         _ Wild,
+6 | |     }
+7 | | }
+  | |_^ the trait `From<u16>` is not implemented for `i16`
+  |
+  = help: the following other types implement trait `From<T>`:
+            `i16` implements `From<bool>`
+            `i16` implements `From<i8>`
+            `i16` implements `From<u8>`
+  = note: required for `u16` to implement `Into<i16>`
+  = note: this error originates in the macro `interface_objects` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,5 @@
+error: Multiple wildcard variants are not allowed
+ --> tests/compile_fail/enum_two_wildcards.rs:6:11
+  |
+6 |         _ C, // duplicate wildcard
+  |           ^

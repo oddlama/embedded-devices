@@ -1,0 +1,5 @@
+error: unsupported underlying type for enum
+ --> tests/compile_fail/enum_wrong_underlying.rs:3:21
+  |
+3 |     enum Bad: i8{3} {
+  |                     ^

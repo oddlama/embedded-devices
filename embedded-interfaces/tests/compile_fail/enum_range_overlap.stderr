@@ -1,0 +1,5 @@
+error: Value 4 is captured by multiple variants
+ --> tests/compile_fail/enum_range_overlap.rs:5:15
+  |
+5 |         4..=8 Range2, // 4-5 overlap
+  |               ^^^^^^

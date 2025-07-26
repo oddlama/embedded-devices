@@ -1,0 +1,5 @@
+error: size constraint {9} is too large for underlying type u8
+ --> tests/compile_fail/enum_too_many_bits.rs:3:25
+  |
+3 |     enum TooWide: u8{9} {
+  |                         ^

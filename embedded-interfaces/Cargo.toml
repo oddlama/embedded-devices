@@ -24,6 +24,9 @@ heapless = "0.8.0"
 maybe-async-cfg = "0.2.5"
 thiserror = { version = "2.0.12", default-features = false }
 
+[dev-dependencies]
+trybuild = "1.0"
+
 [features]
 default = ["sync", "async"]
 

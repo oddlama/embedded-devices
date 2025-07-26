@@ -1,0 +1,5 @@
+error: Bit coverage does not match expected size. Expected 8 bits, found 9 bits.
+ --> tests/compile_fail/struct_wrong_size.rs:3:12
+  |
+3 |     struct Bad(size = 1) {
+  |            ^^^

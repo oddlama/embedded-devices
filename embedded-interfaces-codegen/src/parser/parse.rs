@@ -241,7 +241,31 @@ impl Parse for EnumDefinition {
                     let content;
                     syn::braced!(content in input);
                     let size_lit: LitInt = content.parse()?;
-                    Some(size_lit.base10_parse::<usize>()?)
+                    let constraint_bits = size_lit.base10_parse::<usize>()?;
+
+                    match underlying_type {
+                        Type::Path(ref type_path) => {
+                            if let Some(ident) = type_path.path.get_ident() {
+                                let type_name = ident.to_string();
+                                let type_bits = match type_name.as_str() {
+                                    "u8" => 8,
+                                    "u16" => 16,
+                                    "u32" => 32,
+                                    "u64" => 64,
+                                    "u128" => 128,
+                                    _ => return Err(input.error("unsupported underlying type for enum")),
+                                };
+                                if constraint_bits > type_bits {
+                                    return Err(input.error(format!(
+                                        "size constraint {{{constraint_bits}}} is too large for underlying type {type_name}"
+                                    )));
+                                }
+                            }
+                        }
+                        _ => return Err(input.error("unsupported underlying type for enum")),
+                    }
+
+                    Some(constraint_bits)
                 } else {
                     None
                 }
@@ -282,10 +306,9 @@ impl Parse for EnumVariant {
         let capture_value = if input.peek(Paren) {
             let content;
             syn::parenthesized!(content in input);
-            let _underlying_type: Type = content.parse()?;
-            true
+            Some(content.parse()?)
         } else {
-            false
+            None
         };
 
         // Optional comma

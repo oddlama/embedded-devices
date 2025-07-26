@@ -1,0 +1,5 @@
+error: Size constraint 10 bits exceeds maximum size 8 bits for type 'u8'
+ --> tests/compile_fail/u8_too_wide.rs:4:13
+  |
+4 |         f1: u8{10}, // u8 cannot be 10 bits wide
+  |             ^^

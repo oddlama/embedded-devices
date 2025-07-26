@@ -1,0 +1,5 @@
+error: An enum without wildcard variant must cover all values. Uncovered value ranges: [(2, 3)]
+ --> tests/compile_fail/enum_without_wildcard.rs:4:10
+  |
+4 |     enum Bad: u8{2} {
+  |          ^^^
