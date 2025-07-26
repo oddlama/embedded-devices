@@ -111,6 +111,7 @@ pub fn generate_accessors(
                                     )?);
                                 }
 
+                                // Packed accessor
                                 let write_fn_name = format_ident!("write_{}{}", prefix, field_name);
                                 let with_fn_name = format_ident!("with_{}{}", prefix, field_name);
 
@@ -125,7 +126,7 @@ pub fn generate_accessors(
                                 )
                                 .map_err(|e| syn::Error::new_spanned(field_name, e))?;
 
-                                Ok(quote! {
+                                let packed_accessor = quote! {
                                     #[doc = #write_fn_doc]
                                     pub fn #write_fn_name(&mut self, value: #packed_type) {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
@@ -142,6 +143,39 @@ pub fn generate_accessors(
                                         self.#write_fn_name(value);
                                         self
                                     }
+                                };
+
+                                // Unpacked accessor
+                                let value_expr = quote! { value };
+                                let pack_statement =
+                                    generate_pack_statement(interface_def, value_expr, field_name, field_type, ranges)?;
+                                let write_fn_name = format_ident!("write_{}{}_unpacked", prefix, field_name);
+                                let with_fn_name = format_ident!("with_{}{}_unpacked", prefix, field_name);
+
+                                let write_fn_doc = ""; // TODO
+                                let with_fn_doc = ""; // TODO
+
+                                let unpacked_accessor = quote! {
+                                    #[doc = #write_fn_doc]
+                                    pub fn #write_fn_name(&mut self, value: #field_type) {
+                                        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+                                        let mut dst = self.0;
+                                        let dst_bits = dst.view_bits_mut::<Msb0>();
+                                        #pack_statement
+                                    }
+
+                                    #[doc = #with_fn_doc]
+                                    #[inline]
+                                    pub fn #with_fn_name(mut self, value: #field_type) -> Self {
+                                        self.#write_fn_name(value);
+                                        self
+                                    }
+                                };
+
+                                // Result
+                                Ok(quote! {
+                                    #packed_accessor
+                                    #unpacked_accessor
 
                                     #(#sub_accessors)*
                                 })

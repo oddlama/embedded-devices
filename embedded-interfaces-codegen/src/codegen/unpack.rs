@@ -105,6 +105,7 @@ pub fn generate_accessors(
                                     )?);
                                 }
 
+                                // Packed accessor
                                 let read_fn_name = format_ident!("read_{}{}", prefix, field_name);
                                 let read_fn_doc = "Reads the embedded packed field as a whole."; // TODO
                                 let copy_ranges = generate_copy_from_normalized_ranges(
@@ -116,7 +117,7 @@ pub fn generate_accessors(
                                 )
                                 .map_err(|e| syn::Error::new_spanned(field_name, e))?;
 
-                                Ok(quote! {
+                                let packed_accessor = quote! {
                                     #[doc = #read_fn_doc]
                                     pub fn #read_fn_name(&self) -> #packed_type {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
@@ -127,6 +128,28 @@ pub fn generate_accessors(
                                         #copy_ranges
                                         #packed_type(dst)
                                     }
+                                };
+
+                                // Unpacked accessor
+                                let unpack_expr =
+                                    generate_unpack_expression(interface_def, field_name, field_type, ranges)?;
+                                let read_fn_name = format_ident!("read_{}{}_unpacked", prefix, field_name);
+                                let read_fn_doc = ""; // TODO
+
+                                let unpacked_accessor = quote! {
+                                    #[doc = #read_fn_doc]
+                                    pub fn #read_fn_name(&self) -> #field_type {
+                                        use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
+                                        let src = self.0;
+                                        let src_bits = src.view_bits::<Msb0>();
+                                        #unpack_expr
+                                    }
+                                };
+
+                                // Result
+                                Ok(quote! {
+                                    #packed_accessor
+                                    #unpacked_accessor
 
                                     #(#sub_accessors)*
                                 })
