@@ -157,7 +157,7 @@ fn generate_packed_struct(
     Ok(quote! {
         #(#doc_attrs)*
         #[doc = concat!("This is the packed representation of [`", stringify!(#unpacked_name), "`].")]
-        #[derive(Copy, Clone, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+        #[derive(Copy, Clone, PartialEq, Eq, embedded_interfaces::bytemuck::Pod, embedded_interfaces::bytemuck::Zeroable)]
         #[repr(transparent)]
         pub struct #packed_name([u8; #size]);
 
