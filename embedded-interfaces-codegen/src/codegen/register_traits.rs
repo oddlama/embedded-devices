@@ -8,6 +8,7 @@ use quote::quote;
 use syn::Ident;
 
 /// Generate register-specific trait implementations
+#[allow(clippy::too_many_arguments)]
 pub fn generate_register_trait_implementations(
     register_name: &Ident,
     unpacked_name: &Ident,

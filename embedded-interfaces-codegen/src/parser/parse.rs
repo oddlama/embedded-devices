@@ -411,12 +411,14 @@ impl Parse for FieldDefinition {
             None
         };
 
-        // Optional units block (placeholder)
-        let units = if input.peek(Brace) && size_constraint.is_none() {
-            let _content;
-            syn::braced!(_content in input);
-            // TODO: Parse units block content
-            Some(UnitsBlock {})
+        // Optional units block
+        let units = if input.peek(Brace) {
+            // Ensure name start with raw_
+            if !name.to_string().starts_with("raw_") {
+                return Err(input.error("When providing units for a field, you must prefix the field name with `raw_`. Additional accessors without the raw prefix will be generated for the specified unit."));
+            }
+
+            Some(input.parse()?)
         } else {
             None
         };
@@ -435,6 +437,97 @@ impl Parse for FieldDefinition {
             default_value,
             units,
         })
+    }
+}
+
+impl Parse for UnitsBlock {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        syn::braced!(content in input);
+
+        let mut quantity = None;
+        let mut unit = None;
+        let mut lsb = None;
+        let mut from_raw = None;
+        let mut into_raw = None;
+
+        while !content.is_empty() {
+            let field_name: Ident = content.parse()?;
+            content.parse::<Token![:]>()?;
+
+            match field_name.to_string().as_str() {
+                "quantity" => {
+                    if quantity.is_some() {
+                        return Err(content.error("Duplicate quantity field"));
+                    }
+                    quantity = Some(content.parse()?);
+                }
+                "unit" => {
+                    if unit.is_some() {
+                        return Err(content.error("Duplicate unit field"));
+                    }
+                    unit = Some(content.parse()?);
+                }
+                "lsb" => {
+                    if lsb.is_some() {
+                        return Err(content.error("Duplicate lsb field"));
+                    }
+                    if from_raw.is_some() || into_raw.is_some() {
+                        return Err(content.error("Cannot mix lsb with from_raw/into_raw"));
+                    }
+                    // Parse lsb as numerator / denominator
+                    let numerator: LitInt = content.parse()?;
+                    content.parse::<Token![/]>()?;
+                    let denominator: LitInt = content.parse()?;
+                    lsb = Some((numerator, denominator));
+                }
+                "from_raw" => {
+                    if from_raw.is_some() {
+                        return Err(content.error("Duplicate from_raw field"));
+                    }
+                    if lsb.is_some() {
+                        return Err(content.error("Cannot mix from_raw/into_raw with lsb"));
+                    }
+                    from_raw = Some(content.parse()?);
+                }
+                "into_raw" => {
+                    if into_raw.is_some() {
+                        return Err(content.error("Duplicate into_raw field"));
+                    }
+                    if lsb.is_some() {
+                        return Err(content.error("Cannot mix from_raw/into_raw with lsb"));
+                    }
+                    into_raw = Some(content.parse()?);
+                }
+                _ => {
+                    return Err(
+                        content.error("Unknown units field. Expected: quantity, unit, lsb, from_raw, or into_raw")
+                    );
+                }
+            }
+
+            // Optional comma
+            if content.peek(Token![,]) {
+                content.parse::<Token![,]>()?;
+            }
+        }
+
+        // Validate required fields
+        let quantity = quantity.ok_or_else(|| input.error("quantity field is required"))?;
+        let unit = unit.ok_or_else(|| input.error("unit field is required"))?;
+
+        // Validate scale specification
+        let scale = if let Some((numerator, denominator)) = lsb {
+            ScaleSpec::Lsb { numerator, denominator }
+        } else if from_raw.is_some() != into_raw.is_some() {
+            return Err(input.error("Both from_raw and into_raw must be specified together"));
+        } else if let (Some(from_raw), Some(into_raw)) = (from_raw, into_raw) {
+            ScaleSpec::Custom { from_raw, into_raw }
+        } else {
+            return Err(input.error("Either lsb or both from_raw and into_raw must be specified"));
+        };
+
+        Ok(UnitsBlock { quantity, unit, scale })
     }
 }
 

@@ -60,6 +60,7 @@ pub fn generate_pack_body(
 /// Generate writing accessors for the packed representation
 pub fn generate_accessors(
     interface_def: &InterfaceObjectsDefinition,
+    unpacked_name: &Ident,
     processed_field: &ProcessedField,
     ranges: &[NormalizedRange],
     prefix: &str,
@@ -105,6 +106,7 @@ pub fn generate_accessors(
 
                                     sub_accessors.push(generate_accessors(
                                         interface_def,
+                                        unpacked_name,
                                         &sub_processed,
                                         &ranges,
                                         &format!("{}{}_", prefix, field_name),
@@ -115,8 +117,10 @@ pub fn generate_accessors(
                                 let write_fn_name = format_ident!("write_{}{}", prefix, field_name);
                                 let with_fn_name = format_ident!("with_{}{}", prefix, field_name);
 
-                                let write_fn_doc = "Writes the embedded packed field as a whole."; // TODO
-                                let with_fn_doc = "Writes the embedded packed field as a whole."; // TODO
+                                let write_fn_doc = format!(
+                                    "Packs and updates the nested packed struct [`{field_name}`]({unpacked_name}::{field_name}) in this packed representation."
+                                );
+                                let chainable_doc = format!("Chainable version of [`Self::{write_fn_name}`].");
                                 let copy_ranges = generate_copy_to_normalized_ranges(
                                     type_bits,
                                     type_bits,
@@ -137,7 +141,9 @@ pub fn generate_accessors(
                                         #copy_ranges
                                     }
 
-                                    #[doc = #with_fn_doc]
+                                    #[doc = #write_fn_doc]
+                                    #[doc = ""]
+                                    #[doc = #chainable_doc]
                                     #[inline]
                                     pub fn #with_fn_name(mut self, value: #packed_type) -> Self {
                                         self.#write_fn_name(value);
@@ -152,8 +158,10 @@ pub fn generate_accessors(
                                 let write_fn_name = format_ident!("write_{}{}_unpacked", prefix, field_name);
                                 let with_fn_name = format_ident!("with_{}{}_unpacked", prefix, field_name);
 
-                                let write_fn_doc = ""; // TODO
-                                let with_fn_doc = ""; // TODO
+                                let write_fn_doc = format!(
+                                    "Fully packs and updates the nested struct [`{field_name}`]({unpacked_name}::{field_name}) in this packed representation."
+                                );
+                                let chainable_doc = format!("Chainable version of [`Self::{write_fn_name}`].");
 
                                 let unpacked_accessor = quote! {
                                     #[doc = #write_fn_doc]
@@ -164,7 +172,9 @@ pub fn generate_accessors(
                                         #pack_statement
                                     }
 
-                                    #[doc = #with_fn_doc]
+                                    #[doc = #write_fn_doc]
+                                    #[doc = ""]
+                                    #[doc = #chainable_doc]
                                     #[inline]
                                     pub fn #with_fn_name(mut self, value: #field_type) -> Self {
                                         self.#write_fn_name(value);
@@ -202,8 +212,10 @@ pub fn generate_accessors(
         let write_fn_name = format_ident!("write_{}{}", prefix, field_name);
         let with_fn_name = format_ident!("with_{}{}", prefix, field_name);
 
-        let write_fn_doc = ""; // TODO
-        let with_fn_doc = ""; // TODO
+        let write_fn_doc = format!(
+            "Packs and updates the value of the [`{field_name}`]({unpacked_name}::{field_name}) field in this packed representation."
+        );
+        let chainable_doc = format!("Chainable version of [`Self::{write_fn_name}`].");
 
         Ok(quote! {
             #[doc = #write_fn_doc]
@@ -214,7 +226,9 @@ pub fn generate_accessors(
                 #pack_statement
             }
 
-            #[doc = #with_fn_doc]
+            #[doc = #write_fn_doc]
+            #[doc = ""]
+            #[doc = #chainable_doc]
             #[inline]
             pub fn #with_fn_name(mut self, value: #field_type) -> Self {
                 self.#write_fn_name(value);

@@ -54,6 +54,7 @@ pub fn generate_unpack_body(
 /// Generate reading accessors for the packed representation
 pub fn generate_accessors(
     interface_def: &InterfaceObjectsDefinition,
+    unpacked_name: &Ident,
     processed_field: &ProcessedField,
     ranges: &[NormalizedRange],
     prefix: &str,
@@ -99,6 +100,7 @@ pub fn generate_accessors(
 
                                     sub_accessors.push(generate_accessors(
                                         interface_def,
+                                        unpacked_name,
                                         &sub_processed,
                                         &ranges,
                                         &format!("{}{}_", prefix, field_name),
@@ -107,7 +109,7 @@ pub fn generate_accessors(
 
                                 // Packed accessor
                                 let read_fn_name = format_ident!("read_{}{}", prefix, field_name);
-                                let read_fn_doc = "Reads the embedded packed field as a whole."; // TODO
+                                let read_fn_doc = format!("Unpacks the nested packed struct [`{field_name}`]({unpacked_name}::{field_name}) from this packed representation.");
                                 let copy_ranges = generate_copy_from_normalized_ranges(
                                     type_bits,
                                     type_bits,
@@ -134,7 +136,7 @@ pub fn generate_accessors(
                                 let unpack_expr =
                                     generate_unpack_expression(interface_def, field_name, field_type, ranges)?;
                                 let read_fn_name = format_ident!("read_{}{}_unpacked", prefix, field_name);
-                                let read_fn_doc = ""; // TODO
+                                let read_fn_doc = format!("Fully unpacks the nested struct [`{field_name}`]({unpacked_name}::{field_name}) from this packed representation.");
 
                                 let unpacked_accessor = quote! {
                                     #[doc = #read_fn_doc]
@@ -173,7 +175,9 @@ pub fn generate_accessors(
     } else {
         let unpack_expr = generate_unpack_expression(interface_def, field_name, field_type, ranges)?;
         let read_fn_name = format_ident!("read_{}{}", prefix, field_name);
-        let read_fn_doc = ""; // TODO
+        let read_fn_doc = format!(
+            "Unpacks only the [`{field_name}`]({unpacked_name}::{field_name}) field from this packed representation."
+        );
 
         Ok(quote! {
             #[doc = #read_fn_doc]

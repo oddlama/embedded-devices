@@ -118,10 +118,24 @@ pub enum BitRange {
     RangeInclusive(usize, usize), // [5..=8]
 }
 
-/// Units block (placeholder for now)
+/// Units block with quantity, unit, and scale information
 #[derive(Debug, Clone)]
 pub struct UnitsBlock {
-    // TODO: Parse quantity, unit, scale, etc.
+    pub quantity: Type,
+    pub unit: Type,
+    pub scale: ScaleSpec,
+}
+
+/// Scale specification - either LSB rational or custom conversion functions
+#[derive(Debug, Clone)]
+pub enum ScaleSpec {
+    /// LSB specified as numerator/denominator rational number
+    Lsb { numerator: LitInt, denominator: LitInt },
+    /// Custom conversion functions
+    Custom {
+        from_raw: Expr, // |x| expression to convert from raw to scaled
+        into_raw: Expr, // |x| expression to convert from scaled to raw
+    },
 }
 
 impl From<RegisterDefinition> for StructDefinition {

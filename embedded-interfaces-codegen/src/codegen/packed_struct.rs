@@ -95,8 +95,9 @@ fn generate_unpacked_struct(
 
         if !processed.field.is_reserved() {
             let ranges = &processed.normalized_ranges;
-            let pack_accessors = super::pack::generate_accessors(interface_def, processed, ranges, "")?;
-            let unpack_accessors = super::unpack::generate_accessors(interface_def, processed, ranges, "")?;
+            let pack_accessors = super::pack::generate_accessors(interface_def, unpacked_name, processed, ranges, "")?;
+            let unpack_accessors =
+                super::unpack::generate_accessors(interface_def, unpacked_name, processed, ranges, "")?;
             struct_accessors.push(pack_accessors);
             struct_accessors.push(unpack_accessors);
         }
