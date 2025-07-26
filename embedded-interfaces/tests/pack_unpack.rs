@@ -1,3 +1,4 @@
+#![allow(clippy::bool_assert_comparison)]
 use embedded_interfaces::codegen::interface_objects;
 
 #[test]
@@ -1114,4 +1115,328 @@ fn test_enum_representative_values() {
         let unpacked = Representative([value]).unpack();
         assert_eq!(unpacked.value, MultiMatch::High);
     }
+}
+
+#[test]
+fn test_basic_custom_struct_embedding() {
+    interface_objects! {
+        struct Inner(size = 2) {
+            a: u8{3} = 0b101,
+            b: u16{9} = 0x123,
+            c: u8{4} = 0b1010,
+        }
+
+        struct Outer(size = 2) {
+            inner: InnerUnpacked = InnerUnpacked { a: 5, b: 0x123, c: 10 },
+        }
+    }
+
+    let packed = OuterUnpacked::default().pack();
+    // Inner should pack to 2 bytes with the given bit layout
+    let inner_packed = InnerUnpacked { a: 5, b: 0x123, c: 10 }.pack();
+    assert_eq!(packed.0[0..2], inner_packed.0);
+    assert_eq!(packed.0, [inner_packed.0[0], inner_packed.0[1]]);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.inner.a, 5);
+    assert_eq!(unpacked.inner.b, 0x123);
+    assert_eq!(unpacked.inner.c, 10);
+}
+
+#[test]
+fn test_multiple_custom_structs_order() {
+    interface_objects! {
+        struct Point(size = 2) {
+            x: u8 = 10,
+            y: u8 = 20,
+        }
+
+        struct Pixel(size = 5) {
+            pos: PointUnpacked = PointUnpacked { x: 10, y: 20 },
+            color: ColorUnpacked = ColorUnpacked { r: 255, g: 128, b: 64 },
+        }
+
+        struct Color(size = 3) {
+            r: u8 = 0xFF,
+            g: u8 = 0x80,
+            b: u8 = 0x40,
+        }
+    }
+
+    let packed = PixelUnpacked::default().pack();
+    assert_eq!(packed.0, [10, 20, 0xFF, 0x80, 0x40]);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.pos.x, 10);
+    assert_eq!(unpacked.pos.y, 20);
+    assert_eq!(unpacked.color.r, 255);
+    assert_eq!(unpacked.color.g, 128);
+    assert_eq!(unpacked.color.b, 64);
+
+    // Test with custom values
+    let custom = PixelUnpacked {
+        pos: PointUnpacked { x: 100, y: 200 },
+        color: ColorUnpacked {
+            r: 0x11,
+            g: 0x22,
+            b: 0x33,
+        },
+    };
+    let packed = custom.pack();
+    assert_eq!(packed.0, [100, 200, 0x11, 0x22, 0x33]);
+    assert_eq!(packed.unpack(), custom);
+}
+
+#[test]
+fn test_nested_custom_structs() {
+    interface_objects! {
+        struct Point(size = 2) {
+            x: u8 = 1,
+            y: u8 = 2,
+        }
+
+        struct Rectangle(size = 4) {
+            top_left: PointUnpacked = PointUnpacked { x: 1, y: 2 },
+            bottom_right: PointUnpacked = PointUnpacked { x: 3, y: 4 },
+        }
+
+        struct Scene(size = 8) {
+            rect1: RectangleUnpacked = RectangleUnpacked {
+                top_left: PointUnpacked { x: 1, y: 2 },
+                bottom_right: PointUnpacked { x: 3, y: 4 }
+            },
+            rect2: RectangleUnpacked = RectangleUnpacked {
+                top_left: PointUnpacked { x: 5, y: 6 },
+                bottom_right: PointUnpacked { x: 7, y: 8 }
+            },
+        }
+    }
+
+    let packed = SceneUnpacked::default().pack();
+    assert_eq!(packed.0, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.rect1.top_left.x, 1);
+    assert_eq!(unpacked.rect1.top_left.y, 2);
+    assert_eq!(unpacked.rect1.bottom_right.x, 3);
+    assert_eq!(unpacked.rect1.bottom_right.y, 4);
+    assert_eq!(unpacked.rect2.top_left.x, 5);
+    assert_eq!(unpacked.rect2.top_left.y, 6);
+    assert_eq!(unpacked.rect2.bottom_right.x, 7);
+    assert_eq!(unpacked.rect2.bottom_right.y, 8);
+}
+
+#[test]
+fn test_custom_struct_with_arrays() {
+    interface_objects! {
+        struct RGB(size = 3) {
+            values: [u8; 3] = [0xFF, 0x80, 0x40],
+        }
+
+        struct Palette(size = 9) {
+            primary: RGBUnpacked = RGBUnpacked { values: [255, 128, 64] },
+            secondary: RGBUnpacked = RGBUnpacked { values: [64, 128, 255] },
+            tertiary: RGBUnpacked = RGBUnpacked { values: [128, 255, 64] },
+        }
+    }
+
+    let packed = PaletteUnpacked::default().pack();
+    assert_eq!(packed.0, [255, 128, 64, 64, 128, 255, 128, 255, 64]);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.primary.values, [255, 128, 64]);
+    assert_eq!(unpacked.secondary.values, [64, 128, 255]);
+    assert_eq!(unpacked.tertiary.values, [128, 255, 64]);
+}
+
+#[test]
+fn test_custom_struct_with_enums() {
+    interface_objects! {
+        enum Status: u8{2} {
+            0 Ok,
+            1 Warning,
+            2 Error,
+            3 Critical,
+        }
+
+        struct StatusBlock(size = 1) {
+            main: Status = Status::Ok,
+            backup: Status = Status::Warning,
+            _: u8{4},
+        }
+
+        struct System(size = 3) {
+            status: StatusBlockUnpacked = StatusBlockUnpacked {
+                main: Status::Ok,
+                backup: Status::Warning
+            },
+            temperature: u8 = 75,
+            uptime: u8 = 42,
+        }
+    }
+
+    let packed = SystemUnpacked::default().pack();
+    let status_packed = StatusBlockUnpacked {
+        main: Status::Ok,
+        backup: Status::Warning,
+    }
+    .pack();
+
+    assert_eq!(packed.0[0], status_packed.0[0]);
+    assert_eq!(packed.0[1], 75);
+    assert_eq!(packed.0[2], 42);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.status.main, Status::Ok);
+    assert_eq!(unpacked.status.backup, Status::Warning);
+    assert_eq!(unpacked.temperature, 75);
+    assert_eq!(unpacked.uptime, 42);
+}
+
+#[test]
+fn test_custom_struct_mixed_with_bit_fields() {
+    interface_objects! {
+        struct Flags(size = 1) {
+            enabled: bool = true,
+            debug: bool = false,
+            verbose: bool = true,
+            _: u8{5},
+        }
+
+        struct Config(size = 3) {
+            version: u8{4} = 0b1111,
+            flags: FlagsUnpacked = FlagsUnpacked { enabled: true, debug: false, verbose: true },
+            timeout: u16{10} = 0x3FF,
+            reserved: u8{2} = 0b11,
+        }
+    }
+
+    let packed = ConfigUnpacked::default().pack();
+    // Verify bit layout is correct
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.version, 15);
+    assert_eq!(unpacked.flags.enabled, true);
+    assert_eq!(unpacked.flags.debug, false);
+    assert_eq!(unpacked.flags.verbose, true);
+    assert_eq!(unpacked.timeout, 0x3FF);
+    assert_eq!(unpacked.reserved, 0b11);
+}
+
+#[test]
+fn test_custom_struct_roundtrip() {
+    interface_objects! {
+        struct Coordinate(size = 4) {
+            x: i16 = -100,
+            y: i16 = 200,
+        }
+
+        struct Entity(size = 12) {
+            id: u32 = 0x12345678,
+            position: CoordinateUnpacked = CoordinateUnpacked { x: -100, y: 200 },
+            velocity: CoordinateUnpacked = CoordinateUnpacked { x: 50, y: -75 },
+        }
+    }
+
+    // Test roundtrip with default values
+    let original = EntityUnpacked::default();
+    let packed = original.pack();
+    let unpacked = packed.unpack();
+    assert_eq!(original, unpacked);
+
+    // Test roundtrip with custom values
+    let custom = EntityUnpacked {
+        id: 0xDEADBEEF,
+        position: CoordinateUnpacked { x: 1000, y: -2000 },
+        velocity: CoordinateUnpacked { x: -500, y: 750 },
+    };
+    let packed = custom.pack();
+    let unpacked = packed.unpack();
+    assert_eq!(custom, unpacked);
+
+    // Verify the packed data makes sense
+    let expected_id_bytes = 0xDEADBEEFu32.to_be_bytes();
+    assert_eq!(&packed.0[0..4], &expected_id_bytes);
+
+    let pos_packed = CoordinateUnpacked { x: 1000, y: -2000 }.pack();
+    assert_eq!(&packed.0[4..8], &pos_packed.0);
+
+    let vel_packed = CoordinateUnpacked { x: -500, y: 750 }.pack();
+    assert_eq!(&packed.0[8..12], &vel_packed.0);
+}
+
+#[test]
+fn test_complex_custom_struct_composition() {
+    interface_objects! {
+        struct Header(size = 4) {
+            magic: u32 = 0xDEADBEEF,
+        }
+
+        struct Metadata(size = 8) {
+            timestamp: u64 = 0x123456789ABCDEF0,
+        }
+
+        struct Payload(size = 16) {
+            data: [u8; 16] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                              0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10],
+        }
+
+        struct Message(size = 28) {
+            header: HeaderUnpacked = HeaderUnpacked { magic: 0xDEADBEEF },
+            metadata: MetadataUnpacked = MetadataUnpacked { timestamp: 0x123456789ABCDEF0 },
+            payload: PayloadUnpacked = PayloadUnpacked {
+                data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+            },
+        }
+    }
+
+    let packed = MessageUnpacked::default().pack();
+
+    // Verify header
+    assert_eq!(&packed.0[0..4], &0xDEADBEEFu32.to_be_bytes());
+
+    // Verify metadata
+    assert_eq!(&packed.0[4..12], &0x123456789ABCDEF0u64.to_be_bytes());
+
+    // Verify payload
+    let expected_payload: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    assert_eq!(&packed.0[12..28], &expected_payload);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.header.magic, 0xDEADBEEF);
+    assert_eq!(unpacked.metadata.timestamp, 0x123456789ABCDEF0);
+    assert_eq!(unpacked.payload.data, expected_payload);
+}
+
+#[test]
+fn test_custom_struct_with_bit_swivelling() {
+    interface_objects! {
+        struct Foo(size = 2) {
+            a: u8{3},
+            b: u8{5},
+            c: u8{4},
+            d: u8{4},
+        }
+
+        struct Container(size = 4) {
+            packed1: FooUnpacked[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30] = FooUnpacked {
+                a: 5, b: 26, c: 12, d: 3
+            },
+            packed2: FooUnpacked[1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31] = FooUnpacked {
+                a: 2, b: 0, c: 0, d: 2
+            },
+        }
+    }
+
+    let packed = ContainerUnpacked::default().pack();
+    assert_eq!(packed.0, [0b10011010, 0b10001000, 0b10100000, 0b00001110]);
+
+    let unpacked = packed.unpack();
+    assert_eq!(unpacked.packed1.a, 5);
+    assert_eq!(unpacked.packed1.b, 26);
+    assert_eq!(unpacked.packed1.c, 12);
+    assert_eq!(unpacked.packed1.d, 3);
+    assert_eq!(unpacked.packed2.a, 2);
+    assert_eq!(unpacked.packed2.b, 0);
+    assert_eq!(unpacked.packed2.c, 0);
+    assert_eq!(unpacked.packed2.d, 2);
 }
