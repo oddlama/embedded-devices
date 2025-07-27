@@ -1,7 +1,6 @@
 #![feature(generic_arg_infer)]
 
 use bondrewd::Bitfields;
-use embedded_registers::register;
 
 #[derive(Bitfields, Debug, Clone, Default, PartialEq, Eq, defmt::Format)]
 #[bondrewd(default_endianess = "msb", read_from = "lsb0", enforce_bytes = "1")]

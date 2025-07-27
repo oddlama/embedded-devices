@@ -23,7 +23,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_interfaces::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -49,7 +49,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_interfaces::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -72,7 +72,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::{TransportError, WritableRegister};
+use embedded_interfaces::{TransportError, WritableRegister};
 use uom::si::f64::ThermodynamicTemperature;
 
 use crate::utils::from_bus_error;
@@ -124,7 +124,7 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct TMP117<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct TMP117<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -136,7 +136,7 @@ pub struct TMP117<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterfa
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> TMP117<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> TMP117<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -150,7 +150,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: self::address::Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
         }
     }
 }
@@ -166,7 +166,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> TMP117<D, I> {
     /// Initialize the sensor by waiting for the boot-up period and verifying its device id.
     /// Calling this function is not mandatory, but recommended to ensure proper operation.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
@@ -228,7 +228,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP117<D,
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
     for TMP117<D, I>
 {
     type Error = TransportError<(), I::BusError>;
@@ -252,7 +252,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for TMP117<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for TMP117<D, I>
+{
     type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
@@ -287,7 +289,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for TMP117<D, I>
 {
     type Error = TransportError<(), I::BusError>;

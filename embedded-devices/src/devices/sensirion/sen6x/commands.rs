@@ -1,6 +1,3 @@
-use embedded_devices_derive::device_register;
-use embedded_registers::register;
-
 use super::registers;
 use crate::devices::sensirion::{SensirionI2cCodec, SensirionI2cCodecConsecutiveFetch, sensirion_command};
 

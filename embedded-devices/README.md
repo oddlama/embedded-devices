@@ -281,7 +281,7 @@ variant, too:
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct MyDevice<I: embedded_registers::RegisterInterface> {
+pub struct MyDevice<I: embedded_interfaces::registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
 }
@@ -305,7 +305,7 @@ construct the device with the given interface.
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I> MyDevice<embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<I> MyDevice<embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
 {
@@ -314,7 +314,7 @@ where
     #[inline]
     pub fn new_i2c(interface: I, address: MyAddress) -> Self {
         Self {
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
         }
     }
 }
@@ -354,7 +354,7 @@ anything that makes the device easy to use.
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<I: embedded_registers::RegisterInterface> MyDevice<I> {
+impl<I: embedded_interfaces::registers::RegisterInterface> MyDevice<I> {
     /// Initialize the sensor by verifying its device id and manufacturer id.
     /// Not mandatory, but recommended.
     pub async fn init(&mut self) -> Result<(), InitError<I::Error>> {

@@ -103,7 +103,7 @@
 //! ```
 
 use embedded_devices_derive::sensor;
-use embedded_registers::TransportError;
+use embedded_interfaces::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 
 use super::bme280::{
@@ -170,7 +170,7 @@ impl Default for Configuration {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Common<D, I, false> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> BME280Common<D, I, false> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. To
     /// configure advanced settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
@@ -199,7 +199,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
     for BME280Common<D, I, false>
 {
     type Error = MeasurementError<I::BusError>;
@@ -249,7 +249,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for BME280Common<D, I, false>
 {
     type Error = MeasurementError<I::BusError>;

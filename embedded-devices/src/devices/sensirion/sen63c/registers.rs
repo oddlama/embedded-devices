@@ -1,6 +1,4 @@
 use bondrewd::Bitfields;
-use embedded_devices_derive::device_register;
-use embedded_registers::register;
 
 use crate::{
     devices::sensirion::{SensirionI2cCodec, sensirion_command},

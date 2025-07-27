@@ -109,7 +109,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::TransportError;
+use embedded_interfaces::TransportError;
 use uom::si::f64::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::ratio::percent;
@@ -176,7 +176,11 @@ pub(super) struct TFine(i32);
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct BME280Common<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool> {
+pub struct BME280Common<
+    D: hal::delay::DelayNs,
+    I: embedded_interfaces::registers::RegisterInterface,
+    const IS_BME: bool,
+> {
     /// The delay provider
     pub(super) delay: D,
     /// The interface to communicate with the device
@@ -356,7 +360,8 @@ impl CalibrationData {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I, const IS_BME: bool> BME280Common<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>, IS_BME>
+impl<D, I, const IS_BME: bool>
+    BME280Common<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>, IS_BME>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -370,7 +375,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
             calibration_data: None,
         }
     }
@@ -381,7 +386,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I, const IS_BME: bool> BME280Common<D, embedded_registers::spi::SpiDevice<I>, IS_BME>
+impl<D, I, const IS_BME: bool> BME280Common<D, embedded_interfaces::spi::SpiDevice<I>, IS_BME>
 where
     I: hal::spi::r#SpiDevice,
     D: hal::delay::DelayNs,
@@ -395,7 +400,7 @@ where
     pub fn new_spi(delay: D, interface: I) -> Self {
         Self {
             delay,
-            interface: embedded_registers::spi::SpiDevice::new(interface),
+            interface: embedded_interfaces::spi::SpiDevice::new(interface),
             calibration_data: None,
         }
     }
@@ -411,7 +416,9 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool> BME280Common<D, I, IS_BME> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface, const IS_BME: bool>
+    BME280Common<D, I, IS_BME>
+{
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     ///
@@ -457,7 +464,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_BME: bool>
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface, const IS_BME: bool>
     crate::device::ResettableDevice for BME280Common<D, I, IS_BME>
 {
     type Error = TransportError<(), I::BusError>;
@@ -479,7 +486,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface, const IS_
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Common<D, I, true> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> BME280Common<D, I, true> {
     /// Configures common sensor settings. Sensor must be in sleep mode for this to work. To
     /// configure advanced settings, please directly update the respective registers.
     pub async fn configure(&mut self, config: Configuration) -> Result<(), TransportError<(), I::BusError>> {
@@ -512,7 +519,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BME280Com
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
     for BME280Common<D, I, true>
 {
     type Error = MeasurementError<I::BusError>;
@@ -579,7 +586,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for BME280Common<D, I, true>
 {
     type Error = MeasurementError<I::BusError>;

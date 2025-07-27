@@ -1,7 +1,7 @@
 use bondrewd::BitfieldEnum;
-use embedded_devices_derive::device_register;
-use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
-use embedded_registers::register;
+
+use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
+
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
 use uom::si::f64;

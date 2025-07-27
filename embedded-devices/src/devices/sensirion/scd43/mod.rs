@@ -75,7 +75,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::i2c::codecs::crc8_codec::CrcError;
+use embedded_interfaces::registers::i2c::codecs::crc8_codec::CrcError;
 use registers::{
     DataReady, GetSensorVariant, MeasureSingleShot, PerformForcedRecalibration, PerformForcedRecalibrationResult,
     ReadMeasurement, Reinit, StartPeriodicMeasurement, StopPeriodicMeasurement, WakeUp,
@@ -92,7 +92,7 @@ pub use super::scd4x::address;
 pub mod registers;
 
 /// Any CRC or Bus related error
-pub type TransportError<E> = embedded_registers::TransportError<CrcError, E>;
+pub type TransportError<E> = embedded_interfaces::TransportError<CrcError, E>;
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
@@ -133,7 +133,7 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct SCD43<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct SCD43<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -145,7 +145,7 @@ pub struct SCD43<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterfac
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> SCD43<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> SCD43<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -159,7 +159,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: self::address::Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
         }
     }
 }
@@ -175,7 +175,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> SCD43<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> SCD43<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, resetting the device and
     /// verifying the sensor variant.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
@@ -228,7 +228,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> SCD43<D, 
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice for SCD43<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
+    for SCD43<D, I>
+{
     type Error = TransportError<I::BusError>;
 
     /// Resets the sensor by stopping any ongoing measurement, and resetting the device.
@@ -260,7 +262,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor for SCD43<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
+    for SCD43<D, I>
+{
     type Error = TransportError<I::BusError>;
     type Measurement = Measurement;
 
@@ -322,7 +326,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for SCD43<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for SCD43<D, I>
+{
     type Error = TransportError<I::BusError>;
     type Measurement = Measurement;
 

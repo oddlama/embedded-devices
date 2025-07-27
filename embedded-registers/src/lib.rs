@@ -24,8 +24,8 @@
 //!
 //! ```
 //! #![feature(generic_arg_infer)]
-//! use embedded_registers::register;
-//! use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+//!
+//! use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 //!
 //! #[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 //! #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
@@ -57,8 +57,8 @@
 //!
 //! ```rust, only_if(async)
 //! # #![feature(generic_arg_infer)]
-//! # use embedded_registers::register;
-//! # use embedded_registers::i2c::codecs::OneByteRegAddrCodec;
+//! #
+//! # use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 //! # #[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
 //! # #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
 //! # pub struct ValueRegister {

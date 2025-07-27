@@ -1,6 +1,6 @@
 use bondrewd::{BitfieldEnum, Bitfields};
-use embedded_devices_derive::device_register;
-use embedded_registers::{i2c::codecs::OneByteRegAddrCodec, register, spi::codecs::standard_codec::StandardCodec};
+
+use embedded_interfaces::{i2c::codecs::OneByteRegAddrCodec, register, spi::codecs::standard_codec::StandardCodec};
 
 pub type BMP390SpiCodec = StandardCodec<1, 6, 0, 7, true, 1>;
 

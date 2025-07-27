@@ -103,7 +103,7 @@ use crate::utils::from_bus_error;
 use self::address::Address;
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::TransportError;
+use embedded_interfaces::TransportError;
 use registers::AdcRange;
 use uom::si::electric_current::ampere;
 use uom::si::electric_potential::volt;
@@ -193,7 +193,7 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct INA228<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct INA228<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -213,7 +213,7 @@ pub struct INA228<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterfa
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> INA228<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> INA228<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -227,7 +227,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
             shunt_resistance: Default::default(),
             max_expected_current: Default::default(),
             current_lsb_na: 1,
@@ -247,7 +247,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA228<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> INA228<D, I> {
     /// Soft-resets the device, verifies its device id and manufacturer id and
     /// calibrates it with the given shunt resistor value and maximum expected current.
     ///
@@ -330,7 +330,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> INA228<D,
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
     for INA228<D, I>
 {
     type Error = TransportError<(), I::BusError>;
@@ -352,7 +352,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for INA228<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for INA228<D, I>
+{
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
@@ -427,7 +429,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for INA228<D, I>
 {
     type Error = ContinuousMeasurementError<I::BusError>;

@@ -11,7 +11,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_interfaces::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -42,7 +42,7 @@
 //!
 //! ```rust, no_run
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_registers::TransportError<(), I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_interfaces::TransportError<(), I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -70,7 +70,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::TransportError;
+use embedded_interfaces::TransportError;
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
@@ -98,7 +98,7 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct TMP102<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct TMP102<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -110,7 +110,7 @@ pub struct TMP102<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterfa
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> TMP102<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> TMP102<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -121,7 +121,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: self::address::Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
         }
     }
 }
@@ -133,7 +133,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> TMP102<D, I> {
     /// Read the last temperature measured
     pub async fn read_temperature(&mut self) -> Result<ThermodynamicTemperature, TransportError<(), I::BusError>> {
         let reg_conf = self.read_register::<Configuration>().await?;
@@ -157,7 +157,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> TMP102<D,
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for TMP102<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for TMP102<D, I>
+{
     type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
@@ -196,7 +198,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for TMP102<D, I>
 {
     type Error = TransportError<(), I::BusError>;

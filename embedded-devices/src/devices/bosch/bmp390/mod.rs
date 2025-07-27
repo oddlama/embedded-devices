@@ -76,7 +76,7 @@
 //! ```
 
 use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_registers::TransportError;
+use embedded_interfaces::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
 use uom::si::thermodynamic_temperature::degree_celsius;
@@ -211,7 +211,7 @@ impl CalibrationData {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct BMP390<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct BMP390<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -225,7 +225,7 @@ pub struct BMP390<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterfa
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> BMP390<D, embedded_registers::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
+impl<D, I> BMP390<D, embedded_interfaces::i2c::I2cDevice<I, hal::i2c::SevenBitAddress>>
 where
     I: hal::i2c::I2c<hal::i2c::SevenBitAddress> + hal::i2c::ErrorType,
     D: hal::delay::DelayNs,
@@ -239,7 +239,7 @@ where
     pub fn new_i2c(delay: D, interface: I, address: Address) -> Self {
         Self {
             delay,
-            interface: embedded_registers::i2c::I2cDevice::new(interface, address.into()),
+            interface: embedded_interfaces::i2c::I2cDevice::new(interface, address.into()),
             calibration_data: None,
         }
     }
@@ -250,7 +250,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> BMP390<D, embedded_registers::spi::SpiDevice<I>>
+impl<D, I> BMP390<D, embedded_interfaces::spi::SpiDevice<I>>
 where
     I: hal::spi::r#SpiDevice,
     D: hal::delay::DelayNs,
@@ -264,7 +264,7 @@ where
     pub fn new_spi(delay: D, interface: I) -> Self {
         Self {
             delay,
-            interface: embedded_registers::spi::SpiDevice::new(interface),
+            interface: embedded_interfaces::spi::SpiDevice::new(interface),
             calibration_data: None,
         }
     }
@@ -281,7 +281,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> BMP390<D, I> {
     /// Initialize the sensor by performing a soft-reset, verifying its chip id
     /// and reading calibration data.
     ///
@@ -350,7 +350,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> BMP390<D,
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::device::ResettableDevice
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
     for BMP390<D, I>
 {
     type Error = TransportError<(), I::BusError>;
@@ -374,7 +374,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::de
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for BMP390<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for BMP390<D, I>
+{
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
@@ -437,7 +439,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for BMP390<D, I>
 {
     type Error = MeasurementError<I::BusError>;
