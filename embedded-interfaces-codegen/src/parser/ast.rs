@@ -91,14 +91,32 @@ pub enum EnumPattern {
     Wildcard,                       // _
 }
 
+/// Endianess constraints
+#[derive(Debug, Clone)]
+pub enum Endianness {
+    Little,
+    Big,
+}
+
+/// Possible bit pattern constraints
+#[derive(Debug, Clone)]
+pub enum BitConstraint {
+    /// A specific pattern
+    Pattern(BitPattern),
+    /// A specific size starting from the highest yet unused bit
+    Size(LitInt, usize),
+    /// A specific endianness using the underlying type's size. Same as Size(<type_bits>) for big
+    /// endian, and 8-bit reversed ranges for little endian.
+    Endianness(Span, Endianness),
+}
+
 /// Field definition within a register or struct
 #[derive(Debug, Clone)]
 pub struct FieldDefinition {
     pub attributes: Vec<Attribute>,
     pub name: Ident, // Reserved fields will start with _
     pub field_type: Type,
-    pub bit_pattern: Option<BitPattern>,
-    pub size_constraint: Option<usize>,
+    pub bit_constraint: BitConstraint,
     pub default_value: Option<Expr>,
     pub units: Option<UnitsBlock>,
 }

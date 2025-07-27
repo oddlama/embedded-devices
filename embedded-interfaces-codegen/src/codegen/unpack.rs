@@ -608,8 +608,7 @@ fn generate_custom_type_unpack(
     Ok(quote! {
         {
             const BITS: usize = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::BITS;
-            #[allow(unused)]
-            embedded_interfaces::const_format::assertcp_eq!(BITS, #total_bits, #size_error);
+            embedded_interfaces::const_format::assertcp!(BITS == #total_bits, #size_error);
 
             let mut dst = [0u8; #type_bytes];
             let dst_bits = dst.view_bits_mut::<Msb0>();

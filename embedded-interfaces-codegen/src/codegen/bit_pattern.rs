@@ -4,12 +4,13 @@
 //! for packed struct fields.
 
 use proc_macro2::{Ident, TokenStream};
-use quote::quote;
+use quote::{ToTokens, quote};
 use std::collections::VecDeque;
 use syn::Type;
 
 use crate::parser::{
-    BitPattern, BitRange, Definition, FieldDefinition, InterfaceObjectsDefinition, get_effective_size,
+    BitConstraint, BitPattern, BitRange, Definition, Endianness, FieldDefinition, InterfaceObjectsDefinition,
+    get_effective_size,
 };
 
 /// A normalized bit range (always exclusive end)
@@ -168,13 +169,16 @@ impl ProcessedField {
     pub(crate) fn generate_doc(&self, ranges: &[NormalizedRange]) -> TokenStream {
         // Generate field documentation
         let default_doc = if let Some(default_val) = &self.field.default_value {
-            quote! { #[doc = concat!("Default: `", stringify!(#default_val), "`")] }
+            let doc = format!("Default: `{}`", default_val.to_token_stream());
+            quote! {
+                #[doc = #doc]
+            }
         } else {
             quote! { #[doc = "Default: not specified"] }
         };
 
         // Generate bit pattern documentation
-        let bit_pattern_doc = generate_bit_pattern_doc(&ranges);
+        let bit_pattern_doc = generate_bit_pattern_doc(ranges);
         quote! {
             #default_doc
             #[doc = ""]
@@ -211,34 +215,59 @@ fn process_single_field(
     field: &FieldDefinition,
     next_auto_bit: &mut usize,
 ) -> syn::Result<ProcessedField> {
-    let normalized_ranges = if let Some(bit_pattern) = &field.bit_pattern {
-        // Explicit bit pattern provided
-        let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
+    let normalized_ranges = match &field.bit_constraint {
+        BitConstraint::Pattern(bit_pattern) => {
+            // Explicit bit pattern provided
+            let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
 
-        // Update next_auto_bit to be after the highest bit used
-        if let Some(max_end) = ranges.iter().map(|r| r.end).max() {
-            *next_auto_bit = (*next_auto_bit).max(max_end);
+            // Update next_auto_bit to be after the highest bit used
+            if let Some(max_end) = ranges.iter().map(|r| r.end).max() {
+                *next_auto_bit = (*next_auto_bit).max(max_end);
+            }
+
+            ranges
         }
+        BitConstraint::Size(lit, size_constraint) => {
+            // Size constraint syntax e.g. u8{3} - use constraint size instead of inferred size
+            let start_bit = *next_auto_bit;
+            let end_bit = start_bit + size_constraint;
 
-        ranges
-    } else if let Some(size_constraint) = field.size_constraint {
-        // Size constraint syntax e.g. u8{3} - use constraint size instead of inferred size
-        let start_bit = *next_auto_bit;
-        let end_bit = start_bit + size_constraint;
+            // Validate that the constraint makes sense for the field type
+            validate_size_constraint(interface_def, &field.field_type, *size_constraint)?;
 
-        // Validate that the constraint makes sense for the field type
-        validate_size_constraint(interface_def, &field.field_type, size_constraint)?;
+            *next_auto_bit = end_bit;
+            vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(lit, e))?]
+        }
+        BitConstraint::Endianness(span, endianness) => {
+            // Auto-generate bit pattern using inferred size
+            let field_size = infer_field_size_bits(interface_def, &field.field_type)?;
+            let start_bit = *next_auto_bit;
+            let end_bit = start_bit + field_size;
 
-        *next_auto_bit = end_bit;
-        vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(field.size_constraint, e))?]
-    } else {
-        // Auto-generate bit pattern using inferred size
-        let field_size = infer_field_size_bits(interface_def, &field.field_type)?;
-        let start_bit = *next_auto_bit;
-        let end_bit = start_bit + field_size;
-
-        *next_auto_bit = end_bit;
-        vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(&field.field_type, e))?]
+            *next_auto_bit = end_bit;
+            match endianness {
+                Endianness::Little => {
+                    // split range every 8 bits and reverse
+                    if (end_bit - start_bit) % 8 != 0 {
+                        return Err(syn::Error::new(
+                            *span,
+                            "The little endian constraint can only be used on types which are a multiple of 8 bits in size",
+                        ));
+                    }
+                    let n_bytes = (end_bit - start_bit) / 8;
+                    (0..n_bytes)
+                        .rev()
+                        .map(|first| {
+                            NormalizedRange::new(start_bit + first * 8, start_bit + first * 8 + 8)
+                                .map_err(|e| syn::Error::new(*span, e))
+                        })
+                        .collect::<syn::Result<Vec<_>>>()?
+                }
+                Endianness::Big => {
+                    vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new(*span, e))?]
+                }
+            }
+        }
     };
 
     Ok(ProcessedField {
@@ -348,10 +377,7 @@ fn normalize_bit_pattern(bit_pattern: &BitPattern) -> Result<Vec<NormalizedRange
     Ok(normalize_ranges(ranges))
 }
 
-fn normalize_ranges(mut ranges: Vec<NormalizedRange>) -> Vec<NormalizedRange> {
-    // Sort ranges by start position
-    ranges.sort();
-
+fn normalize_ranges(ranges: Vec<NormalizedRange>) -> Vec<NormalizedRange> {
     // Merge overlapping and adjacent ranges
     let mut merged: Vec<NormalizedRange> = Vec::new();
     for range in ranges {
@@ -590,9 +616,6 @@ pub fn extract_bits(xs: &[NormalizedRange], ys: &[NormalizedRange]) -> Vec<Norma
         return result;
     }
 
-    // Sort to ensure we can create proper ranges
-    result_bits.sort_unstable();
-
     let mut start = result_bits[0];
     let mut end = start + 1;
 
@@ -642,12 +665,11 @@ mod extract_tests {
         // logical 16-23 maps to actual 4-7, 0-3
         // logical 8-15 maps to actual 12-15, 8-11
         // So we should get actual bits: 4-7, 0-3, 12-15, 8-11
-        // Sorted: 0-3, 4-7, 8-11, 12-15
         let expected = normalize_ranges(vec![
-            NormalizedRange::new(0, 4).unwrap(),
             NormalizedRange::new(4, 8).unwrap(),
-            NormalizedRange::new(8, 12).unwrap(),
+            NormalizedRange::new(0, 4).unwrap(),
             NormalizedRange::new(12, 16).unwrap(),
+            NormalizedRange::new(8, 12).unwrap(),
         ]);
 
         assert_eq!(result, expected);

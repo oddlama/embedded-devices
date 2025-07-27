@@ -83,6 +83,11 @@ fn test_unsigned() {
             f1: u8{3} = 0b010,
             f2: u8{5} = 0b11011,
         }
+
+        struct Split(size = 1) {
+            f1: u8[7, 0..4] = 0b11001,
+            _: u8[4..7],
+        }
     }
 
     let packed = StructUnpacked::default().pack();
@@ -101,6 +106,10 @@ fn test_unsigned() {
     assert_eq!(packed.read_f1(), 0b010);
     assert_eq!(packed.read_f2(), 0b11011);
 
+    let packed = SplitUnpacked::default().pack();
+    assert_eq!(packed.0, [0b10010001]);
+    assert_eq!(packed.unpack(), SplitUnpacked::default());
+
     // Test write accessors
     let mut packed = StructUnpacked::default().pack();
     packed.write_f1(0xAB);
@@ -112,6 +121,20 @@ fn test_unsigned() {
     let packed = NarrowUnpacked::default().pack().with_f1(0b111).with_f2(0b00001);
     assert_eq!(packed.read_f1(), 0b111);
     assert_eq!(packed.read_f2(), 0b00001);
+}
+
+#[test]
+fn test_endianness() {
+    interface_objects! {
+        struct Struct(size = 8) {
+            f1: u32{be} = 0x12345678,
+            f2: u32{le} = 0x12345678,
+        }
+    }
+
+    let packed = StructUnpacked::default().pack();
+    assert_eq!(packed.0, [0x12, 0x34, 0x56, 0x78, 0x78, 0x56, 0x34, 0x12]);
+    assert_eq!(packed.unpack(), StructUnpacked::default());
 }
 
 #[test]

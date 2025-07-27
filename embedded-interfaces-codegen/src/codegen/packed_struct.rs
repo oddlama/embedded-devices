@@ -7,7 +7,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{Attribute, Ident};
 
-use super::bit_pattern::{generate_bit_pattern_doc, process_field_bit_patterns};
+use super::bit_pattern::process_field_bit_patterns;
 use crate::parser::{FieldDefinition, InterfaceObjectsDefinition};
 
 /// Generate a pair of packed and unpacked structs with conversion implementations
@@ -157,7 +157,7 @@ fn generate_packed_struct(
         #[doc = concat!("This is the packed representation of [`", stringify!(#unpacked_name), "`].")]
         #[derive(Copy, Clone, PartialEq, Eq, embedded_interfaces::bytemuck::Pod, embedded_interfaces::bytemuck::Zeroable)]
         #[repr(transparent)]
-        pub struct #packed_name([u8; #size]);
+        pub struct #packed_name(pub [u8; #size]);
 
         impl #packed_name {
             #[inline]

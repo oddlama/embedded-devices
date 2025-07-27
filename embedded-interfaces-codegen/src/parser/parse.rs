@@ -5,6 +5,7 @@ use syn::{
     Attribute, Expr, Ident, Lit, LitInt, Token, Type,
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
+    spanned::Spanned,
     token::{Brace, Bracket, Paren},
 };
 
@@ -383,25 +384,33 @@ impl Parse for FieldDefinition {
         input.parse::<Token![:]>()?;
         let field_type: Type = input.parse()?;
 
-        // Check for size constraint syntax: {size}
-        let size_constraint = if input.peek(Brace) {
+        // Check for size constraint {size} or endianness constraint ({be} or {le})
+        let mut bit_constraint = None;
+        if input.peek(Brace) {
             let content;
             syn::braced!(content in input);
-            let size_lit: LitInt = content.parse()?;
-            Some(size_lit.base10_parse::<usize>()?)
-        } else {
-            None
-        };
+
+            let lookahead = content.lookahead1();
+            if lookahead.peek(Ident) {
+                let ident: Ident = content.parse()?; // consume
+                bit_constraint = match ident.to_string().as_str() {
+                    "le" => Some(BitConstraint::Endianness(ident.span(), Endianness::Little)),
+                    "be" => Some(BitConstraint::Endianness(ident.span(), Endianness::Big)),
+                    _ => return Err(content.error("Expected size literal, 'be' or 'le'")),
+                }
+            } else {
+                let size_lit: LitInt = content.parse()?;
+                bit_constraint = Some(BitConstraint::Size(size_lit.clone(), size_lit.base10_parse::<usize>()?));
+            }
+        }
 
         // Optional bit pattern (mutually exclusive with size constraint)
-        let bit_pattern = if input.peek(Bracket) {
-            if size_constraint.is_some() {
-                return Err(input.error("Cannot specify both size constraint {n} and bit pattern [n..m]"));
+        if input.peek(Bracket) {
+            if bit_constraint.is_some() {
+                return Err(input.error("Cannot specify both size/endianness constraint and a bit pattern [n..m]"));
             }
-            Some(input.parse()?)
-        } else {
-            None
-        };
+            bit_constraint = Some(BitConstraint::Pattern(input.parse()?));
+        }
 
         // Optional default value
         let default_value = if input.peek(Token![=]) {
@@ -428,12 +437,12 @@ impl Parse for FieldDefinition {
             input.parse::<Token![,]>()?;
         }
 
+        let bit_constraint = bit_constraint.unwrap_or(BitConstraint::Endianness(field_type.span(), Endianness::Big));
         Ok(FieldDefinition {
             attributes,
             name,
             field_type,
-            bit_pattern,
-            size_constraint,
+            bit_constraint,
             default_value,
             units,
         })

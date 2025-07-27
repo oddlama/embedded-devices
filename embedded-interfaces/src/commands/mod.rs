@@ -76,7 +76,7 @@ macro_rules! define_executor {
             _marker: PhantomData<C>,
         }
 
-        impl<C: $command_trait> embedded_registers::commands::Executor for $executor<C> {
+        impl<C: $command_trait> embedded_interfaces::commands::Executor for $executor<C> {
             type Error = $error_type;
             type Command = C;
         }
