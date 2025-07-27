@@ -130,11 +130,20 @@ fn test_endianness() {
             f1: u32{be} = 0x12345678,
             f2: u32{le} = 0x12345678,
         }
+
+        struct Struct24(size = 6) {
+            f1: u32{24,be} = 0x123456,
+            f2: u32{24,le} = 0x123456,
+        }
     }
 
     let packed = StructUnpacked::default().pack();
     assert_eq!(packed.0, [0x12, 0x34, 0x56, 0x78, 0x78, 0x56, 0x34, 0x12]);
     assert_eq!(packed.unpack(), StructUnpacked::default());
+
+    let packed = Struct24Unpacked::default().pack();
+    assert_eq!(packed.0, [0x12, 0x34, 0x56, 0x56, 0x34, 0x12]);
+    assert_eq!(packed.unpack(), Struct24Unpacked::default());
 }
 
 #[test]

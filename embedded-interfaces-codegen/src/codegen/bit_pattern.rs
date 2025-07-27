@@ -216,7 +216,7 @@ fn process_single_field(
     next_auto_bit: &mut usize,
 ) -> syn::Result<ProcessedField> {
     let normalized_ranges = match &field.bit_constraint {
-        BitConstraint::Pattern(bit_pattern) => {
+        Some(BitConstraint::Pattern(bit_pattern)) => {
             // Explicit bit pattern provided
             let ranges = normalize_bit_pattern(bit_pattern).map_err(|e| syn::Error::new(bit_pattern.span, e))?;
 
@@ -227,7 +227,7 @@ fn process_single_field(
 
             ranges
         }
-        BitConstraint::Size(lit, size_constraint) => {
+        Some(BitConstraint::Size(lit, size_constraint)) => {
             // Size constraint syntax e.g. u8{3} - use constraint size instead of inferred size
             let start_bit = *next_auto_bit;
             let end_bit = start_bit + size_constraint;
@@ -236,21 +236,12 @@ fn process_single_field(
             validate_size_constraint(interface_def, &field.field_type, *size_constraint)?;
 
             *next_auto_bit = end_bit;
-            vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(lit, e))?]
-        }
-        BitConstraint::Endianness(span, endianness) => {
-            // Auto-generate bit pattern using inferred size
-            let field_size = infer_field_size_bits(interface_def, &field.field_type)?;
-            let start_bit = *next_auto_bit;
-            let end_bit = start_bit + field_size;
-
-            *next_auto_bit = end_bit;
-            match endianness {
-                Endianness::Little => {
+            match field.endianness {
+                Endianness::Little(span) => {
                     // split range every 8 bits and reverse
                     if (end_bit - start_bit) % 8 != 0 {
                         return Err(syn::Error::new(
-                            *span,
+                            span,
                             "The little endian constraint can only be used on types which are a multiple of 8 bits in size",
                         ));
                     }
@@ -259,12 +250,43 @@ fn process_single_field(
                         .rev()
                         .map(|first| {
                             NormalizedRange::new(start_bit + first * 8, start_bit + first * 8 + 8)
-                                .map_err(|e| syn::Error::new(*span, e))
+                                .map_err(|e| syn::Error::new(span, e))
                         })
                         .collect::<syn::Result<Vec<_>>>()?
                 }
-                Endianness::Big => {
-                    vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new(*span, e))?]
+                Endianness::Big(_) => {
+                    vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new_spanned(lit, e))?]
+                }
+            }
+        }
+        // Auto-generate bit pattern using inferred size
+        None => {
+            // Auto-generate bit pattern using inferred size
+            let field_size = infer_field_size_bits(interface_def, &field.field_type)?;
+            let start_bit = *next_auto_bit;
+            let end_bit = start_bit + field_size;
+
+            *next_auto_bit = end_bit;
+            match field.endianness {
+                Endianness::Little(span) => {
+                    // split range every 8 bits and reverse
+                    if (end_bit - start_bit) % 8 != 0 {
+                        return Err(syn::Error::new(
+                            span,
+                            "The little endian constraint can only be used on types which are a multiple of 8 bits in size",
+                        ));
+                    }
+                    let n_bytes = (end_bit - start_bit) / 8;
+                    (0..n_bytes)
+                        .rev()
+                        .map(|first| {
+                            NormalizedRange::new(start_bit + first * 8, start_bit + first * 8 + 8)
+                                .map_err(|e| syn::Error::new(span, e))
+                        })
+                        .collect::<syn::Result<Vec<_>>>()?
+                }
+                Endianness::Big(span) => {
+                    vec![NormalizedRange::new(start_bit, end_bit).map_err(|e| syn::Error::new(span, e))?]
                 }
             }
         }

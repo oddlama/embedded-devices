@@ -385,6 +385,7 @@ impl Parse for FieldDefinition {
         let field_type: Type = input.parse()?;
 
         // Check for size constraint {size} or endianness constraint ({be} or {le})
+        let mut endianness = Endianness::Big(field_type.span());
         let mut bit_constraint = None;
         if input.peek(Brace) {
             let content;
@@ -393,14 +394,26 @@ impl Parse for FieldDefinition {
             let lookahead = content.lookahead1();
             if lookahead.peek(Ident) {
                 let ident: Ident = content.parse()?; // consume
-                bit_constraint = match ident.to_string().as_str() {
-                    "le" => Some(BitConstraint::Endianness(ident.span(), Endianness::Little)),
-                    "be" => Some(BitConstraint::Endianness(ident.span(), Endianness::Big)),
+                endianness = match ident.to_string().as_str() {
+                    "le" => Endianness::Little(ident.span()),
+                    "be" => Endianness::Big(ident.span()),
                     _ => return Err(content.error("Expected size literal, 'be' or 'le'")),
                 }
             } else {
                 let size_lit: LitInt = content.parse()?;
                 bit_constraint = Some(BitConstraint::Size(size_lit.clone(), size_lit.base10_parse::<usize>()?));
+
+                // endianness
+                if content.peek(Token![,]) {
+                    content.parse::<Token![,]>()?;
+
+                    let ident: Ident = content.parse()?; // consume
+                    endianness = match ident.to_string().as_str() {
+                        "le" => Endianness::Little(ident.span()),
+                        "be" => Endianness::Big(ident.span()),
+                        _ => return Err(content.error("Expected size literal, 'be' or 'le'")),
+                    }
+                }
             }
         }
 
@@ -437,11 +450,11 @@ impl Parse for FieldDefinition {
             input.parse::<Token![,]>()?;
         }
 
-        let bit_constraint = bit_constraint.unwrap_or(BitConstraint::Endianness(field_type.span(), Endianness::Big));
         Ok(FieldDefinition {
             attributes,
             name,
             field_type,
+            endianness,
             bit_constraint,
             default_value,
             units,
