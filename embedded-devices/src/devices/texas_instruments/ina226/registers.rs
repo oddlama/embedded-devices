@@ -1,5 +1,5 @@
-use bondrewd::BitfieldEnum;
-
+use crate::devices::texas_instruments::ina226::INA226Register;
+use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 
 use uom::si::electric_current::ampere;
@@ -8,27 +8,177 @@ use uom::si::f64;
 use uom::si::f64::{ElectricCurrent, ElectricPotential};
 use uom::si::power::watt;
 
-/// Conversion averaging counts
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-#[allow(non_camel_case_types)]
-pub enum AverageCount {
-    /// Single sample without averaging.
-    X_1 = 0b000,
-    /// 4x averaging.
-    X_4 = 0b001,
-    /// 16x averaging.
-    X_16 = 0b010,
-    /// 64x averaging.
-    X_64 = 0b011,
-    /// 128x averaging.
-    X_128 = 0b100,
-    /// 256x averaging.
-    X_256 = 0b101,
-    /// 512x averaging.
-    X_512 = 0b110,
-    /// 1024x averaging.
-    X_1024 = 0b111,
+pub type INA226I2cCodec = OneByteRegAddrCodec;
+
+interface_objects! {
+    register_defaults {
+        codec_error = (),
+        i2c_codec = INA226I2cCodec,
+        spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
+    }
+
+    register_devices [ INA226 ]
+
+    /// Conversion averaging counts
+    #[allow(non_camel_case_types)]
+    enum AverageCount: u8{3} {
+        /// Single sample without averaging.
+        0b000 X_1,
+        /// 4x averaging.
+        0b001 X_4,
+        /// 16x averaging.
+        0b010 X_16,
+        /// 64x averaging.
+        0b011 X_64,
+        /// 128x averaging.
+        0b100 X_128,
+        /// 256x averaging.
+        0b101 X_256,
+        /// 512x averaging.
+        0b110 X_512,
+        /// 1024x averaging.
+        0b111 X_1024,
+    }
+
+    /// Measurement conversion time
+    #[allow(non_camel_case_types)]
+    enum ConversionTime: u8{3} {
+        /// 140 μs
+        0b000 T_140,
+        /// 204 μs
+        0b001 T_204,
+        /// 332 μs
+        0b010 T_332,
+        /// 588 μs
+        0b011 T_588,
+        /// 1.1 ms
+        0b100 T_1100,
+        /// 2.116 ms
+        0b101 T_2116,
+        /// 4.156 ms
+        0b110 T_4156,
+        /// 8.244 ms
+        0b111 T_8244,
+    }
+
+    /// Operating mode.
+    enum OperatingMode: u8{3} {
+        0b000 PowerDown,
+        0b001 ShuntTriggered,
+        0b010 BusTriggered,
+        0b011 ShuntAndBusTriggered,
+        0b100 PowerDown2,
+        0b101 ShuntContinuous,
+        0b110 BusContinuous,
+        0b111 ShuntAndBusContinuous,
+    }
+
+    /// Device configuration register
+    register Configuration(addr = 0x00, mode = rw, size = 2) {
+        /// Setting this flag generates a system reset that is the same
+        /// as power-on reset. Resets all registers to default values.
+        /// This bit self-clears.
+        reset: bool = false,
+        /// Reserved bits
+        _: u8{3},
+        /// The count of ADC samples to average. Applies to all measurements.
+        average_count: AverageCount = AverageCount::X_1,
+        /// The conversion time of the bus voltage measurement
+        bus_conversion_time: ConversionTime = ConversionTime::T_1100,
+        /// The conversion time of the shunt voltage measurement
+        shunt_conversion_time: ConversionTime = ConversionTime::T_1100,
+        /// The operating mode of the device.
+        operating_mode: OperatingMode = OperatingMode::ShuntAndBusContinuous,
+    }
+
+    /// Shunt voltage measurement data
+    register ShuntVoltage(addr = 0x01, mode = r, size = 2) {
+        /// The raw voltage measurement with 2.5µV/LSB resolution
+        raw_value: i16 = 0 {
+            quantity: ElectricPotential,
+            unit: volt,
+            lsb: 1f64 / 400000f64,
+        },
+    }
+
+    /// Bus voltage measurement data
+    register BusVoltage(addr = 0x02, mode = r, size = 2) {
+        /// The raw voltage measurement with 1.25mV/LSB resolution
+        raw_value: i16 = 0 {
+            quantity: ElectricPotential,
+            unit: volt,
+            lsb: 1f64 / 800f64,
+        },
+    }
+
+    /// Power measurement data
+    register Power(addr = 0x03, mode = r, size = 2) {
+        /// The raw power measurement, W/LSB is determined by calibration register
+        raw_value: u16 = 0,
+    }
+
+    /// Contains the amount of current flowing through the shunt resistor
+    register Current(addr = 0x04, mode = r, size = 2) {
+        /// The raw current measurement, A/LSB is determined by calibration register
+        raw_value: i16 = 0,
+    }
+
+    /// Calibration register
+    register Calibration(addr = 0x05, mode = rw, size = 2) {
+        /// Reserved bit
+        _: u8{1},
+        /// The raw calibration value
+        raw_value: u16{15} = 0,
+    }
+
+    /// Mask/Enable register
+    register MaskEnable(addr = 0x06, mode = rw, size = 2) {
+        /// Alert pin shunt voltage over voltage
+        shunt_over_voltage: bool = false,
+        /// Alert pin shunt voltage under voltage
+        shunt_under_voltage: bool = false,
+        /// Alert pin bus voltage over voltage
+        bus_over_voltage: bool = false,
+        /// Alert pin bus under voltage
+        bus_under_voltage: bool = false,
+        /// Alert pin power over limit
+        power_over_limit: bool = false,
+        /// Alert pin conversion ready
+        conversion_ready: bool = false,
+        /// Reserved bits
+        _: u8{5},
+        /// Alert function flag
+        alert_function_flag: bool = false,
+        /// Conversion ready flag
+        conversion_ready_flag: bool = false,
+        /// Math overflow flag
+        math_overflow_flag: bool = false,
+        /// Alert pin polarity
+        alert_polarity: bool = false,
+        /// Alert pin latch
+        alert_latch: bool = false,
+    }
+
+    /// Alert limit register
+    register AlertLimit(addr = 0x07, mode = rw, size = 2) {
+        /// The value used to compare against the other register as configured in
+        /// the MaskEnable register to determine if a limit has been exceeded.
+        raw_value: u16 = 0,
+    }
+
+    /// Manufacturer ID register
+    register ManufacturerId(addr = 0xFE, mode = r, size = 2) {
+        /// Manufacturer Id. Reads `"TI"` in ASCII.
+        id: u16 = 0x5449,
+    }
+
+    /// Die ID register
+    register DieId(addr = 0xFF, mode = r, size = 2) {
+        /// Die Id.
+        id: u16{12} = 0b001000100110,
+        /// Revision.
+        revision: u8{4} = 0b0000,
+    }
 }
 
 impl AverageCount {
@@ -47,29 +197,6 @@ impl AverageCount {
     }
 }
 
-/// Measurement conversion time
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-#[allow(non_camel_case_types)]
-pub enum ConversionTime {
-    /// 140 μs
-    T_140 = 0b000,
-    /// 204 μs
-    T_204 = 0b001,
-    /// 332 μs
-    T_332 = 0b010,
-    /// 588 μs
-    T_588 = 0b011,
-    /// 1.1 ms
-    T_1100 = 0b100,
-    /// 2.116 ms
-    T_2116 = 0b101,
-    /// 4.156 ms
-    T_4156 = 0b110,
-    /// 8.244 ms
-    T_8244 = 0b111,
-}
-
 impl ConversionTime {
     /// Returns the associated time in µs
     pub fn us(&self) -> u32 {
@@ -86,111 +213,20 @@ impl ConversionTime {
     }
 }
 
-/// Operating mode.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum OperatingMode {
-    PowerDown = 0b000,
-    ShuntTriggered = 0b001,
-    BusTriggered = 0b010,
-    ShuntAndBusTriggered = 0b011,
-    PowerDown2 = 0b100,
-    ShuntContinuous = 0b101,
-    BusContinuous = 0b110,
-    ShuntAndBusContinuous = 0b111,
-}
-
-/// Device configuration register
-#[device_register(super::INA226)]
-#[register(address = 0x00, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Configuration {
-    /// Setting this flag generates a system reset that is the same
-    /// as power-on reset. Resets all registers to default values.
-    /// This bit self-clears.
-    #[register(default = false)]
-    pub reset: bool,
-    #[bondrewd(bit_length = 3, reserve)]
-    #[allow(dead_code)]
-    pub reserved: u8,
-    /// The count of ADC samples to average. Applies to all measurements.
-    #[bondrewd(enum_primitive = "u8", bit_length = 3)]
-    #[register(default = AverageCount::X_1)]
-    pub average_count: AverageCount,
-    /// The conversion time of the bus voltage measurement
-    #[bondrewd(enum_primitive = "u8", bit_length = 3)]
-    #[register(default = ConversionTime::T_1100)]
-    pub bus_conversion_time: ConversionTime,
-    /// The conversion time of the shunt voltage measurement
-    #[bondrewd(enum_primitive = "u8", bit_length = 3)]
-    #[register(default = ConversionTime::T_1100)]
-    pub shunt_conversion_time: ConversionTime,
-    /// The operating mode of the device.
-    #[bondrewd(enum_primitive = "u8", bit_length = 3)]
-    #[register(default = OperatingMode::ShuntAndBusContinuous)]
-    pub operating_mode: OperatingMode,
-}
-
 impl Configuration {
     /// Calculate the total conversion time based on configured operating mode, average count and conversion times.
     pub fn total_conversion_time_us(&self) -> u32 {
-        let sample_measure_time = match self.read_operating_mode() {
+        let sample_measure_time = match self.operating_mode {
             OperatingMode::PowerDown | OperatingMode::PowerDown2 => return 0,
-            OperatingMode::BusContinuous | OperatingMode::BusTriggered => self.read_bus_conversion_time().us(),
-            OperatingMode::ShuntContinuous | OperatingMode::ShuntTriggered => self.read_shunt_conversion_time().us(),
+            OperatingMode::BusContinuous | OperatingMode::BusTriggered => self.bus_conversion_time.us(),
+            OperatingMode::ShuntContinuous | OperatingMode::ShuntTriggered => self.shunt_conversion_time.us(),
             OperatingMode::ShuntAndBusContinuous | OperatingMode::ShuntAndBusTriggered => {
-                self.read_bus_conversion_time().us() + self.read_shunt_conversion_time().us()
+                self.bus_conversion_time.us() + self.shunt_conversion_time.us()
             }
         };
 
-        sample_measure_time * self.read_average_count().count()
+        sample_measure_time * self.average_count.count()
     }
-}
-
-/// Shunt voltage measurement data
-#[device_register(super::INA226)]
-#[register(address = 0x01, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct ShuntVoltage {
-    /// The raw voltage measurement with 2.5µV/LSB resolution
-    #[register(default = 0)]
-    pub raw_value: i16,
-}
-
-impl ShuntVoltage {
-    /// Read the shunt voltage
-    pub fn read_voltage(&self) -> ElectricPotential {
-        // 2.5µV/LSB
-        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 400_000.0)
-    }
-}
-
-/// Shunt voltage measurement data
-#[device_register(super::INA226)]
-#[register(address = 0x02, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct BusVoltage {
-    /// The raw voltage measurement with 1.25mV/LSB resolution
-    #[register(default = 0)]
-    pub raw_value: i16,
-}
-
-impl BusVoltage {
-    /// Read the shunt voltage
-    pub fn read_voltage(&self) -> ElectricPotential {
-        // 1.25mV/LSB
-        ElectricPotential::new::<volt>(self.read_raw_value() as f64 / 800.0)
-    }
-}
-
-/// Power measurement data
-#[device_register(super::INA226)]
-#[register(address = 0x03, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Power {
-    /// The raw power measurement, W/LSB is determined by calibration register
-    #[register(default = 0)]
-    pub raw_value: u16,
 }
 
 impl Power {
@@ -198,112 +234,14 @@ impl Power {
     /// for the current register which is used to derive the nW/LSB for the power register
     pub fn read_power(&self, current_lsb_na: i64) -> f64::Power {
         // nW/LSB = 25 * nA/LSB
-        f64::Power::new::<watt>((self.read_raw_value() as i64 * current_lsb_na * 25) as f64 / 1_000_000_000f64)
+        f64::Power::new::<watt>((self.raw_value as i64 * current_lsb_na * 25) as f64 / 1_000_000_000f64)
     }
-}
-
-/// Contains the amount of current flowing through the shunt resistor
-#[device_register(super::INA226)]
-#[register(address = 0x04, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Current {
-    /// The raw current measurement, A/LSB is determined by calibration register
-    #[register(default = 0)]
-    pub raw_value: i16,
 }
 
 impl Current {
     /// Read the current, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register.
     pub fn read_current(&self, current_lsb_na: i64) -> ElectricCurrent {
-        ElectricCurrent::new::<ampere>((self.read_raw_value() as i64 * current_lsb_na) as f64 / 1_000_000_000f64)
+        ElectricCurrent::new::<ampere>((self.raw_value as i64 * current_lsb_na) as f64 / 1_000_000_000f64)
     }
-}
-
-#[device_register(super::INA226)]
-#[register(address = 0x05, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Calibration {
-    #[bondrewd(bit_length = 1, reserve)]
-    #[allow(dead_code)]
-    pub reserved: u8,
-    /// The raw calibration value
-    #[bondrewd(bit_length = 15)]
-    #[register(default = 0)]
-    pub raw_value: u16,
-}
-
-#[device_register(super::INA226)]
-#[register(address = 0x06, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct MaskEnable {
-    /// Alert pin shunt voltage over voltage
-    #[register(default = false)]
-    pub shunt_over_voltage: bool,
-    /// Alert pin shunt voltage under voltage
-    #[register(default = false)]
-    pub shunt_under_voltage: bool,
-    /// Alert pin bus voltage over voltage
-    #[register(default = false)]
-    pub bus_over_voltage: bool,
-    /// Alert pin bus under voltage
-    #[register(default = false)]
-    pub bus_under_voltage: bool,
-    /// Alert pin power over limit
-    #[register(default = false)]
-    pub power_over_limit: bool,
-    /// Alert pin conversion ready
-    #[register(default = false)]
-    pub conversion_ready: bool,
-    #[bondrewd(bit_length = 5, reserve)]
-    #[allow(dead_code)]
-    pub reserved: u8,
-    /// Alert function flag
-    #[register(default = false)]
-    pub alert_function_flag: bool,
-    /// Conversion ready flag
-    #[register(default = false)]
-    pub conversion_ready_flag: bool,
-    /// Math overflow flag
-    #[register(default = false)]
-    pub math_overflow_flag: bool,
-    /// Alert pin polarity
-    #[register(default = false)]
-    pub alert_polarity: bool,
-    /// Alert pin latch
-    #[register(default = false)]
-    pub alert_latch: bool,
-}
-
-#[device_register(super::INA226)]
-#[register(address = 0x07, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct AlertLimit {
-    /// The value used to compare against the other register as configured in
-    /// the MaskEnable register to determine if a limit has been exceeded.
-    #[register(default = 0)]
-    pub raw_value: u16,
-}
-
-#[device_register(super::INA226)]
-#[register(address = 0xFE, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct ManufacturerId {
-    /// Manufacturer Id. Reads `"TI"` in ASCII.
-    #[register(default = 0x5449)]
-    pub id: u16,
-}
-
-#[device_register(super::INA226)]
-#[register(address = 0xFF, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct DieId {
-    /// Die Id.
-    #[bondrewd(bit_length = 12)]
-    #[register(default = 0b001000100110)]
-    pub id: u16,
-    /// Revision.
-    #[bondrewd(bit_length = 4)]
-    #[register(default = 0b0000)]
-    pub revision: u8,
 }

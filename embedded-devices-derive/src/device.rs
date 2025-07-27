@@ -17,7 +17,7 @@ pub(crate) fn device(args: TokenStream, orig_input: TokenStream) -> syn::Result<
     let output = quote! {
         #orig_input
 
-        /// A marker trait to distinguish related registers from unrelated ones
+        /// A marker trait to distinguish registers related to this device from others
         pub trait #register_marker {}
     };
 

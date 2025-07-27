@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use embedded_registers::{TransportError, commands::Command, define_executor};
+use embedded_interfaces::{TransportError, commands::Command, define_executor};
 use heapless::Vec;
 
 /// An error representing CRC errors.
@@ -63,10 +63,10 @@ define_executor!(SensirionWriteReadCommandExecutor, SensirionWriteReadCommand, C
     async(feature = "async"),
     keep_self
 )]
-impl<C: SensirionSendCommand> embedded_registers::commands::i2c::Executor for SensirionSendCommandExecutor<C> {
+impl<C: SensirionSendCommand> embedded_interfaces::commands::i2c::Executor for SensirionSendCommandExecutor<C> {
     async fn execute<D, I, A>(
         delay: &mut D,
-        bound_bus: &mut embedded_registers::i2c::I2cBoundBus<I, A>,
+        bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
         _input: impl AsRef<C::In>,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
@@ -87,10 +87,10 @@ impl<C: SensirionSendCommand> embedded_registers::commands::i2c::Executor for Se
     async(feature = "async"),
     keep_self
 )]
-impl<C: SensirionWriteCommand> embedded_registers::commands::i2c::Executor for SensirionWriteCommandExecutor<C> {
+impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for SensirionWriteCommandExecutor<C> {
     async fn execute<D, I, A>(
         delay: &mut D,
-        bound_bus: &mut embedded_registers::i2c::I2cBoundBus<I, A>,
+        bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
         input: impl AsRef<C::In>,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
@@ -111,10 +111,10 @@ impl<C: SensirionWriteCommand> embedded_registers::commands::i2c::Executor for S
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
-                .expect("Command data too large for buffer. Raise an issue in embedded_registers.");
+                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
             array
                 .push(crc.checksum(x))
-                .expect("Command data too large for buffer. Raise an issue in embedded_registers.");
+                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
         }
 
         bound_bus.interface.write(bound_bus.address, &array).await?;
@@ -129,10 +129,10 @@ impl<C: SensirionWriteCommand> embedded_registers::commands::i2c::Executor for S
     async(feature = "async"),
     keep_self
 )]
-impl<C: SensirionReadCommand> embedded_registers::commands::i2c::Executor for SensirionReadCommandExecutor<C> {
+impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for SensirionReadCommandExecutor<C> {
     async fn execute<D, I, A>(
         delay: &mut D,
-        bound_bus: &mut embedded_registers::i2c::I2cBoundBus<I, A>,
+        bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
         _input: impl AsRef<C::In>,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
@@ -178,12 +178,12 @@ impl<C: SensirionReadCommand> embedded_registers::commands::i2c::Executor for Se
     async(feature = "async"),
     keep_self
 )]
-impl<C: SensirionWriteReadCommand> embedded_registers::commands::i2c::Executor
+impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
     for SensirionWriteReadCommandExecutor<C>
 {
     async fn execute<D, I, A>(
         delay: &mut D,
-        bound_bus: &mut embedded_registers::i2c::I2cBoundBus<I, A>,
+        bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
         input: impl AsRef<C::In>,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
@@ -205,10 +205,10 @@ impl<C: SensirionWriteReadCommand> embedded_registers::commands::i2c::Executor
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
-                .expect("Command data too large for buffer. Raise an issue in embedded_registers.");
+                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
             array
                 .push(crc.checksum(x))
-                .expect("Command data too large for buffer. Raise an issue in embedded_registers.");
+                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
         }
 
         bound_bus.interface.write(bound_bus.address, &array).await?;

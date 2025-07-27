@@ -286,8 +286,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let flags = self.read_register::<self::registers::MaskEnable>().await?;
 
         let measurement = Measurement {
-            shunt_voltage: shunt_voltage.read_voltage(),
-            bus_voltage: bus_voltage.read_voltage(),
+            shunt_voltage: shunt_voltage.read_value(),
+            bus_voltage: bus_voltage.read_value(),
             current: current.read_current(self.current_lsb_na),
             power: power.read_power(self.current_lsb_na),
         };
@@ -368,8 +368,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
             let power = self.read_register::<self::registers::Power>().await?;
 
             let measurement = Measurement {
-                shunt_voltage: shunt_voltage.read_voltage(),
-                bus_voltage: bus_voltage.read_voltage(),
+                shunt_voltage: shunt_voltage.read_value(),
+                bus_voltage: bus_voltage.read_value(),
                 current: current.read_current(self.current_lsb_na),
                 power: power.read_power(self.current_lsb_na),
             };
@@ -434,8 +434,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let power = self.read_register::<self::registers::Power>().await?;
 
         let measurement = Measurement {
-            shunt_voltage: shunt_voltage.read_voltage(),
-            bus_voltage: bus_voltage.read_voltage(),
+            shunt_voltage: shunt_voltage.read_value(),
+            bus_voltage: bus_voltage.read_value(),
             current: current.read_current(self.current_lsb_na),
             power: power.read_power(self.current_lsb_na),
         };
@@ -466,8 +466,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
                 let power = self.read_register::<self::registers::Power>().await?;
 
                 let measurement = Measurement {
-                    shunt_voltage: shunt_voltage.read_voltage(),
-                    bus_voltage: bus_voltage.read_voltage(),
+                    shunt_voltage: shunt_voltage.read_value(),
+                    bus_voltage: bus_voltage.read_value(),
                     current: current.read_current(self.current_lsb_na),
                     power: power.read_power(self.current_lsb_na),
                 };

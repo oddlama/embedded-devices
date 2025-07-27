@@ -89,7 +89,7 @@ use crate::utils::from_bus_error;
 use self::address::Address;
 use self::registers::{
     BurstMeasurements, ChipId, Cmd, Config, DataRateControl, IIRFilter, Oversampling, OversamplingControl,
-    PowerControl, SensorMode, TrimmingCoefficients, TrimmingCoefficientsBitfield,
+    PowerControl, SensorMode, TrimmingCoefficients, TrimmingCoefficientsUnpacked,
 };
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
@@ -155,7 +155,7 @@ impl Default for Configuration {
 pub(super) struct TFine(i32);
 
 #[derive(Debug)]
-pub(super) struct CalibrationData(TrimmingCoefficientsBitfield);
+pub(super) struct CalibrationData(TrimmingCoefficientsUnpacked);
 
 impl CalibrationData {
     pub(super) fn compensate_temperature(&self, uncompensated: u32) -> (ThermodynamicTemperature, TFine) {
@@ -310,7 +310,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     /// before taking any measurements. Calling [`Self::init`] will
     /// automatically do this.
     pub async fn calibrate(&mut self) -> Result<(), TransportError<(), I::BusError>> {
-        let coefficients = self.read_register::<TrimmingCoefficients>().await?.read_all();
+        let coefficients = self.read_register::<TrimmingCoefficients>().await?.unpack();
         self.calibration_data = Some(CalibrationData(coefficients));
 
         Ok(())
@@ -410,7 +410,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let max_measurement_delay_us = 234 + (392 + 2020 * o_p.factor()) + (163 + o_t.factor() * 2020);
         self.delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self.read_register::<BurstMeasurements>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurements>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
         };
@@ -419,8 +419,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let pressure_enable = power_ctrl.read_pressure_enable();
 
         let (temperature, pressure) = if temperature_enable {
-            let (temp, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
-            let press = pressure_enable.then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine));
+            let (temp, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
+            let press = pressure_enable.then(|| cal.compensate_pressure(raw_data.read_pressure_value(), t_fine));
             (Some(temp), press)
         } else {
             (None, None)
@@ -479,7 +479,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
     /// Returns the most recent measurement. Will never return None.
     async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
-        let raw_data = self.read_register::<BurstMeasurements>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurements>().await?;
         let power_ctrl = self.read_register::<PowerControl>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
@@ -489,8 +489,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let pressure_enable = power_ctrl.read_pressure_enable();
 
         let (temperature, pressure) = if temperature_enable {
-            let (temp, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
-            let press = pressure_enable.then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine));
+            let (temp, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
+            let press = pressure_enable.then(|| cal.compensate_pressure(raw_data.read_pressure_value(), t_fine));
             (Some(temp), press)
         } else {
             (None, None)

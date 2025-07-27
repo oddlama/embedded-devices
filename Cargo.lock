@@ -221,7 +221,6 @@ dependencies = [
  "embedded-hal",
  "embedded-hal-async",
  "embedded-interfaces",
- "embedded-registers",
  "heapless",
  "maybe-async-cfg",
  "paste",
@@ -280,38 +279,6 @@ name = "embedded-interfaces-codegen"
 version = "0.9.13"
 dependencies = [
  "prettyplease",
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
-name = "embedded-registers"
-version = "0.9.13"
-dependencies = [
- "bondrewd",
- "bytemuck",
- "crc",
- "defmt",
- "embedded-hal",
- "embedded-hal-async",
- "embedded-registers-derive",
- "heapless",
- "maybe-async-cfg",
- "thiserror",
-]
-
-[[package]]
-name = "embedded-registers-derive"
-version = "0.9.13"
-dependencies = [
- "bondrewd",
- "bytemuck",
- "darling",
- "defmt",
- "embedded-hal",
- "embedded-hal-async",
- "embedded-registers",
  "proc-macro2",
  "quote",
  "syn 2.0.104",

@@ -228,13 +228,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
         self.delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self.read_register::<BurstMeasurementsPT>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPT>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
         };
 
-        let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
-        let pressure = cal.compensate_pressure(raw_data.pressure.pressure, t_fine);
+        let (temperature, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
+        let pressure = cal.compensate_pressure(raw_data.read_pressure_value(), t_fine);
 
         Ok(Measurement { temperature, pressure })
     }
@@ -294,14 +294,14 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let reg_ctrl_m = self.read_register::<ControlMeasurement>().await?;
         let o_p = reg_ctrl_m.read_pressure_oversampling();
 
-        let raw_data = self.read_register::<BurstMeasurementsPT>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPT>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
         };
 
-        let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
+        let (temperature, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
         let pressure = (o_p != Oversampling::Disabled)
-            .then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine))
+            .then(|| cal.compensate_pressure(raw_data.read_pressure_value(), t_fine))
             .flatten();
 
         Ok(Some(Measurement { temperature, pressure }))

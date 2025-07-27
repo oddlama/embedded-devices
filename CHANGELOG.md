@@ -1,8 +1,17 @@
 # v0.10.0
 
-This release includes several breaking changes.
+This release includes several breaking changes!
+
+The whole crate was reworked to allow non-register based interfaces (such as
+commands) and allow a more ergonomic definition of bit-packed structs. New
+traits have been added to unify how different devices are initialized, reset
+and used - especially sensors which now implement their measurements using a
+common abstraction.
 
 ## Features / Improvements
+
+`embedded-registers` was retired in favor of `embedded-interfaces`, which is
+more general and brings its own bit-packing macro.
 
 #### Devices
 

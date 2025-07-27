@@ -253,8 +253,8 @@ pub(super) struct CalibrationData {
 
 impl CalibrationData {
     pub fn new(params1: self::registers::TrimmingParameters1, params2: self::registers::TrimmingParameters2) -> Self {
-        let params1 = params1.read_all();
-        let params2 = params2.read_all();
+        let params1 = params1.unpack();
+        let params2 = params2.unpack();
         Self {
             dig_t1: params1.dig_t1,
             dig_t2: params1.dig_t2,
@@ -557,17 +557,17 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
         self.delay.delay_us(max_measurement_delay_us).await;
 
-        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
         };
 
-        let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
+        let (temperature, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
         let pressure = (o_p != Oversampling::Disabled)
-            .then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine))
+            .then(|| cal.compensate_pressure(raw_data.read_pressure_value(), t_fine))
             .flatten();
         let humidity =
-            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.humidity.humidity, t_fine));
+            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.read_humidity_value(), t_fine));
 
         Ok(Measurement {
             temperature,
@@ -640,17 +640,17 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let o_h = reg_ctrl_h.read_oversampling();
         let o_p = reg_ctrl_m.read_pressure_oversampling();
 
-        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?.read_all();
+        let raw_data = self.read_register::<BurstMeasurementsPTH>().await?;
         let Some(ref cal) = self.calibration_data else {
             return Err(MeasurementError::NotCalibrated);
         };
 
-        let (temperature, t_fine) = cal.compensate_temperature(raw_data.temperature.temperature);
+        let (temperature, t_fine) = cal.compensate_temperature(raw_data.read_temperature_value());
         let pressure = (o_p != Oversampling::Disabled)
-            .then(|| cal.compensate_pressure(raw_data.pressure.pressure, t_fine))
+            .then(|| cal.compensate_pressure(raw_data.read_pressure_value(), t_fine))
             .flatten();
         let humidity =
-            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.humidity.humidity, t_fine));
+            (o_h != Oversampling::Disabled).then(|| cal.compensate_humidity(raw_data.read_humidity_value(), t_fine));
 
         Ok(Some(Measurement {
             temperature,
