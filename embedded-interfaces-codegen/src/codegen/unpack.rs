@@ -55,6 +55,7 @@ pub fn generate_accessors(
     unpacked_name: &Ident,
     processed_field: &ProcessedField,
     ranges: &[NormalizedRange],
+    field_doc: &TokenStream2,
     prefix: &str,
 ) -> syn::Result<TokenStream2> {
     let field_name = &processed_field.field.name;
@@ -96,11 +97,20 @@ pub fn generate_accessors(
                                         continue;
                                     }
 
+                                    let generated_field_doc = sub_processed.generate_doc(&ranges);
+                                    let field_doc: Vec<_> = sub_processed.field.attributes.iter().filter(|x| x.path().is_ident("doc")).collect();
+                                    let field_doc = quote! {
+                                        #(#field_doc)*
+                                        #[doc = ""]
+                                        #generated_field_doc
+                                    };
+
                                     sub_accessors.push(generate_accessors(
                                         interface_def,
                                         unpacked_name,
                                         &sub_processed,
                                         &ranges,
+                                        &field_doc,
                                         &format!("{}{}_", prefix, field_name),
                                     )?);
                                 }
@@ -119,6 +129,8 @@ pub fn generate_accessors(
 
                                 let packed_accessor = quote! {
                                     #[doc = #read_fn_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     pub fn #read_fn_name(&self) -> #packed_type {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                                         let src_bits = self.0.view_bits::<Msb0>();
@@ -137,6 +149,8 @@ pub fn generate_accessors(
 
                                 let unpacked_accessor = quote! {
                                     #[doc = #read_fn_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     pub fn #read_fn_name(&self) -> #field_type {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                                         let src_bits = self.0.view_bits::<Msb0>();
@@ -206,6 +220,8 @@ pub fn generate_accessors(
 
             quote! {
                 #[doc = #read_unit_fn_doc]
+                #[doc = ""]
+                #field_doc
                 #[inline]
                 pub fn #read_unit_fn_name(&self) -> #ty_quant {
                     let raw = self.#read_fn_name();
@@ -218,6 +234,8 @@ pub fn generate_accessors(
 
         Ok(quote! {
             #[doc = #read_fn_doc]
+            #[doc = ""]
+            #field_doc
             pub fn #read_fn_name(&self) -> #field_type {
                 use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                 let src_bits = self.0.view_bits::<Msb0>();

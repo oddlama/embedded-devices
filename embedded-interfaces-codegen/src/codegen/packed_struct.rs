@@ -73,31 +73,28 @@ fn generate_unpacked_struct(
         let field_name = &field.name;
         let field_type = &field.field_type;
         let field_attrs = &field.attributes;
-
-        // Generate field documentation
-        let default_doc = if let Some(default_val) = &field.default_value {
-            quote! { #[doc = concat!("Default: `", stringify!(#default_val), "`")] }
-        } else {
-            quote! { #[doc = "Default: not specified"] }
-        };
-
-        // Generate bit pattern documentation
-        let bit_pattern_doc = generate_bit_pattern_doc(&processed.normalized_ranges);
-        let bit_doc = quote! { #[doc = #bit_pattern_doc] };
+        let generated_field_doc = processed.generate_doc(&processed.normalized_ranges);
 
         struct_fields.push(quote! {
             #(#field_attrs)*
             #[doc = ""]
-            #default_doc
-            #bit_doc
+            #generated_field_doc
             pub #field_name: #field_type
         });
 
+        let field_doc: Vec<_> = field_attrs.iter().filter(|x| x.path().is_ident("doc")).collect();
+        let field_doc = quote! {
+            #(#field_doc)*
+            #[doc = ""]
+            #generated_field_doc
+        };
+
         if !processed.field.is_reserved() {
             let ranges = &processed.normalized_ranges;
-            let pack_accessors = super::pack::generate_accessors(interface_def, unpacked_name, processed, ranges, "")?;
+            let pack_accessors =
+                super::pack::generate_accessors(interface_def, unpacked_name, processed, ranges, &field_doc, "")?;
             let unpack_accessors =
-                super::unpack::generate_accessors(interface_def, unpacked_name, processed, ranges, "")?;
+                super::unpack::generate_accessors(interface_def, unpacked_name, processed, ranges, &field_doc, "")?;
             struct_accessors.push(pack_accessors);
             struct_accessors.push(unpack_accessors);
         }
@@ -156,6 +153,7 @@ fn generate_packed_struct(
 
     Ok(quote! {
         #(#doc_attrs)*
+        #[doc = ""]
         #[doc = concat!("This is the packed representation of [`", stringify!(#unpacked_name), "`].")]
         #[derive(Copy, Clone, PartialEq, Eq, embedded_interfaces::bytemuck::Pod, embedded_interfaces::bytemuck::Zeroable)]
         #[repr(transparent)]

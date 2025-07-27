@@ -63,6 +63,7 @@ pub fn generate_accessors(
     unpacked_name: &Ident,
     processed_field: &ProcessedField,
     ranges: &[NormalizedRange],
+    field_doc: &TokenStream2,
     prefix: &str,
 ) -> syn::Result<TokenStream2> {
     let field_name = &processed_field.field.name;
@@ -104,11 +105,20 @@ pub fn generate_accessors(
                                         continue;
                                     }
 
+                                    let generated_field_doc = sub_processed.generate_doc(&ranges);
+                                    let field_doc: Vec<_> = sub_processed.field.attributes.iter().filter(|x| x.path().is_ident("doc")).collect();
+                                    let field_doc = quote! {
+                                        #(#field_doc)*
+                                        #[doc = ""]
+                                        #generated_field_doc
+                                    };
+
                                     sub_accessors.push(generate_accessors(
                                         interface_def,
                                         unpacked_name,
                                         &sub_processed,
                                         &ranges,
+                                        &field_doc,
                                         &format!("{}{}_", prefix, field_name),
                                     )?);
                                 }
@@ -132,6 +142,8 @@ pub fn generate_accessors(
 
                                 let packed_accessor = quote! {
                                     #[doc = #write_fn_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     pub fn #write_fn_name(&mut self, value: #packed_type) {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                                         let dst_bits = self.0.view_bits_mut::<Msb0>();
@@ -143,6 +155,8 @@ pub fn generate_accessors(
                                     #[doc = #write_fn_doc]
                                     #[doc = ""]
                                     #[doc = #chainable_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     #[inline]
                                     pub fn #with_fn_name(mut self, value: #packed_type) -> Self {
                                         self.#write_fn_name(value);
@@ -164,6 +178,8 @@ pub fn generate_accessors(
 
                                 let unpacked_accessor = quote! {
                                     #[doc = #write_fn_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     pub fn #write_fn_name(&mut self, value: #field_type) {
                                         use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                                         let dst_bits = self.0.view_bits_mut::<Msb0>();
@@ -173,6 +189,8 @@ pub fn generate_accessors(
                                     #[doc = #write_fn_doc]
                                     #[doc = ""]
                                     #[doc = #chainable_doc]
+                                    #[doc = ""]
+                                    #field_doc
                                     #[inline]
                                     pub fn #with_fn_name(mut self, value: #field_type) -> Self {
                                         self.#write_fn_name(value);
@@ -249,6 +267,8 @@ pub fn generate_accessors(
 
             quote! {
                 #[doc = #write_unit_fn_doc]
+                #[doc = ""]
+                #field_doc
                 #[inline]
                 pub fn #write_unit_fn_name(&mut self, value: #ty_quant) {
                     let raw = #to_raw;
@@ -258,6 +278,8 @@ pub fn generate_accessors(
                 #[doc = #write_unit_fn_doc]
                 #[doc = ""]
                 #[doc = #unit_chainable_doc]
+                #[doc = ""]
+                #field_doc
                 #[inline]
                 pub fn #with_unit_fn_name(mut self, value: #ty_quant) -> Self {
                     let raw = #to_raw;
@@ -271,6 +293,8 @@ pub fn generate_accessors(
 
         Ok(quote! {
             #[doc = #write_fn_doc]
+            #[doc = ""]
+            #field_doc
             pub fn #write_fn_name(&mut self, value: #field_type) {
                 use embedded_interfaces::bitvec::{order::Msb0, view::BitView};
                 let dst_bits = self.0.view_bits_mut::<Msb0>();
@@ -280,6 +304,8 @@ pub fn generate_accessors(
             #[doc = #write_fn_doc]
             #[doc = ""]
             #[doc = #chainable_doc]
+            #[doc = ""]
+            #field_doc
             #[inline]
             pub fn #with_fn_name(mut self, value: #field_type) -> Self {
                 self.#write_fn_name(value);

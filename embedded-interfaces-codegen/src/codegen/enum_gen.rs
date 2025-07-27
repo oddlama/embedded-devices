@@ -24,14 +24,18 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
         let variant_attrs = &variant.attributes;
 
         if let Some(cap_type) = &variant.capture_value {
+            let pattern = generate_pattern(&variant.pattern);
+            let doc = format!("Value pattern: `{}`\n\nCaptures the specific value.", pattern);
+
             // Variant captures the underlying value
             enum_variants.push(quote! {
                 #(#variant_attrs)*
+                #[doc = ""]
+                #[doc = #doc]
                 #variant_name(#cap_type)
             });
 
             // For from_unsigned, we need to check if the value matches the pattern
-            let pattern = generate_pattern(&variant.pattern);
             from_unsigned_arms.push(quote! {
                 #pattern => Self::#variant_name(value.into())
             });
@@ -41,14 +45,21 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
                 Self::#variant_name(v) => *v as #underlying_type
             });
         } else {
+            let pattern = generate_pattern(&variant.pattern);
+            let doc = format!(
+                "Value pattern: `{}`\n\nRepresentative value: `{}`",
+                pattern, variant.representative
+            );
+
             // Variant doesn't capture the value
             enum_variants.push(quote! {
                 #(#variant_attrs)*
+                #[doc = ""]
+                #[doc = #doc]
                 #variant_name
             });
 
             // For from_unsigned, we need to check if the value matches the pattern
-            let pattern = generate_pattern(&variant.pattern);
             from_unsigned_arms.push(quote! {
                 #pattern => Self::#variant_name
             });
@@ -62,8 +73,11 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
     }
 
     // Generate the enum definition
+    let enum_doc = format!("Enum width: {} bits", bit_size);
     let enum_def_code = quote! {
         #(#attributes)*
+        #[doc = ""]
+        #[doc = #enum_doc]
         #[derive(Copy, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
         pub enum #enum_name {
             #(#enum_variants,)*

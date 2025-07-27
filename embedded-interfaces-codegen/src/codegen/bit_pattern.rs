@@ -3,7 +3,8 @@
 //! This module handles the consolidation, normalization, and validation of bit patterns
 //! for packed struct fields.
 
-use proc_macro2::Ident;
+use proc_macro2::{Ident, TokenStream};
+use quote::quote;
 use std::collections::VecDeque;
 use syn::Type;
 
@@ -161,6 +162,25 @@ where
 pub struct ProcessedField {
     pub field: FieldDefinition,
     pub normalized_ranges: Vec<NormalizedRange>,
+}
+
+impl ProcessedField {
+    pub(crate) fn generate_doc(&self, ranges: &[NormalizedRange]) -> TokenStream {
+        // Generate field documentation
+        let default_doc = if let Some(default_val) = &self.field.default_value {
+            quote! { #[doc = concat!("Default: `", stringify!(#default_val), "`")] }
+        } else {
+            quote! { #[doc = "Default: not specified"] }
+        };
+
+        // Generate bit pattern documentation
+        let bit_pattern_doc = generate_bit_pattern_doc(&ranges);
+        quote! {
+            #default_doc
+            #[doc = ""]
+            #[doc = #bit_pattern_doc]
+        }
+    }
 }
 
 /// Process and validate all fields' bit patterns
@@ -525,12 +545,12 @@ pub fn generate_bit_pattern_doc(ranges: &[NormalizedRange]) -> String {
             if r.size() == 1 {
                 format!("{}", r.start)
             } else {
-                format!("{}..{}", r.start, r.end)
+                format!("{}..={}", r.start, r.end - 1)
             }
         })
         .collect();
 
-    format!("Bits: [{}]", range_strs.join(", "))
+    format!("Bits: `[{}]`", range_strs.join(", "))
 }
 
 pub fn extract_bits(xs: &[NormalizedRange], ys: &[NormalizedRange]) -> Vec<NormalizedRange> {
