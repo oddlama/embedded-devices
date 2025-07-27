@@ -672,6 +672,7 @@ fn generate_custom_type_pack(
     Ok(quote! {
         {
             const BITS: usize = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::BITS;
+            #[allow(unused)]
             embedded_interfaces::const_format::assertcp_eq!(BITS, #total_bits, #size_error);
 
             let src = <#custom_type as embedded_interfaces::packable::UnsignedPackable>::to_unsigned(&(#value_expr)) as #type_ident;

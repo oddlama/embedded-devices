@@ -68,6 +68,7 @@ fn generate_register(
 
     // Generate register-specific trait implementations
     let trait_impls = generate_register_trait_implementations(
+        interface_def,
         register_name,
         &unpacked_name,
         &addr,

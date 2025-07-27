@@ -133,7 +133,7 @@ use embedded_interfaces::codegen::interface_objects;
 interface_objects! {
     // Underlying type must be some unsigned type, and exact bit width must be given
     enum Status: u8{4} {
-        0 Off,             // Single value
+        0x0 Off,           // Single value
         1..=3 Low(u8),     // Value range, captures the specific value
         4..8 Medium,       // Exclusive range, doesn't capture the value. Packing will use lowest associated value.
         8|10|12..16 High,  // Specific values
@@ -215,6 +215,64 @@ interface_objects! {
             from_raw: |x| (x as f64 + 7.0) * 31.0,
             into_raw: |x| (x / 31.0 - 7.0) as u16,
         },
+    }
+}
+```
+
+## Registers
+
+Registers are structs with some meta information, such as an address and codecs
+that specify how this register has to be interfaced with. By replacing `struct`
+with `register`, the macro will automatically implement the register specific
+traits so they can be used with register based devices.
+
+Apart from `size`, registers require some additional attributes to be set:
+- **addr** The register address
+- **mode** One of `"r"`, `"w"` or `"rw"`, specifying whether the register can
+  be read from, written to or both.
+- **codec_error** The error type which the codec may produce, usually `()` for
+  simple codecs.
+- **i2c_codec** The codec which is responsible to interface this register over
+  I2C. Often determines the address size in bytes. If I2C is not supported, set
+  this to `UnsupportedCodec`.
+- **spi_codec** The codec which is responsible to interface this register over
+  SPI. Often determines how the address header is structured. If SPI is not
+  supported, set this to `UnsupportedCodec`.
+
+
+```rust
+use embedded_interfaces::codegen::interface_objects;
+use embedded_interfaces::registers::i2c::codecs::TwoByteRegAddrCodec;
+type UnsupportedSpiCodec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec<()>;
+
+interface_objects! {
+    register ExampleRegister(addr = 0x1234, mode = r, size = 2, codec_error = (), i2c_codec = TwoByteRegAddrCodec, spi_codec = UnsupportedSpiCodec) {
+        value: u8,
+        flags: [bool; 8],
+    }
+}
+```
+
+### Register defaults
+
+Often you will find yourself defining multiple registers for a device, each time repeating
+the codec settings. The `register_defaults` block allows you to define this once in the beginning:
+
+```rust
+use embedded_interfaces::codegen::interface_objects;
+use embedded_interfaces::registers::i2c::codecs::TwoByteRegAddrCodec;
+type UnsupportedSpiCodec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec<()>;
+
+interface_objects! {
+    register_defaults {
+        codec_error = (),
+        i2c_codec = TwoByteRegAddrCodec,
+        spi_codec = UnsupportedSpiCodec,
+    }
+
+    register ExampleRegister(addr = 0x1234, mode = r, size = 2) {
+        value: u8,
+        flags: [bool; 8],
     }
 }
 ```

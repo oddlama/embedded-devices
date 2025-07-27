@@ -10,7 +10,7 @@ pub(crate) const ALLOWED_STRUCT_ATTRS: &[&str] = &["size"];
 #[derive(Debug, Clone)]
 pub struct InterfaceObjectsDefinition {
     pub register_defaults: Option<RegisterDefaultsBlock>,
-    pub devices: Option<DevicesBlock>,
+    pub register_devices: Option<RegisterDevicesBlock>,
     pub definitions: Vec<Definition>,
 }
 
@@ -37,9 +37,9 @@ pub struct Attr {
     pub value: Expr,
 }
 
-/// Devices block: devices [ DeviceA, DeviceB, ... ]
+/// Devices block: register_devices [ DeviceA, DeviceB, ... ]
 #[derive(Debug, Clone)]
-pub struct DevicesBlock {
+pub struct RegisterDevicesBlock {
     pub devices: Vec<Ident>,
 }
 

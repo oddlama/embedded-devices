@@ -6,8 +6,7 @@ use quote::{format_ident, quote};
 #[derive(Debug, FromMeta)]
 struct DeviceArgs {}
 
-/// This adds accessor functions for the given register and
-/// proxies the embedded_registers::register attribute.
+/// Creates a register marker trait for this device.
 pub(crate) fn device(args: TokenStream, orig_input: TokenStream) -> syn::Result<TokenStream> {
     let _args = DeviceArgs::from_list(&NestedMeta::parse_meta_list(args)?)?;
 

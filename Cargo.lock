@@ -220,6 +220,7 @@ dependencies = [
  "embedded-devices-derive",
  "embedded-hal",
  "embedded-hal-async",
+ "embedded-interfaces",
  "embedded-registers",
  "heapless",
  "maybe-async-cfg",

@@ -4,12 +4,15 @@
 //! implementations like Register, ReadableRegister, and WritableRegister.
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::Ident;
+
+use crate::parser::InterfaceObjectsDefinition;
 
 /// Generate register-specific trait implementations
 #[allow(clippy::too_many_arguments)]
 pub fn generate_register_trait_implementations(
+    interface_def: &InterfaceObjectsDefinition,
     register_name: &Ident,
     unpacked_name: &Ident,
     addr: &TokenStream2,
@@ -19,7 +22,8 @@ pub fn generate_register_trait_implementations(
     i2c_codec: &TokenStream2,
     spi_codec: &TokenStream2,
 ) -> syn::Result<TokenStream2> {
-    let register_trait = generate_register_trait(
+    let register_traits = generate_register_traits(
+        interface_def,
         register_name,
         unpacked_name,
         addr,
@@ -32,13 +36,15 @@ pub fn generate_register_trait_implementations(
     let mode_traits = generate_mode_traits(register_name, mode)?;
 
     Ok(quote! {
-        #register_trait
+        #register_traits
         #mode_traits
     })
 }
 
 /// Generate the main Register trait implementation
-fn generate_register_trait(
+#[allow(clippy::too_many_arguments)]
+fn generate_register_traits(
+    interface_def: &InterfaceObjectsDefinition,
     register_name: &Ident,
     unpacked_name: &Ident,
     addr: &TokenStream2,
@@ -47,7 +53,23 @@ fn generate_register_trait(
     i2c_codec: &TokenStream2,
     spi_codec: &TokenStream2,
 ) -> syn::Result<TokenStream2> {
+    let register_marker_impls: Vec<_> = interface_def
+        .register_devices
+        .as_ref()
+        .map(|x| x.devices.clone())
+        .unwrap_or_default()
+        .iter()
+        .map(|device| {
+            let device_register_marker = format_ident!("{}Register", device);
+            quote! {
+                impl #device_register_marker for #register_name {}
+            }
+        })
+        .collect();
+
     Ok(quote! {
+        #(#register_marker_impls)*
+
         impl embedded_interfaces::registers::Register for #register_name {
             type Unpacked = #unpacked_name;
             type CodecError = #codec_error;

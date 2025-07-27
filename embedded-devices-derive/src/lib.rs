@@ -6,7 +6,6 @@ use syn::DeriveInput;
 mod derive_measurement;
 mod device;
 mod device_impl;
-mod device_register;
 mod sensor;
 
 #[proc_macro_attribute]
@@ -20,14 +19,6 @@ pub fn device(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn device_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     match device_impl::device_impl(args.into(), input.into()) {
-        Ok(result) => result.into(),
-        Err(e) => e.into_compile_error().into(),
-    }
-}
-
-#[proc_macro_attribute]
-pub fn device_register(args: TokenStream, input: TokenStream) -> TokenStream {
-    match device_register::device_register(args.into(), input.into()) {
         Ok(result) => result.into(),
         Err(e) => e.into_compile_error().into(),
     }

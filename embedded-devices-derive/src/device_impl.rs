@@ -7,8 +7,6 @@ use syn::spanned::Spanned;
 #[derive(Debug, FromMeta)]
 struct DeviceImplArgs {}
 
-/// This adds accessor functions for the given register and
-/// proxies the embedded_registers::register attribute.
 pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Result<TokenStream> {
     let args_span = args.span();
     let _args = DeviceImplArgs::from_list(&NestedMeta::parse_meta_list(args)?)?;
@@ -43,9 +41,9 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
         quote! {
             #[doc = #read_register_doc]
             #[inline]
-            pub async fn read_register<R>(&mut self) -> Result<R, embedded_registers::TransportError<<R as embedded_registers::Register>::CodecError, I::BusError>>
+            pub async fn read_register<R>(&mut self) -> Result<R, embedded_interfaces::TransportError<<R as embedded_interfaces::registers::Register>::CodecError, I::BusError>>
             where
-                R: embedded_registers::ReadableRegister + #register_marker
+                R: embedded_interfaces::registers::ReadableRegister + #register_marker
             {
                 self.interface.read_register::<R>().await
             }
@@ -56,9 +54,9 @@ pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Re
             pub async fn write_register<R>(
                 &mut self,
                 register: impl AsRef<R>,
-            ) -> Result<(), embedded_registers::TransportError<<R as embedded_registers::Register>::CodecError, I::BusError>>
+            ) -> Result<(), embedded_interfaces::TransportError<<R as embedded_interfaces::registers::Register>::CodecError, I::BusError>>
             where
-                R: embedded_registers::WritableRegister + #register_marker
+                R: embedded_interfaces::registers::WritableRegister + #register_marker
             {
                 self.interface.write_register::<R>(register).await
             }

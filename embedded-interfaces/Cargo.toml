@@ -26,7 +26,7 @@ thiserror = { version = "2.0.12", default-features = false }
 
 [dev-dependencies]
 trybuild = "1.0"
-uom = "0.37"
+uom = { version = "0.37", features = ["f32", "f64", "si"], default-features = false }
 
 [features]
 default = ["sync", "async"]

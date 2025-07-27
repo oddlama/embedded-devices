@@ -114,7 +114,7 @@ pub struct Measurement {
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct MAX31865<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> {
+pub struct MAX31865<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -131,7 +131,7 @@ pub struct MAX31865<D: hal::delay::DelayNs, I: embedded_registers::RegisterInter
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D, I> MAX31865<D, embedded_registers::spi::SpiDevice<I>>
+impl<D, I> MAX31865<D, embedded_interfaces::spi::SpiDevice<I>>
 where
     I: hal::spi::r#SpiDevice,
     D: hal::delay::DelayNs,
@@ -149,7 +149,7 @@ where
     pub fn new_spi(delay: D, interface: I, reference_resistor_ratio: f64) -> Self {
         Self {
             delay,
-            interface: embedded_registers::spi::SpiDevice::new(interface),
+            interface: embedded_interfaces::spi::SpiDevice::new(interface),
             reference_resistor_ratio,
         }
     }
@@ -162,7 +162,7 @@ where
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> MAX31865<D, I> {
     /// Initializes the device by configuring important settings and
     /// running an initial fault detection cycle.
     // TODO call this configure, make init verify device communication and reset
@@ -290,7 +290,9 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> MAX31865<
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::OneshotSensor for MAX31865<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+    for MAX31865<D, I>
+{
     type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
@@ -341,7 +343,7 @@ impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::se
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
     for MAX31865<D, I>
 {
     type Error = MeasurementError<I::BusError>;

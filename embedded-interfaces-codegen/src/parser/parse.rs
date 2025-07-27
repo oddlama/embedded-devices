@@ -11,7 +11,7 @@ use syn::{
 impl Parse for InterfaceObjectsDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut register_defaults = None;
-        let mut devices = None;
+        let mut register_devices = None;
         let mut definitions = Vec::new();
 
         while !input.is_empty() {
@@ -35,11 +35,11 @@ impl Parse for InterfaceObjectsDefinition {
                 let lookahead = input.lookahead1();
                 if lookahead.peek(Ident) {
                     let ident: Ident = input.fork().parse()?;
-                    if ident == "devices" {
-                        if devices.is_some() {
+                    if ident == "register_devices" {
+                        if register_devices.is_some() {
                             return Err(input.error("Multiple devices blocks are not allowed"));
                         }
-                        devices = Some(input.parse()?);
+                        register_devices = Some(input.parse()?);
                         continue;
                     }
                 }
@@ -51,7 +51,7 @@ impl Parse for InterfaceObjectsDefinition {
 
         Ok(InterfaceObjectsDefinition {
             register_defaults,
-            devices,
+            register_devices,
             definitions,
         })
     }
@@ -117,7 +117,7 @@ impl Parse for RegisterDefaultsBlock {
     }
 }
 
-impl Parse for DevicesBlock {
+impl Parse for RegisterDevicesBlock {
     fn parse(input: ParseStream) -> Result<Self> {
         let _devices_token: Ident = input.parse()?;
         let content;
@@ -127,7 +127,7 @@ impl Parse for DevicesBlock {
             .into_iter()
             .collect();
 
-        Ok(DevicesBlock { devices })
+        Ok(RegisterDevicesBlock { devices })
     }
 }
 
