@@ -60,9 +60,12 @@ fn generate_register_traits(
         .unwrap_or_default()
         .iter()
         .map(|device| {
-            let device_register_marker = format_ident!("{}Register", device);
+            let mut device_register = device.clone();
+            if let Some(ref mut last) = device_register.segments.last_mut() {
+                last.ident = format_ident!("{}Register", last.ident);
+            }
             quote! {
-                impl #device_register_marker for #register_name {}
+                impl #device_register for #register_name {}
             }
         })
         .collect();

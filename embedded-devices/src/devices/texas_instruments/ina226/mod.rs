@@ -89,7 +89,7 @@ use crate::utils::from_bus_error;
 
 use self::address::Address;
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use uom::si::electric_current::ampere;
 use uom::si::electrical_resistance::ohm;
@@ -162,7 +162,6 @@ pub struct Measurement {
 /// voltage support from 0 V to +36 V.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -180,6 +179,8 @@ pub struct INA226<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Reg
     /// Configured nA/LSB for current readings
     current_lsb_na: i64,
 }
+
+pub trait INA226Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -208,7 +209,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Voltage, Current, Power)]
 #[maybe_async_cfg::maybe(
     idents(

@@ -71,8 +71,8 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_interfaces::{TransportError, WritableRegister};
+use embedded_devices_derive::{forward_register_fns, sensor};
+use embedded_interfaces::{TransportError, registers::WritableRegister};
 use uom::si::f64::ThermodynamicTemperature;
 
 use crate::utils::from_bus_error;
@@ -118,7 +118,6 @@ pub struct Measurement {
 /// temperature range of –20 °C to 50 °C with no calibration.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -130,6 +129,8 @@ pub struct TMP117<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Reg
     /// The interface to communicate with the device
     interface: I,
 }
+
+pub trait TMP117Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -155,7 +156,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(
@@ -189,7 +190,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     /// value as the new power-on default. Not all registers / register-bits support this.
     pub async fn write_eeprom<R>(&mut self) -> Result<(), EepromError<I::BusError>>
     where
-        R: WritableRegister,
+        R: WritableRegister + TMP117Register,
     {
         use self::registers::{EepromLockMode, EepromUnlock};
 

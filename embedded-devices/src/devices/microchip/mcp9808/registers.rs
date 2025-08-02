@@ -1,4 +1,3 @@
-use crate::devices::microchip::mcp9808::MCP9808Register;
 use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 
@@ -17,7 +16,7 @@ interface_objects! {
         spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
     }
 
-    register_devices [ MCP9808 ]
+    register_devices [ super::MCP9808 ]
 
     /// T_{UPPER} and T_{LOWER} Limit Hysteresis bits.
     ///
@@ -214,7 +213,7 @@ interface_objects! {
         /// Whether T_A is lower than T_LOWER
         is_lower: bool = false,
         /// The ambient temperature in °C with a resolution of 0.0625°C/LSB.
-        raw_temperature: i16{13} = 0 {
+        raw_temperature: i16{13} = 0 => {
             quantity: ThermodynamicTemperature,
             unit: degree_celsius,
             lsb: 1f64 / 16f64,
@@ -230,7 +229,7 @@ interface_objects! {
         /// Reserved bits
         _: u8{3},
         /// The temperature limit in °C with a resolution of 0.25°C/LSB.
-        raw_temperature_limit: i16{11} = 0 {
+        raw_temperature_limit: i16{11} = 0 => {
             quantity: ThermodynamicTemperature,
             unit: degree_celsius,
             lsb: 1f64 / 4f64,
@@ -248,7 +247,7 @@ interface_objects! {
         /// Reserved bits
         _: u8{3},
         /// The temperature limit in °C with a resolution of 0.25°C/LSB.
-        raw_temperature_limit: i16{11} = 0 {
+        raw_temperature_limit: i16{11} = 0 => {
             quantity: ThermodynamicTemperature,
             unit: degree_celsius,
             lsb: 1f64 / 4f64,
@@ -266,7 +265,7 @@ interface_objects! {
         /// Reserved bits
         _: u8{3},
         /// The temperature limit in °C with a resolution of 0.25°C/LSB.
-        raw_temperature_limit: i16{11} = 0 {
+        raw_temperature_limit: i16{11} = 0 => {
             quantity: ThermodynamicTemperature,
             unit: degree_celsius,
             lsb: 1f64 / 4f64,

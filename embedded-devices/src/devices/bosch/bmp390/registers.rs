@@ -1,4 +1,3 @@
-use crate::devices::bosch::bmp390::BMP390Register;
 use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::{i2c::codecs::OneByteRegAddrCodec, spi::codecs::standard_codec::StandardCodec};
 
@@ -12,7 +11,7 @@ interface_objects! {
         spi_codec = BMP390SpiCodec,
     }
 
-    register_devices [ BMP390 ]
+    register_devices [ super::BMP390 ]
 
     /// Known chip ids
     enum Chip: u8{8} {

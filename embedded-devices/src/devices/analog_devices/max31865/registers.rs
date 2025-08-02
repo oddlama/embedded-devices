@@ -1,4 +1,3 @@
-use crate::devices::analog_devices::max31865::MAX31865Register;
 use embedded_interfaces::codegen::interface_objects;
 
 pub type MAX31865I2cCodec = embedded_interfaces::registers::i2c::codecs::unsupported_codec::UnsupportedCodec<()>;
@@ -12,7 +11,7 @@ interface_objects! {
         spi_codec = MAX31865SpiCodec,
     }
 
-    register_devices [ MAX31865 ]
+    register_devices [ super::MAX31865 ]
 
     /// Conversion mode.
     enum ConversionMode: u8{1} {

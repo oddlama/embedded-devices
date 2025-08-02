@@ -12,7 +12,7 @@ pub trait Executor: crate::commands::r#Executor {
     async fn execute<D, I, A>(
         delay: &mut D,
         bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
-        input: impl AsRef<<Self::Command as Command>::In>,
+        input: <Self::Command as Command>::In,
     ) -> Result<<Self::Command as Command>::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
@@ -37,7 +37,7 @@ where
     async fn execute<C, D>(
         &mut self,
         delay: &mut D,
-        input: impl AsRef<C::In>,
+        input: C::In,
     ) -> Result<C::Out, TransportError<C::ExecutorError, Self::BusError>>
     where
         D: hal::delay::DelayNs,

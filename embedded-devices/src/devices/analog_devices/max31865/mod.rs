@@ -57,8 +57,8 @@
 //! # }
 //! ```
 
+use embedded_devices_derive::forward_register_fns;
 use embedded_devices_derive::sensor;
-use embedded_devices_derive::{device, device_impl};
 use registers::{
     Configuration, ConversionMode, FaultDetectionCycle, FaultThresholdHigh, FaultThresholdLow, FilterMode, WiringMode,
 };
@@ -108,7 +108,6 @@ pub struct Measurement {
 /// resistance temperature detectors (RTDs).
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -125,6 +124,8 @@ pub struct MAX31865<D: hal::delay::DelayNs, I: embedded_interfaces::registers::R
     /// but your design may vary.
     reference_resistor_ratio: f64,
 }
+
+pub trait MAX31865Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), SpiDevice),
@@ -155,7 +156,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Temperature)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),

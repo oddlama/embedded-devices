@@ -13,7 +13,6 @@ license.workspace = true
 
 [dependencies]
 approx = { version = "0.5.1", default-features = false }
-bondrewd = { version = "0.1.14", default-features = false, features = ["derive"] }
 bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 defmt = "1.0.1"
 embedded-hal = "1.0.0"

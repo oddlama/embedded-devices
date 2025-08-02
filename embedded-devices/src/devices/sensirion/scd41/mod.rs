@@ -74,25 +74,23 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
-use embedded_interfaces::registers::i2c::codecs::crc8_codec::CrcError;
-use registers::{
-    DataReady, GetSensorVariant, MeasureSingleShot, PerformForcedRecalibration, PerformForcedRecalibrationResult,
-    ReadMeasurement, Reinit, StartPeriodicMeasurement, StopPeriodicMeasurement, WakeUp,
+use self::commands::{
+    GetDataReady, GetSensorVariant, MeasureSingleShot, PerformForcedRecalibration, ReadMeasurement, Reinit,
+    StartPeriodicMeasurement, StopPeriodicMeasurement, TargetCo2Concentration, WakeUp,
 };
-use uom::si::{
-    f64::{Ratio, ThermodynamicTemperature},
-    ratio::{part_per_million, percent},
-    thermodynamic_temperature::degree_celsius,
-};
+use embedded_devices_derive::{forward_command_fns, sensor};
+use uom::si::f64::{Ratio, ThermodynamicTemperature};
 
-use super::{SensirionCommand, scd4x::registers::SensorVariant};
+use super::{
+    commands::Crc8Error,
+    scd4x::commands::{DataReadyStatus, SensorVariant},
+};
 
 pub use super::scd4x::address;
-pub mod registers;
+pub mod commands;
 
 /// Any CRC or Bus related error
-pub type TransportError<E> = embedded_interfaces::TransportError<CrcError, E>;
+pub type TransportError<E> = embedded_interfaces::TransportError<Crc8Error, E>;
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
@@ -123,17 +121,16 @@ pub struct Measurement {
 /// an inbuilt SHT4x temperature and humidity sensor for measurement compensation.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         I2cDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct SCD41<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
+pub struct SCD41<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
@@ -164,18 +161,20 @@ where
     }
 }
 
-#[device_impl]
+pub trait SCD41Command {}
+
+#[forward_command_fns]
 #[sensor(RelativeHumidity, Temperature, Co2Concentration)]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ResettableDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> SCD41<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> SCD41<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, resetting the device and
     /// verifying the sensor variant.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
@@ -186,7 +185,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         self.reset().await?;
 
         // Verify sensor variant
-        match self.read_register::<GetSensorVariant>().await?.read_variant() {
+        match self.execute::<GetSensorVariant>(()).await?.read_variant() {
             SensorVariant::r#SCD41 => Ok(()),
             variant => Err(InitError::InvalidSensorVariant(variant)),
         }
@@ -204,31 +203,26 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         &mut self,
         target_co2_concentration: Ratio,
     ) -> Result<Option<Ratio>, TransportError<I::BusError>> {
-        self.write_register(
-            PerformForcedRecalibration::default()
-                .with_target_co2_concentration(target_co2_concentration.get::<part_per_million>() as u16),
-        )
-        .await?;
-        self.delay.delay_ms(PerformForcedRecalibration::EXECUTION_TIME_MS).await;
-
         let frc_correction = self
-            .read_register::<PerformForcedRecalibrationResult>()
-            .await?
-            .read_correction();
-        Ok((frc_correction == u16::MAX).then(|| Ratio::new::<part_per_million>((frc_correction - 0x8000) as f64)))
+            .execute::<PerformForcedRecalibration>(
+                TargetCo2Concentration::default().with_target_co2_concentration(target_co2_concentration),
+            )
+            .await?;
+
+        Ok((frc_correction.read_raw_correction() != u16::MAX).then(|| frc_correction.read_correction()))
     }
 }
 
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ResettableDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::device::ResettableDevice
     for SCD41<D, I>
 {
     type Error = TransportError<I::BusError>;
@@ -236,19 +230,11 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     /// Resets the sensor by stopping any ongoing measurement, and resetting the device.
     async fn reset(&mut self) -> Result<(), Self::Error> {
         // Try to wake the sensor up
-        if self.write_register(WakeUp::default()).await.is_ok() {
-            self.delay.delay_ms(WakeUp::EXECUTION_TIME_MS).await;
-        }
-
+        let _ = self.execute::<WakeUp>(()).await;
         // Try to stop measurement if it is ongoing, otherwise ignore
-        if self.write_register(StopPeriodicMeasurement::default()).await.is_ok() {
-            self.delay.delay_ms(StopPeriodicMeasurement::EXECUTION_TIME_MS).await;
-        }
-
+        let _ = self.execute::<StopPeriodicMeasurement>(()).await;
         // Reset
-        self.write_register(Reinit::default()).await?;
-        self.delay.delay_ms(Reinit::EXECUTION_TIME_MS).await;
-
+        self.execute::<Reinit>(()).await?;
         Ok(())
     }
 }
@@ -256,13 +242,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ContinuousSensor
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::ContinuousSensor
     for SCD41<D, I>
 {
     type Error = TransportError<I::BusError>;
@@ -270,15 +256,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
     /// Starts continuous measurement.
     async fn start_measuring(&mut self) -> Result<(), Self::Error> {
-        self.write_register(StartPeriodicMeasurement::default()).await?;
-        self.delay.delay_ms(StartPeriodicMeasurement::EXECUTION_TIME_MS).await;
+        self.execute::<StartPeriodicMeasurement>(()).await?;
         Ok(())
     }
 
     /// Stops continuous measurement.
     async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
-        self.write_register(StopPeriodicMeasurement::default()).await?;
-        self.delay.delay_ms(StopPeriodicMeasurement::EXECUTION_TIME_MS).await;
+        self.execute::<StopPeriodicMeasurement>(()).await?;
         Ok(())
     }
 
@@ -289,19 +273,17 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
     /// Returns the most recent measurement.
     async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
-        let measurement = self.read_register::<ReadMeasurement>().await?.read_all();
+        let measurement = self.execute::<ReadMeasurement>(()).await?;
         Ok(Some(Measurement {
-            relative_humidity: Ratio::new::<percent>(measurement.relative_humidity as f64 / ((1 << 16) - 1) as f64),
-            temperature: ThermodynamicTemperature::new::<degree_celsius>(
-                -45.0 + (measurement.temperature as f64 * 175.0) / ((1 << 16) - 1) as f64,
-            ),
-            co2_concentration: Ratio::new::<part_per_million>(measurement.co2_concentration as f64),
+            relative_humidity: measurement.read_relative_humidity(),
+            temperature: measurement.read_temperature(),
+            co2_concentration: measurement.read_co2_concentration(),
         }))
     }
 
     /// Check if new measurements are available.
     async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.read_register::<DataReady>().await?.read_data_ready() != 0)
+        Ok(self.execute::<GetDataReady>(()).await?.read_data_ready() == DataReadyStatus::Ready)
     }
 
     /// Wait indefinitely until new measurements are available and return them. Checks whether data
@@ -319,14 +301,14 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ContinuousSensor,
         OneshotSensor
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::OneshotSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::OneshotSensor
     for SCD41<D, I>
 {
     type Error = TransportError<I::BusError>;
@@ -335,7 +317,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     /// Performs a one-shot measurement.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         use crate::sensor::ContinuousSensor;
-        self.write_register(MeasureSingleShot::default()).await?;
+        self.execute::<MeasureSingleShot>(()).await?;
         self.next_measurement().await
     }
 }

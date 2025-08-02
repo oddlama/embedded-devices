@@ -68,7 +68,7 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::registers::i2c::codecs::crc8_codec::CrcError;
 use registers::{
     DataReady, DeviceReset, MeasuredValuesMassConcentrationOnly, StartContinuousMeasurement, StopMeasurement,
@@ -103,7 +103,6 @@ pub struct Measurement {
 /// The SEN60 is a particulate matter (PM) sensor from Sensition's SEN6x sensor module family.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
@@ -119,6 +118,8 @@ pub struct SEN60<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Regi
     /// The interface to communicate with the device
     interface: I,
 }
+
+pub trait SEN60Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -144,7 +145,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Pm1Concentration, Pm2_5Concentration, Pm4Concentration, Pm10Concentration)]
 #[maybe_async_cfg::maybe(
     idents(

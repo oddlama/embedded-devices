@@ -1,46 +1,157 @@
-use bondrewd::BitfieldEnum;
-
+use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 
 use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
-/// At the end of every conversion, the device updates the temperature
-/// register with the conversion result.
-#[device_register(super::TMP102)]
-#[register(address = 0b0000, mode = "r", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Temperature {
-    /// The temperature in °C with a resolution of 7.8125m°C/LSB.
-    pub raw_temperature: i16,
+pub type TMP102I2cCodec = OneByteRegAddrCodec;
+
+interface_objects! {
+    register_defaults {
+        codec_error = (),
+        i2c_codec = TMP102I2cCodec,
+        spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
+    }
+
+    register_devices [ super::TMP102 ]
+
+    /// Temperature alert flag
+    enum AlertFlag: u8{1} {
+        /// The alert is unset
+        0 Cleared,
+        /// The associated alert was triggered
+        1 Set,
+    }
+
+    /// Conversion cycle time
+    #[allow(non_camel_case_types)]
+    enum ConversionCycleTime: u8{2} {
+        /// 4s
+        0b00 T_4000,
+        /// 1s
+        0b01 T_1000,
+        /// 250ms
+        0b10 T_250,
+        /// 125ms
+        0b11 T_125,
+    }
+
+    /// Therm/Alert mode
+    enum InterruptThermMode: u8{1} {
+        /// In this mode, the device compares the conversion result at the end of every conversion
+        /// with the values in the low limit register and high limit register and sets the high alert
+        /// status flag in the configuration register if the temperature exceeds the value in the
+        /// high limit register. When set, the device clears the high alert status flag if the conversion
+        /// result goes below the value in the low limit register.
+        /// This is the power-on default.
+        ///
+        /// Thus, the difference between the high and low limits effectively acts like a hysteresis.
+        /// In this mode, the low alert status flag is disabled and always reads 0. Unlike the alert
+        /// mode, I2C reads of the configuration register do not affect the status bits. The high alert
+        /// status flag is only set or cleared at the end of conversions based on the value of the
+        /// temperature result compared to the high and low limits.
+        0 Therm,
+        /// In this mode, the device compares the conversion result at the end of every
+        /// conversion with the values in the low limit register and high limit register.
+        /// If the temperature result exceeds the value in the high limit register,
+        /// the high alert status flag in the configuration register is set. On the other hand,
+        /// if the temperature result is lower than the value in the low limit register,
+        /// the alert status flag in the configuration register is set. It is cleared on temperature
+        /// register read.
+        ///
+        /// This mode effectively makes the device behave like a window limit detector.
+        /// Thus this mode can be used in applications where detecting if the temperature
+        /// goes outside of the specified range is necessary.
+        1 Interrupt,
+    }
+
+    /// Alert pin polarity
+    enum AlertPinPolarity: u8{1} {
+        /// Power-on default
+        0 ActiveLow,
+        1 ActiveHigh,
+    }
+
+    /// Fault Queue
+    #[allow(non_camel_case_types)]
+    enum FaultQueue: u8{2} {
+        /// Alert is triggered at the first event
+        0b00 F_1,
+        /// Two consecutive events are required to set the Alert
+        0b01 F_2,
+        /// Four consecutive events are required to set the Alert
+        0b10 F_4,
+        /// Six consecutive events are required to set the Alert
+        0b11 F_6,
+    }
+
+    /// Resolution. The TMP102 only supports 12 bits resolution. Read-only.
+    #[allow(non_camel_case_types)]
+    enum Resolution: u8{2} {
+        /// 12 bits resolution
+        0b11 R_12,
+        _ Invalid,
+    }
+
+    /// At the end of every conversion, the device updates the temperature
+    /// register with the conversion result.
+    register Temperature(addr = 0b0000, mode = r, size = 2) {
+        /// The temperature in °C with a resolution of 7.8125m°C/LSB.
+        raw_temperature: i16 = 0 => {
+            quantity: ThermodynamicTemperature,
+            unit: degree_celsius,
+            lsb: 1f64 / 128f64,
+        },
+    }
+
+    /// The device configuration register
+    register Configuration(addr = 0b0001, mode = rw, size = 2) {
+        oneshot: bool = false,
+        resolution: Resolution = Resolution::R_12,
+        fault_queue: FaultQueue = FaultQueue::F_1,
+        alert_polarity: AlertPinPolarity = AlertPinPolarity::ActiveLow,
+        alert_mode: InterruptThermMode = InterruptThermMode::Therm,
+        shutdown: bool = false,
+        /// Amount of time to wait between conversions.
+        conversion_cycle_time: ConversionCycleTime = ConversionCycleTime::T_250,
+        /// Set when the conversion result is higher than the high limit.
+        /// This flag is cleared on read except in Therm mode, where it is
+        /// cleared when the conversion result is lower than the hysteresis.
+        alert: AlertFlag = AlertFlag::Cleared,
+        extended: bool = false,
+        /// Reserved bits
+        _: u8{4},
+    }
+
+    /// This register stores the high limit for comparison with the temperature result
+    /// with a resolution is 7.8125m°C/LSB (but the ). The range of the register is ±256°C.
+    /// Following power-up or a general-call reset, the high-limit register is loaded with the
+    /// stored value from the EEPROM. The factory default reset value is 6000h (192°C).
+    register TemperatureLimitHigh(addr = 0b0010, mode = rw, size = 2) {
+        /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.
+        raw_temperature_limit: i16 = 0x6000 => {
+            quantity: ThermodynamicTemperature,
+            unit: degree_celsius,
+            lsb: 1f64 / 128f64,
+        },
+    }
+
+    /// This register stores the low limit for comparison with the temperature result
+    /// with a resolution is 7.8125m°C/LSB. The range of the register is ±256°C.
+    /// Following power-up or a general-call reset, the low-limit register is loaded with the
+    /// stored value from the EEPROM. The factory default reset value is 8000h (-256°C).
+    register TemperatureLimitLow(addr = 0b0011, mode = rw, size = 2) {
+        /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.
+        raw_temperature_limit: i16 = i16::MIN => {
+            quantity: ThermodynamicTemperature,
+            unit: degree_celsius,
+            lsb: 1f64 / 128f64,
+        },
+    }
 }
 
-/// Temperature alert flag.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum AlertFlag {
-    /// The alert is unset.
-    Cleared = 0,
-    /// The associated alert was triggered.
-    Set = 1,
-}
-
-/// Conversion cycle time.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-#[allow(non_camel_case_types)]
-pub enum ConversionCycleTime {
-    /// 4s
-    T_4000 = 0b00,
-    /// 1s
-    T_1000 = 0b01,
-    /// 250ms
-    T_250 = 0b10,
-    /// 125ms
-    T_125 = 0b11,
-}
 impl ConversionCycleTime {
-    /// Returns the averaging factor
+    /// Returns the conversion time in milliseconds
     pub fn conversion_time_ms(&self) -> u32 {
         match self {
             ConversionCycleTime::T_4000 => 4000,
@@ -50,170 +161,3 @@ impl ConversionCycleTime {
         }
     }
 }
-
-/// Therm/Alert mode.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum InterruptThermMode {
-    /// In this mode, the device compares the conversion result at the end of every conversion
-    /// with the values in the low limit register and high limit register and sets the high alert
-    /// status flag in the configuration register if the temperature exceeds the value in the
-    /// high limit register. When set, the device clears the high alert status flag if the conversion
-    /// result goes below the value in the low limit register.
-    /// This is the power-on default.
-    ///
-    /// Thus, the difference between the high and low limits effectively acts like a hysteresis.
-    /// In this mode, the low alert status flag is disabled and always reads 0. Unlike the alert
-    /// mode, I2C reads of the configuration register do not affect the status bits. The high alert
-    /// status flag is only set or cleared at the end of conversions based on the value of the
-    /// temperature result compared to the high and low limits.
-    Therm = 0,
-    /// In this mode, the device compares the conversion result at the end of every
-    /// conversion with the values in the low limit register and high limit register.
-    /// If the temperature result exceeds the value in the high limit register,
-    /// the high alert status flag in the configuration register is set. On the other hand,
-    /// if the temperature result is lower than the value in the low limit register,
-    /// the alert status flag in the configuration register is set. It is cleared on temperature
-    /// register read.
-    ///
-    /// This mode effectively makes the device behave like a window limit detector.
-    /// Thus this mode can be used in applications where detecting if the temperature
-    /// goes outside of the specified range is necessary.
-    Interrupt = 1,
-}
-
-/// Alert pin polarity.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum AlertPinPolarity {
-    /// Power-on default.
-    ActiveLow = 0,
-    ActiveHigh = 1,
-}
-
-/// Fault Queue
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-#[allow(non_camel_case_types)]
-pub enum FaultQueue {
-    /// Alert is triggered at the first event
-    F_1 = 0b00,
-    /// Two consecutive events are required to set the Alert
-    F_2 = 0b01,
-    /// Four consecutive events are required to set the Alert
-    F_4 = 0b10,
-    /// Six consecutive events are required to set the Alert
-    F_6 = 0b11,
-}
-
-/// Resolution. The TMP102 only supports 12 bits resolution. Read-only.
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-#[allow(non_camel_case_types)]
-pub enum Resolution {
-    /// 12 bits resolution
-    R_12 = 0b11,
-}
-
-/// The device configuration register.
-#[device_register(super::TMP102)]
-#[register(address = 0b0001, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct Configuration {
-    #[register(default = false)]
-    pub oneshot: bool,
-    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
-    #[register(default = Resolution::R_12)]
-    pub resolution: Resolution,
-    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
-    #[register(default = FaultQueue::F_1)]
-    pub fault_queue: FaultQueue,
-    #[bondrewd(enum_primitive = "u8", bit_length = 1)]
-    #[register(default = AlertPinPolarity::ActiveLow)]
-    pub alert_polarity: AlertPinPolarity,
-    #[bondrewd(enum_primitive = "u8", bit_length = 1)]
-    #[register(default = InterruptThermMode::Therm)]
-    pub alert_mode: InterruptThermMode,
-    #[register(default = false)]
-    pub shutdown: bool,
-    /// Amount of time to wait between conversions.
-    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
-    #[register(default = ConversionCycleTime::T_250)]
-    pub conversion_cycle_time: ConversionCycleTime,
-    /// Set when the conversion result is higher than the high limit.
-    /// This flag is cleared on read except in Therm mode, where it is
-    /// cleared when the conversion result is lower than the hysteresis.
-    #[bondrewd(enum_primitive = "u8", bit_length = 1)]
-    #[register(default = AlertFlag::Cleared)]
-    pub alert: AlertFlag,
-    #[register(default = false)]
-    pub extended: bool,
-    #[bondrewd(bit_length = 4, reserve)]
-    #[allow(dead_code)]
-    #[register(default = 0)]
-    pub reserved: u8,
-}
-
-macro_rules! define_temp_limit_register {
-    ($name:ident, $address:expr, $doc:expr) => {
-        #[doc = $doc]
-        #[device_register(super::TMP102)]
-        #[register(address = $address, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-        #[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-        pub struct $name {
-            /// The temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            pub raw_temperature_limit: i16,
-        }
-
-        impl $name {
-            /// Reads the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            pub fn read_temperature_limit(&self) -> ThermodynamicTemperature {
-                ThermodynamicTemperature::new::<degree_celsius>(self.read_raw_temperature_limit() as f64 / 128.0)
-            }
-
-            /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            /// The passed temperature will be truncated (rounded down).
-            pub fn write_temperature_limit(
-                &mut self,
-                temperature_limit: ThermodynamicTemperature,
-            ) -> Result<(), core::num::TryFromIntError> {
-                let temp = temperature_limit.get::<degree_celsius>();
-                let temp: i16 = ((temp * 128.0) as i32).try_into()?;
-                self.write_raw_temperature_limit(temp);
-                Ok(())
-            }
-
-            /// Writes the temperature limit in °C with a resolution of 7.8125m°C/LSB.
-            /// The passed temperature will be truncated (rounded down).
-            pub fn with_temperature_limit(
-                mut self,
-                temperature_limit: ThermodynamicTemperature,
-            ) -> Result<Self, core::num::TryFromIntError> {
-                self.write_temperature_limit(temperature_limit)?;
-                Ok(self)
-            }
-        }
-    };
-}
-
-define_temp_limit_register!(
-    TemperatureLimitHigh,
-    0b0010,
-    r#"
-This register stores the high limit for comparison with the temperature result
-with a resolution is 7.8125m°C/LSB (but the ). The range of the register is ±256°C.
-Following power-up or a general-call reset, the high-limit register is loaded with the
-stored value from the EEPROM. The factory default reset value is 6000h (192°C).
-"#
-);
-
-define_temp_limit_register!(
-    TemperatureLimitLow,
-    0b0011,
-    r#"
-This register stores the low limit for comparison with the temperature result
-with a resolution is 7.8125m°C/LSB. The range of the register is ±256°C.
-Following power-up or a general-call reset, the low-limit register is loaded with the
-stored value from the EEPROM. The factory default reset value is 8000h (-256°C).
-"#
-);

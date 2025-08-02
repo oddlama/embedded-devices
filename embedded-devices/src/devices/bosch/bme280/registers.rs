@@ -1,4 +1,3 @@
-use crate::devices::bosch::bme280::BME280CommonRegister;
 use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::{i2c::codecs::OneByteRegAddrCodec, spi::codecs::standard_codec::StandardCodec};
 
@@ -12,7 +11,7 @@ interface_objects! {
         spi_codec = BME280SpiCodec,
     }
 
-    register_devices [ BME280Common ]
+    register_devices [ super::BME280Common ]
 
     /// Known chip ids
     enum Chip: u8{8} {

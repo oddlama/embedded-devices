@@ -4,21 +4,21 @@ use proc_macro::TokenStream;
 use syn::DeriveInput;
 
 mod derive_measurement;
-mod device;
-mod device_impl;
+mod forward_command_fns;
+mod forward_register_fns;
 mod sensor;
 
 #[proc_macro_attribute]
-pub fn device(args: TokenStream, input: TokenStream) -> TokenStream {
-    match device::device(args.into(), input.into()) {
+pub fn forward_command_fns(args: TokenStream, input: TokenStream) -> TokenStream {
+    match forward_command_fns::forward_command_fns(args.into(), input.into()) {
         Ok(result) => result.into(),
         Err(e) => e.into_compile_error().into(),
     }
 }
 
 #[proc_macro_attribute]
-pub fn device_impl(args: TokenStream, input: TokenStream) -> TokenStream {
-    match device_impl::device_impl(args.into(), input.into()) {
+pub fn forward_register_fns(args: TokenStream, input: TokenStream) -> TokenStream {
+    match forward_register_fns::forward_register_fns(args.into(), input.into()) {
         Ok(result) => result.into(),
         Err(e) => e.into_compile_error().into(),
     }

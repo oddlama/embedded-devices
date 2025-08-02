@@ -204,12 +204,12 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 
 interface_objects! {
     struct Units(size = 4) {
-        raw_temperature: u16 = 75 {
+        raw_temperature: u16 = 75 => {
             quantity: ThermodynamicTemperature,
             unit: degree_celsius,
             lsb: 1f64 / 128f64,
         },
-        raw_pressure: u16 = 12 {
+        raw_pressure: u16 = 12 => {
             quantity: Pressure,
             unit: pascal,
             from_raw: |x| (x as f64 + 7.0) * 31.0,

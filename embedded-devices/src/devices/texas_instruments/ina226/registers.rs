@@ -1,4 +1,3 @@
-use crate::devices::texas_instruments::ina226::INA226Register;
 use embedded_interfaces::codegen::interface_objects;
 use embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec;
 
@@ -17,7 +16,7 @@ interface_objects! {
         spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
     }
 
-    register_devices [ INA226 ]
+    register_devices [ super::INA226 ]
 
     /// Conversion averaging counts
     #[allow(non_camel_case_types)]
@@ -94,7 +93,7 @@ interface_objects! {
     /// Shunt voltage measurement data
     register ShuntVoltage(addr = 0x01, mode = r, size = 2) {
         /// The raw voltage measurement with 2.5µV/LSB resolution
-        raw_value: i16 = 0 {
+        raw_value: i16 = 0 => {
             quantity: ElectricPotential,
             unit: volt,
             lsb: 1f64 / 400000f64,
@@ -104,7 +103,7 @@ interface_objects! {
     /// Bus voltage measurement data
     register BusVoltage(addr = 0x02, mode = r, size = 2) {
         /// The raw voltage measurement with 1.25mV/LSB resolution
-        raw_value: i16 = 0 {
+        raw_value: i16 = 0 => {
             quantity: ElectricPotential,
             unit: volt,
             lsb: 1f64 / 800f64,

@@ -1,2 +1,2 @@
 pub mod address;
-pub mod registers;
+pub mod commands;

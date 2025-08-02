@@ -2,7 +2,7 @@
 
 use super::ast::*;
 use syn::{
-    Attribute, Expr, Ident, Lit, LitInt, Token, Type,
+    Attribute, Expr, Ident, Lit, LitInt, Path, Token, Type,
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
     spanned::Spanned,
@@ -124,7 +124,7 @@ impl Parse for RegisterDevicesBlock {
         let content;
         syn::bracketed!(content in input);
 
-        let devices = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?
+        let devices = Punctuated::<Path, Token![,]>::parse_terminated(&content)?
             .into_iter()
             .collect();
 
@@ -434,7 +434,9 @@ impl Parse for FieldDefinition {
         };
 
         // Optional units block
-        let units = if input.peek(Brace) {
+        let units = if input.peek(Token![=>]) {
+            input.parse::<Token![=>]>()?;
+
             // Ensure name start with raw_
             if !name.to_string().starts_with("raw_") {
                 return Err(input.error("When providing units for a field, you must prefix the field name with `raw_`. Additional accessors without the raw prefix will be generated for the specified unit."));

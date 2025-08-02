@@ -5,35 +5,35 @@ use quote::{ToTokens, format_ident, quote};
 use syn::spanned::Spanned;
 
 #[derive(Debug, FromMeta)]
-struct DeviceImplArgs {}
+struct ForwardRegisterFnsArgs {}
 
-pub(crate) fn device_impl(args: TokenStream, orig_input: TokenStream) -> syn::Result<TokenStream> {
+pub(crate) fn forward_register_fns(args: TokenStream, orig_input: TokenStream) -> syn::Result<TokenStream> {
     let args_span = args.span();
-    let _args = DeviceImplArgs::from_list(&NestedMeta::parse_meta_list(args)?)?;
+    let _args = ForwardRegisterFnsArgs::from_list(&NestedMeta::parse_meta_list(args)?)?;
     let mut item_impl = syn::parse2::<syn::ItemImpl>(orig_input.clone())?;
 
     let syn::Type::Path(self_ty_path) = item_impl.self_ty.as_ref() else {
         return Err(syn::Error::new(
             args_span,
-            "Could not parse device identifier as path. This should not happen, please report this as a bug.",
+            "Could not parse identifier as path. This should not happen, please report this as a bug.",
         ));
     };
     let mut register_marker = self_ty_path.clone();
     let Some(last_segment) = register_marker.path.segments.last_mut() else {
         return Err(syn::Error::new(
             args_span,
-            "Could not parse device identifier as path. This should not happen, please report this as a bug.",
+            "Could not parse identifier as path. This should not happen, please report this as a bug.",
         ));
     };
     last_segment.ident = format_ident!("{}Register", last_segment.ident);
     last_segment.arguments = syn::PathArguments::None;
 
     let read_register_doc = format!(
-        "Reads from the given register. For a list of all available registers, refer to implentors of [`{}`].",
+        "Reads from the given register. For a list of all available registers, refer to implementors of [`{}`].",
         register_marker.to_token_stream()
     );
     let write_register_doc = format!(
-        "Writes to the given register. For a list of all available registers, refer to implentors of [`{}`].",
+        "Writes to the given register. For a list of all available registers, refer to implementors of [`{}`].",
         register_marker.to_token_stream()
     );
 

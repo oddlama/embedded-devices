@@ -8,14 +8,13 @@ use crate::{TransportError, commands::Command};
 #[allow(async_fn_in_trait)]
 pub trait Executor: crate::commands::r#Executor {
     /// Execute the given command through the given SPI interface
-    async fn execute<C, D, I>(
+    async fn execute<D, I>(
         delay: &mut D,
         interface: &mut I,
-        input: impl AsRef<C::In>,
-    ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
+        input: <Self::Command as Command>::In,
+    ) -> Result<<Self::Command as Command>::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
-        C: Command<ExecutorError = Self::Error>,
         I: hal::spi::r#SpiDevice;
 }
 
@@ -35,12 +34,12 @@ where
     async fn execute<C, D>(
         &mut self,
         delay: &mut D,
-        input: impl AsRef<C::In>,
+        input: C::In,
     ) -> Result<C::Out, TransportError<C::ExecutorError, Self::BusError>>
     where
         D: hal::delay::DelayNs,
         C: Command,
     {
-        <C::SpiExecutor as Executor>::execute::<C, D, I>(delay, &mut self.interface, input).await
+        <C::SpiExecutor as Executor>::execute::<D, I>(delay, &mut self.interface, input).await
     }
 }

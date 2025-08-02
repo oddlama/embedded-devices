@@ -75,7 +75,7 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use uom::si::f64::{Pressure, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
@@ -205,7 +205,6 @@ impl CalibrationData {
 /// module is housed in an extremely compact 10-pin metal-lid LGA package with a footprint of only 2.0 × 2.0 mm² and max 0.8
 /// mm package height. Its small dimensions and its low power consumption of 3.2 μA @1Hz allow the implementation in battery
 /// driven devices such as mobile phones, GPS modules or watches.
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -219,6 +218,8 @@ pub struct BMP390<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Reg
     /// Calibration data
     pub(super) calibration_data: Option<CalibrationData>,
 }
+
+pub trait BMP390Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -270,7 +271,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Temperature, Pressure)]
 #[maybe_async_cfg::maybe(
     idents(

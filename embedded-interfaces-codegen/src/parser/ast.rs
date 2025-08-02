@@ -1,7 +1,7 @@
 //! Abstract Syntax Tree definitions
 
 use proc_macro2::Span;
-use syn::{Attribute, Expr, Ident, Lit, LitInt, Type};
+use syn::{Attribute, Expr, Ident, Lit, LitInt, Path, Type};
 
 pub(crate) const ALLOWED_REGISTER_ATTRS: &[&str] = &["addr", "mode", "size", "i2c_codec", "spi_codec", "codec_error"];
 pub(crate) const ALLOWED_STRUCT_ATTRS: &[&str] = &["size"];
@@ -40,7 +40,7 @@ pub struct Attr {
 /// Devices block: register_devices [ DeviceA, DeviceB, ... ]
 #[derive(Debug, Clone)]
 pub struct RegisterDevicesBlock {
-    pub devices: Vec<Ident>,
+    pub devices: Vec<Path>,
 }
 
 /// Individual register definition

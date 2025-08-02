@@ -2,6 +2,7 @@ use crate::TransportError;
 
 pub mod i2c;
 pub mod spi;
+pub mod unsupported_executor;
 
 /// A base trait for all executors
 pub trait Executor {
@@ -59,7 +60,7 @@ pub trait CommandInterface {
     async fn execute<C, D>(
         &mut self,
         delay: &mut D,
-        input: impl AsRef<C::In>,
+        input: C::In,
     ) -> Result<C::Out, TransportError<C::ExecutorError, Self::BusError>>
     where
         D: hal::delay::DelayNs,

@@ -68,7 +68,7 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use uom::si::f64::ThermodynamicTemperature;
 
@@ -106,7 +106,6 @@ pub struct Measurement {
 /// -20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -118,6 +117,8 @@ pub struct MCP9808<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Re
     /// The interface to communicate with the device
     interface: I,
 }
+
+pub trait MCP9808Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -143,7 +144,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),

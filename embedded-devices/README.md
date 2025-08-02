@@ -11,7 +11,7 @@ This project contains a collection of drivers for embedded devices, as well as a
 framework to make building drivers more streamlined and simple. As a user
 you get:
 
-- ✅ **Type-safe and ergonomic access** to all device registers and functions
+- ✅ **Type-safe and ergonomic access** to all device registers and commands
 - 📚 **Thorough documentation** for each device based on the original datasheets
 - 🧵 **Supports both sync and async** usage for each driver - simultaneously if needed
 - 🧩 **Consistent interaction** with all devices following the same principles
@@ -22,8 +22,8 @@ Please refer to the list below for supported devices. For driver developers,
 this framework aims to make it a lot easier to write consistent and
 fully-featured drivers:
 
-- ✨ **Effortless, type-safe representation** of registers - capture exactly what has been specified in the datasheet
-- ⚡ **Zero-cost abstractions** for efficient register access
+- ✨ **Effortless, type-safe representation** of bit packed structs like registers or commands let's you capture exactly what has been specified in the datasheet
+- ⚡ **Zero-cost abstractions** for resource-efficient access to packed struct members
 - 🧰 **Unified framework** for building and extending drivers
 - 🔄 **Reusable codecs** to handle extended communication protocols (e.g. CRC checks over I2C/SPI)
 
@@ -34,10 +34,10 @@ fully-featured drivers:
 
 This project contains of several crates:
 
-- [embedded-devices](./embedded-devices) - contains the actual driver implementations for real hardware
-- [embedded-registers](./embedded-registers) - provides the abstraction to define and use registers over I2C/SPI, used heavily by embedded-devices
-- [embedded-registers-derive](./embedded-registers-derive), a proc-macro to reduce boilerplate for register definitions
-- [embedded-devices-derive](./embedded-registers-derive), a proc-macro to reduce boilerplate for device definitions
+- [embedded-devices](./embedded-devices), contains the actual driver implementations for real hardware ICs
+- [embedded-devices-derive](./embedded-devices-derive), a proc-macro to reduce boilerplate for device definitions
+- [embedded-interfaces](./embedded-interfaces), provides the main abstractions for register- or command-based interfaces over I2C/SPI
+- [embedded-interfaces-codegen](./embedded-interfaces-codegen), a proc-macro to reduce boilerplate for interface definitions including bit-packed structs, enums and registers
 
 ## Supported Devices
 
@@ -131,24 +131,38 @@ device requires a more complex codec.
 
 ### Register based devices
 
-The [embedded-registers](./embedded-registers) crate provides a generic way to define registers, and an interface implementation
-to allow reading and writing those registers via I2C or SPI.
+The [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/) crate provides a simple way to
+define bit-packed registers, as well as an interface implementation to allow
+reading and writing those registers via I2C or SPI.
 
-A register usually refers to a specific memory address (or consecutive memory region) on the device by
-specifiying its start address. We also associate each register to a specific device by
-specifying a marker trait. This prevents the generated API from accepting registers of unrelated devices.
-In the following, we'll have a short look at how to define and work with register based devices.
+A register usually refers to a specific memory address (or consecutive memory
+region) on the device by specifiying its start address. We also associate each
+register to a specific device by specifying a marker trait. This prevents the
+generated API from accepting registers of unrelated devices. In the following,
+we'll have a short look at how to define and work with register based devices.
+
+### Command based devices
+
+This framework also provides a more generic concept to interface with devices,
+which are called commands. A commands is a very general concept that represents
+a sequence of read, write or delay operations on the underlaying bus. A command
+may take input data and may produce output data.
+
+For each type of command, an executor needs to be defined that realizes the
+execution of the associated transaction sequence on the actual bus. For an
+example, have a look at any of the sensirion device drivers.
+
+[embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/) crate provides a simple way to
 
 ### Defining a register
 
 First, lets start with a very simple register definition. We will later create
 a device struct which we can use to read and write this register.
 
-To define our very simple register, we
-
-1. Specify the device it belongs to using the `#[device_register(MyDevice)]` macro. The mentioned device will be created later.
-2. Define its address and access mode (read-only, write-only, read-write) using the `#[register(...)]` macro,
-3. Describe its internal structure with [bondrewd](https://github.com/Devlyn-Nelson/Bondrewd), a flexible bitfield macro crate.
+To define our very simple register, we will use the special
+`interface_objects!` macro from
+[embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/)
+which was creates specifically for this crate to make it simple and straight-forward to define bit-packed structs and registers.
 
 Most devices support a burst-read/write operations, where you can begin reading from address `A` and will automatically receive
 values from the consecutive memory region until you stop reading. This means you can define registers with a `size > 1 byte`
@@ -158,38 +172,42 @@ Let's imagine our `MyDevice` had a 2-byte read-write register at device address 
 We can define the corresponding register like so:
 
 ```rust
-/// Insert explanation of this register from the datasheet.
-#[device_register(MyDevice)]
-#[register(address = 0x42, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 2)]
-pub struct ValueRegister {
-    /// Insert explanation of this value from the datasheet.
-    pub width: u8,
-    /// Insert explanation of this value from the datasheet.
-    pub height: u8,
+use embedded_interfaces::codegen::interface_objects;
+
+interface_objects! {
+    // We specify the default codecs used by our device
+    register_defaults {
+        codec_error = (),
+        i2c_codec = embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec,
+        spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
+    }
+
+    // This marks any registers defined in this macro as compatible with our device
+    register_devices [ MyDevice ]
+
+    /// You can later insert the explanation for this register from the datasheet.
+    register ValueRegister(addr=0x42, mode=rw, size=2) {
+        /// Insert explanation of this value from the datasheet.
+        width: u8,
+        /// Insert explanation of this value from the datasheet.
+        height: u8,
+    }
 }
 ```
 
-This macro combination generates two structs: `ValueRegister` (the packed
-representation) and `ValueRegisterBitfield` (the unpacked fields). The former
-will only contain a byte array `[u8; N]` to store the packed register contents,
-and the latter will have the unpacked fields as we defined them. Usually we
-will interface with a device using the packed data representation which can be
-transferred over the bus as-is. Each field will automatically get accessor
-functions with which you may read or write them without incurring the overhead
-for full (de-)serialization.
+This macro generates two structs: `ValueRegister` (the packed representation)
+and `ValueRegisterUnpacked` (the unpacked representation). The former will only
+contain a byte array `[u8; N]` to store the packed register contents, and the
+latter will have the unpacked fields as we defined them. Usually we will
+interface with a device using the packed data representation which can be
+transferred over the bus almost as-is. Each field will automatically get
+accessor functions with which you may read or write them without incurring the
+overhead for full (de-)serialization.
 
 The given codec provides then necessary information about the protocol that is
 needed to access the register on a certain bus. It can determine how the
 register address is used on the wire and could do extra checks like CRC
 checksums.
-
-> \[!NOTE]
-> I find it a bit misleading that the members written in `ValueRegister` end up in `ValueRegisterBitfield`.
-> So this might change in the future, but I currently cannot think of another design that is as simple
-> to use as the one we have now. The issue is that we need a struct for the packed data and one for
-> the unpacked data. Since we usually deal with the packed data, and want to allow direct read/write
-> operations on the packed data for performance, the naming gets confusing quite quickly.
 
 ### Accessing a register
 
@@ -205,15 +223,15 @@ let mut reg = dev.read_register::<ValueRegister>().await?;
 println!("{}", reg.read_width());
 // If you need all fields (or are not bound to tight resource constraints),
 // you can also unpack all fields and access them more conveniently
-let data = reg.read_all();
-// All bitfields implement Debug and defmt::Format, so you can conveniently
-// print the contents
+let data = reg.unpack();
+// All representations implement Debug and defmt::Format, so you can conveniently
+// print their contents
 println!("{:?}", data);
 
 // We can also change a single value
 reg.write_height(190);
-// Or pack a bitfield and replace everything
-reg.write_all(data); // same as reg = ValueRegister::new(data);
+// Or re-pack a whole unpacked field and replace everything
+reg = data.pack();
 
 // Which we can now write back to the device, given that the register is writable.
 dev.write_register(reg).await?;
@@ -221,36 +239,41 @@ dev.write_register(reg).await?;
 
 ### A more complex register
 
-A real-world application may involve describing registers with more complex layouts involving
-different data types or even enumerations. Luckily, all of this is fairly simple with bondrewd.
+A real-world application may involve describing registers with more complex
+layouts involving different data types, bit lengths or enumerations. Luckily,
+all of this is fairly simple with [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/).
 
-We also make sure to annotate all fields with `#[register(default = ...)]` to allow
-easy reconstruction of the power-up defaults.
+We also make sure to annotate all fields with `= /* default */` to allow easy
+reconstruction of the power-up defaults.
 
 ```rust
-#[allow(non_camel_case_types)]
-#[derive(BitfieldEnum, Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
-#[bondrewd_enum(u8)]
-pub enum TemperatureResolution {
-    Deg_0_5C = 0b00,
-    Deg_0_25C = 0b01,
-    Deg_0_125C = 0b10,
-    Deg_0_0625C = 0b11,
-}
+use embedded_interfaces::codegen::interface_objects;
 
-#[device_register(MyDevice)]
-#[register(address = 0x44, mode = "rw", i2c_codec = "OneByteRegAddrCodec")]
-#[bondrewd(read_from = "msb0", default_endianness = "be", enforce_bytes = 1)]
-pub struct ComplexRegister {
-    #[bondrewd(bit_length = 6, reserve)]
-    #[allow(dead_code)]
-    pub reserved: u8,
+interface_objects! {
+    register_defaults {
+        codec_error = (),
+        i2c_codec = embedded_interfaces::registers::i2c::codecs::OneByteRegAddrCodec,
+        spi_codec = embedded_interfaces::registers::spi::codecs::unsupported_codec::UnsupportedCodec::<()>,
+    }
 
-    /// All fields should be documented with data from the datasheet.
-    /// This docstring will also be copied to all generated read/write functions
-    #[bondrewd(enum_primitive = "u8", bit_length = 2)]
-    #[register(default = TemperatureResolution::Deg_0_0625C)]
-    pub temperature_resolution: TemperatureResolution,
+    register_devices [ MyDevice ]
+
+    /// An enum
+    enum TemperatureResolution: u8{2} {
+        0b00 Deg_0_5C,
+        0b01 Deg_0_25C,
+        0b10 Deg_0_125C,
+        0b11 Deg_0_0625C,
+    }
+
+    /// A slightly more complex register
+    register ComplexRegister(addr=0x44, mode=rw, size=1) {
+        // Reserve 6 bits
+        _: u8{6},
+        /// All fields should be documented with data from the datasheet.
+        /// This docstring will also be copied to all generated read/write functions
+        temperature_resolution: TemperatureResolution = TemperatureResolution::Deg_0_0625C,
+    }
 }
 ```
 
@@ -263,10 +286,10 @@ pub struct ComplexRegister {
 Now we also need to define our device so we can actually use the register.
 Imagine our simple device would communicate over I2C only.
 
-First of all, we create a struct for it and annotate it with `#[device]`. This
-struct stores the runtime state necessary to use our device, such as the
-communication interface. The macro just defines a marker trait which we will
-need later to define associated registers.
+First of all, we create a struct for it which stores the runtime state
+necessary to use our device, such as the communication interface. Additionally
+we define a marker trait which we will need later to define associated
+registers.
 
 Also, we always write async code and let the `#[maybe_async_cfg::maybe]` macro
 rewrite our definition twice to provide a `MyDeviceSync` and `MyDeviceAsync`
@@ -275,7 +298,6 @@ variant, too:
 
 ```rust
 /// Insert description from datasheet.
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -285,10 +307,12 @@ pub struct MyDevice<I: embedded_interfaces::registers::RegisterInterface> {
     /// The interface to communicate with the device
     interface: I,
 }
+
+pub trait MyDeviceRegister {}
 ```
 
 The register interface `I` can be anything that implements the corresponding
-trait from `embedded-registers` - which requires that the interface exposes
+trait from `embedded-interfaces` - which requires that the interface exposes
 `read_register` and `write_register` functions. These function will later be
 used to actually read or write a specific register. But before we can do that,
 we still need to add a constructor to our device.
@@ -320,7 +344,7 @@ where
 }
 ```
 
-Here we use the `I2cDevice` interface provided by `embedded-registers`, which
+Here we use the `I2cDevice` interface provided by `embedded-interfaces`, which
 already implements the necessary trait from above. This means we pass down the
 given interface implementation plus some compile time information like the kind
 of I2C address that the device uses (7/10-bit). In turn, `I2cDevice` provides a
@@ -340,7 +364,7 @@ device to make it convenient for a user to use these without first requiring
 them to get the interface.
 
 Since this is something every device will do, we again have a convenience macro
-`#[device_impl]` that lifts these functions into the device.
+`#[forward_register_fns]` that lifts these functions into the device.
 
 The last step - apart from defining registers - is to expose some convenience
 functions for our device. The classics are things like `init`, `reset`,
@@ -348,7 +372,7 @@ functions for our device. The classics are things like `init`, `reset`,
 anything that makes the device easy to use.
 
 ```rust
-#[device_impl]
+#[forward_register_fns]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -378,13 +402,8 @@ impl<I: embedded_interfaces::registers::RegisterInterface> MyDevice<I> {
 
 ### Definining registers
 
-For an in-depth explanation of how registers are defined, please
-please refer to the [embedded-registers-derive](https://docs.rs/embedded-registers-derive/latest/embedded_registers_derive/) docs.
-
-### Register and interface traits
-
-For an in-depth explanation of how the defined registers are used,
-please refer to the [embedded-registers](https://docs.rs/embedded-registers/latest/embedded_registers/) docs.
+For an in-depth explanation of how registers are defined and how they can be used, please
+please refer to the [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/) docs.
 
 ## Device driver best-practices
 

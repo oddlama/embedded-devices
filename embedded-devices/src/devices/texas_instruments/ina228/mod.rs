@@ -102,7 +102,7 @@ use crate::utils::from_bus_error;
 
 use self::address::Address;
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use registers::AdcRange;
 use uom::si::electric_current::ampere;
@@ -187,7 +187,6 @@ pub struct Measurement {
 /// voltage support from –0.3 V to +85 V.
 ///
 /// For a full description and usage examples, refer to the [module documentation](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -207,6 +206,8 @@ pub struct INA228<D: hal::delay::DelayNs, I: embedded_interfaces::registers::Reg
     /// The configured adc range
     pub adc_range: self::registers::AdcRange,
 }
+
+pub trait INA228Register {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -236,7 +237,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[sensor(Voltage, Temperature, Current, Power, Energy, Charge)]
 #[maybe_async_cfg::maybe(
     idents(
@@ -398,8 +399,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
                 let measurement = Measurement {
                     shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
-                    bus_voltage: bus_voltage.read_voltage(),
-                    temperature: temperature.read_temperature(),
+                    bus_voltage: bus_voltage.read_value(),
+                    temperature: temperature.read_value(),
                     current: current.read_current(self.current_lsb_na),
                     power: power.read_power(self.current_lsb_na),
                     energy: energy.read_energy(self.current_lsb_na),
@@ -486,8 +487,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
         let measurement = Measurement {
             shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
-            bus_voltage: bus_voltage.read_voltage(),
-            temperature: temperature.read_temperature(),
+            bus_voltage: bus_voltage.read_value(),
+            temperature: temperature.read_value(),
             current: current.read_current(self.current_lsb_na),
             power: power.read_power(self.current_lsb_na),
             energy: energy.read_energy(self.current_lsb_na),
@@ -524,8 +525,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
                 let measurement = Measurement {
                     shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
-                    bus_voltage: bus_voltage.read_voltage(),
-                    temperature: temperature.read_temperature(),
+                    bus_voltage: bus_voltage.read_value(),
+                    temperature: temperature.read_value(),
                     current: current.read_current(self.current_lsb_na),
                     power: power.read_power(self.current_lsb_na),
                     energy: energy.read_energy(self.current_lsb_na),

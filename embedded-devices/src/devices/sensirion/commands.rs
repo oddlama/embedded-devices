@@ -19,8 +19,6 @@ pub trait SensirionCommand {
     /// This reflects the execution time for this command in milliseconds, if specified in the
     /// datasheet.
     const EXECUTION_TIME_MS: u32;
-    /// Whether this command can be executed during measurement
-    const DURING_MEASUREMENT: bool;
 }
 
 /// This trait represents a send-command as specified by Sensirion. It consists of sending a
@@ -52,8 +50,11 @@ pub trait SensirionWriteReadCommand:
 {
 }
 
-define_executor!(SensirionSendCommandExecutor, SensirionSendCommand, ());
-define_executor!(SensirionWriteCommandExecutor, SensirionWriteCommand, ());
+// Crc8Error is technically not needed for send and write, but we use it anyway to make
+// the interface more usable. Otherwise we'd need a ton of fallible error conversions.
+// FIXME: try to rework this once the never type is stable and we can express that this can't error, ever.
+define_executor!(SensirionSendCommandExecutor, SensirionSendCommand, Crc8Error);
+define_executor!(SensirionWriteCommandExecutor, SensirionWriteCommand, Crc8Error);
 define_executor!(SensirionReadCommandExecutor, SensirionReadCommand, Crc8Error);
 define_executor!(SensirionWriteReadCommandExecutor, SensirionWriteReadCommand, Crc8Error);
 
@@ -67,7 +68,7 @@ impl<C: SensirionSendCommand> embedded_interfaces::commands::i2c::Executor for S
     async fn execute<D, I, A>(
         delay: &mut D,
         bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
-        _input: impl AsRef<C::In>,
+        _input: C::In,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
@@ -91,7 +92,7 @@ impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for 
     async fn execute<D, I, A>(
         delay: &mut D,
         bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
-        input: impl AsRef<C::In>,
+        input: C::In,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
@@ -107,7 +108,7 @@ impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for 
             .expect("Command id is too large for command buffer");
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
-        let data = bytemuck::bytes_of(input.as_ref());
+        let data = bytemuck::bytes_of(&input);
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
@@ -133,7 +134,7 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
     async fn execute<D, I, A>(
         delay: &mut D,
         bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
-        _input: impl AsRef<C::In>,
+        _input: C::In,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
@@ -184,7 +185,7 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
     async fn execute<D, I, A>(
         delay: &mut D,
         bound_bus: &mut embedded_interfaces::i2c::I2cBoundBus<I, A>,
-        input: impl AsRef<C::In>,
+        input: C::In,
     ) -> Result<C::Out, TransportError<Self::Error, I::Error>>
     where
         D: hal::delay::DelayNs,
@@ -201,7 +202,7 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
             .expect("Command id is too large for command buffer");
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
-        let data = bytemuck::bytes_of(input.as_ref());
+        let data = bytemuck::bytes_of(&input);
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
@@ -238,3 +239,253 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         Ok(out)
     }
 }
+
+#[allow(unused)]
+macro_rules! define_send_command {
+    ($name:ident, id_len=$id_len:literal, id=$id:expr, time=$time_ms:expr) => {
+        impl embedded_interfaces::commands::Command for $name {
+            type In = ();
+            type Out = ();
+            type ExecutorError = crate::devices::sensirion::commands::Crc8Error;
+            type SpiExecutor = embedded_interfaces::commands::unsupported_executor::UnsupportedExecutor<
+                crate::devices::sensirion::commands::Crc8Error,
+                Self,
+            >;
+            type I2cExecutor = crate::devices::sensirion::commands::SensirionSendCommandExecutor<Self>;
+        }
+        impl crate::devices::sensirion::commands::SensirionCommand for $name {
+            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID: u64 = $id;
+            const EXECUTION_TIME_MS: u32 = $time_ms;
+        }
+        impl crate::devices::sensirion::commands::SensirionSendCommand for $name {}
+    };
+}
+#[allow(unused)]
+pub(crate) use define_send_command;
+
+#[allow(unused)]
+macro_rules! define_write_command {
+    ($name:ident, id_len=$id_len:literal, id=$id:expr, time=$time_ms:expr, in=$in:ty) => {
+        impl embedded_interfaces::commands::Command for $name {
+            type In = $in;
+            type Out = ();
+            type ExecutorError = crate::devices::sensirion::commands::Crc8Error;
+            type SpiExecutor = embedded_interfaces::commands::unsupported_executor::UnsupportedExecutor<
+                crate::devices::sensirion::commands::Crc8Error,
+                Self,
+            >;
+            type I2cExecutor = crate::devices::sensirion::commands::SensirionWriteCommandExecutor<Self>;
+        }
+        impl crate::devices::sensirion::commands::SensirionCommand for $name {
+            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID: u64 = $id;
+            const EXECUTION_TIME_MS: u32 = $time_ms;
+        }
+        impl crate::devices::sensirion::commands::SensirionWriteCommand for $name {}
+    };
+}
+#[allow(unused)]
+pub(crate) use define_write_command;
+
+#[allow(unused)]
+macro_rules! define_read_command {
+    ($name:ident, id_len=$id_len:literal, id=$id:expr, time=$time_ms:expr, out=$out:ty) => {
+        impl embedded_interfaces::commands::Command for $name {
+            type In = ();
+            type Out = $out;
+            type ExecutorError = crate::devices::sensirion::commands::Crc8Error;
+            type SpiExecutor = embedded_interfaces::commands::unsupported_executor::UnsupportedExecutor<
+                crate::devices::sensirion::commands::Crc8Error,
+                Self,
+            >;
+            type I2cExecutor = crate::devices::sensirion::commands::SensirionReadCommandExecutor<Self>;
+        }
+        impl crate::devices::sensirion::commands::SensirionCommand for $name {
+            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID: u64 = $id;
+            const EXECUTION_TIME_MS: u32 = $time_ms;
+        }
+        impl crate::devices::sensirion::commands::SensirionReadCommand for $name {}
+    };
+}
+#[allow(unused)]
+pub(crate) use define_read_command;
+
+#[allow(unused)]
+macro_rules! define_write_read_command {
+    ($name:ident, id_len=$id_len:literal, id=$id:expr, time=$time_ms:expr, in=$in:ty, out=$out:ty) => {
+        impl embedded_interfaces::commands::Command for $name {
+            type In = $in;
+            type Out = $out;
+            type ExecutorError = crate::devices::sensirion::commands::Crc8Error;
+            type SpiExecutor = embedded_interfaces::commands::unsupported_executor::UnsupportedExecutor<
+                crate::devices::sensirion::commands::Crc8Error,
+                Self,
+            >;
+            type I2cExecutor = crate::devices::sensirion::commands::SensirionWriteReadCommandExecutor<Self>;
+        }
+        impl crate::devices::sensirion::commands::SensirionCommand for $name {
+            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID: u64 = $id;
+            const EXECUTION_TIME_MS: u32 = $time_ms;
+        }
+        impl crate::devices::sensirion::commands::SensirionWriteReadCommand for $name {}
+    };
+}
+#[allow(unused)]
+pub(crate) use define_write_read_command;
+
+macro_rules! define_sensirion_commands {
+    // Main entry point - parse the marker section first
+    (
+        id_len $id_len:literal;
+        marker [
+            $(($feature:literal, $trait_path:path)),* $(,)?
+        ];
+        $($rest:tt)*
+    ) => {
+        define_sensirion_commands! {
+            @id_len $id_len;
+            @markers [$(($feature, $trait_path)),*];
+            @parse [$($rest)*]
+        }
+    };
+
+    // Parse individual command definitions
+    (
+        @id_len $id_len:literal;
+        @markers [$($markers:tt)*];
+        @parse [
+            $(#[doc = $doc:literal])*
+            send $id:literal time_ms=$time:literal $name:ident();
+            $($rest:tt)*
+        ]
+    ) => {
+        define_sensirion_commands! { @emit_send { [$( #[doc = $doc] )*], $name, $id_len, $id, $time } }
+        define_sensirion_commands! { @emit_impls { $name, [$($markers)*] } }
+        define_sensirion_commands! {
+            @id_len $id_len;
+            @markers [$($markers)*];
+            @parse [$($rest)*]
+        }
+    };
+
+    (
+        @id_len $id_len:literal;
+        @markers [$($markers:tt)*];
+        @parse [
+            $(#[doc = $doc:literal])*
+            read $id:literal time_ms=$time:literal $name:ident() -> $out:ty;
+            $($rest:tt)*
+        ]
+    ) => {
+        define_sensirion_commands! { @emit_read { [$( #[doc = $doc] )*], $name, $id_len, $id, $time, $out } }
+        define_sensirion_commands! { @emit_impls { $name, [$($markers)*] } }
+        define_sensirion_commands! {
+            @id_len $id_len;
+            @markers [$($markers)*];
+            @parse [$($rest)*]
+        }
+    };
+
+    (
+        @id_len $id_len:literal;
+        @markers [$($markers:tt)*];
+        @parse [
+            $(#[doc = $doc:literal])*
+            write $id:literal time_ms=$time:literal $name:ident($in:ty);
+            $($rest:tt)*
+        ]
+    ) => {
+        define_sensirion_commands! { @emit_write { [$( #[doc = $doc] )*], $name, $id_len, $id, $time, $in } }
+        define_sensirion_commands! { @emit_impls { $name, [$($markers)*] } }
+        define_sensirion_commands! {
+            @id_len $id_len;
+            @markers [$($markers)*];
+            @parse [$($rest)*]
+        }
+    };
+
+    (
+        @id_len $id_len:literal;
+        @markers [$($markers:tt)*];
+        @parse [
+            $(#[doc = $doc:literal])*
+            write_read $id:literal time_ms=$time:literal $name:ident($in:ty) -> $out:ty;
+            $($rest:tt)*
+        ]
+    ) => {
+        define_sensirion_commands! { @emit_write_read { [$( #[doc = $doc] )*], $name, $id_len, $id, $time, $in, $out } }
+        define_sensirion_commands! { @emit_impls { $name, [$($markers)*] } }
+        define_sensirion_commands! {
+            @id_len $id_len;
+            @markers [$($markers)*];
+            @parse [$($rest)*]
+        }
+    };
+
+    // Base case - no more commands to parse
+    (
+        @id_len $id_len:literal;
+        @markers [$($markers:tt)*];
+        @parse []
+    ) => {};
+
+    // Emit the actual command definitions
+    (@emit_send { [$( $doc:tt )*], $name:ident, $id_len:literal, $id:literal, $time:literal }) => {
+        $( $doc )*
+        #[doc = ""]
+        #[doc = concat!("Execution time (ms): `", stringify!($time), "`")]
+        pub struct $name {}
+
+        crate::devices::sensirion::commands::define_send_command!($name, id_len=$id_len, id=$id, time=$time);
+    };
+
+    (@emit_read { [$( $doc:tt )*], $name:ident, $id_len:literal, $id:literal, $time:literal, $out:ty }) => {
+        $( $doc )*
+        #[doc = ""]
+        #[doc = concat!("Out: [`", stringify!($out), "`]")]
+        #[doc = ""]
+        #[doc = concat!("Execution time (ms): `", stringify!($time), "`")]
+        pub struct $name {}
+
+        crate::devices::sensirion::commands::define_read_command!($name, id_len=$id_len, id=$id, time=$time, out=$out);
+    };
+
+    (@emit_write { [$( $doc:tt )*], $name:ident, $id_len:literal, $id:literal, $time:literal, $in:ty }) => {
+        $( $doc )*
+        #[doc = ""]
+        #[doc = concat!("In: [`", stringify!($in), "`]")]
+        #[doc = ""]
+        #[doc = concat!("Execution time (ms): `", stringify!($time), "`")]
+        pub struct $name {}
+
+        crate::devices::sensirion::commands::define_write_command!($name, id_len=$id_len, id=$id, time=$time, in=$in);
+    };
+
+    (@emit_write_read { [$( $doc:tt )*], $name:ident, $id_len:literal, $id:literal, $time:literal, $in:ty, $out:ty }) => {
+        $( $doc )*
+        #[doc = ""]
+        #[doc = concat!("In: [`", stringify!($in), "`]")]
+        #[doc = ""]
+        #[doc = concat!("Out: [`", stringify!($out), "`]")]
+        #[doc = ""]
+        #[doc = concat!("Execution time (ms): `", stringify!($time), "`")]
+        pub struct $name {}
+
+        crate::devices::sensirion::commands::define_write_read_command!($name, id_len=$id_len, id=$id, time=$time, in=$in, out=$out);
+    };
+
+    // Emit trait implementations for all markers
+    (
+        @emit_impls { $name:ident, [$(($feature:literal, $trait_path:path)),*] }
+    ) => {
+        $(
+            #[cfg(feature = $feature)]
+            impl $trait_path for $name {}
+        )*
+    };
+}
+#[allow(unused)]
+pub(crate) use define_sensirion_commands;

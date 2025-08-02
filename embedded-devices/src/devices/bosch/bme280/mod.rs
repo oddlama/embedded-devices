@@ -108,7 +108,7 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{device, device_impl, sensor};
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use uom::si::f64::{Pressure, Ratio, ThermodynamicTemperature};
 use uom::si::pressure::pascal;
@@ -170,7 +170,6 @@ pub(super) struct TFine(i32);
 
 /// The common base for both BME280 and BMP280.
 /// For a full description and usage examples, refer to [BME280](self).
-#[device]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
@@ -188,6 +187,8 @@ pub struct BME280Common<
     /// Calibration data
     pub(super) calibration_data: Option<CalibrationData>,
 }
+
+pub trait BME280CommonRegister {}
 
 /// The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 /// sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package.
@@ -406,7 +407,7 @@ where
     }
 }
 
-#[device_impl]
+#[forward_register_fns]
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
