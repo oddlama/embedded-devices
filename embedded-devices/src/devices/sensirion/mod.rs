@@ -5,7 +5,7 @@ pub mod commands;
     feature = "sensirion-scd41",
     feature = "sensirion-scd43",
 ))]
-pub(crate) mod scd4x;
+pub mod scd4x;
 
 #[cfg(feature = "sensirion-scd40")]
 pub mod scd40;
@@ -20,7 +20,7 @@ pub mod scd43;
     feature = "sensirion-sen66",
     feature = "sensirion-sen68"
 ))]
-pub(crate) mod sen6x;
+pub mod sen6x;
 
 #[cfg(feature = "sensirion-sen60")]
 pub mod sen60;

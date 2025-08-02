@@ -76,14 +76,14 @@
 
 use self::commands::{
     GetDataReady, GetSensorVariant, PerformForcedRecalibration, ReadMeasurement, Reinit, StartPeriodicMeasurement,
-    StopPeriodicMeasurement, TargetCo2Concentration,
+    StopPeriodicMeasurement,
 };
 use embedded_devices_derive::{forward_command_fns, sensor};
 use uom::si::f64::{Ratio, ThermodynamicTemperature};
 
 use super::{
     commands::Crc8Error,
-    scd4x::commands::{DataReadyStatus, SensorVariant},
+    scd4x::commands::{DataReadyStatus, SensorVariant, TargetCo2Concentration},
 };
 
 pub use super::scd4x::address;

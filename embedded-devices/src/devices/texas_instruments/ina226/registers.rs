@@ -215,16 +215,16 @@ impl ConversionTime {
 impl Configuration {
     /// Calculate the total conversion time based on configured operating mode, average count and conversion times.
     pub fn total_conversion_time_us(&self) -> u32 {
-        let sample_measure_time = match self.operating_mode {
+        let sample_measure_time = match self.read_operating_mode() {
             OperatingMode::PowerDown | OperatingMode::PowerDown2 => return 0,
-            OperatingMode::BusContinuous | OperatingMode::BusTriggered => self.bus_conversion_time.us(),
-            OperatingMode::ShuntContinuous | OperatingMode::ShuntTriggered => self.shunt_conversion_time.us(),
+            OperatingMode::BusContinuous | OperatingMode::BusTriggered => self.read_bus_conversion_time().us(),
+            OperatingMode::ShuntContinuous | OperatingMode::ShuntTriggered => self.read_shunt_conversion_time().us(),
             OperatingMode::ShuntAndBusContinuous | OperatingMode::ShuntAndBusTriggered => {
-                self.bus_conversion_time.us() + self.shunt_conversion_time.us()
+                self.read_bus_conversion_time().us() + self.read_shunt_conversion_time().us()
             }
         };
 
-        sample_measure_time * self.average_count.count()
+        sample_measure_time * self.read_average_count().count()
     }
 }
 
@@ -233,7 +233,7 @@ impl Power {
     /// for the current register which is used to derive the nW/LSB for the power register
     pub fn read_power(&self, current_lsb_na: i64) -> f64::Power {
         // nW/LSB = 25 * nA/LSB
-        f64::Power::new::<watt>((self.raw_value as i64 * current_lsb_na * 25) as f64 / 1_000_000_000f64)
+        f64::Power::new::<watt>((self.read_raw_value() as i64 * current_lsb_na * 25) as f64 / 1_000_000_000f64)
     }
 }
 
@@ -241,6 +241,6 @@ impl Current {
     /// Read the current, current_lsb_na is the calibrated amount of nA/LSB
     /// for the current register.
     pub fn read_current(&self, current_lsb_na: i64) -> ElectricCurrent {
-        ElectricCurrent::new::<ampere>((self.raw_value as i64 * current_lsb_na) as f64 / 1_000_000_000f64)
+        ElectricCurrent::new::<ampere>((self.read_raw_value() as i64 * current_lsb_na) as f64 / 1_000_000_000f64)
     }
 }

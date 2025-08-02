@@ -6,6 +6,7 @@ use crate::{TransportError, commands::Command};
     async(feature = "async")
 )]
 #[allow(async_fn_in_trait)]
+#[allow(clippy::type_complexity)]
 pub trait Executor: crate::commands::r#Executor {
     /// Execute the given command through the given SPI interface
     async fn execute<D, I>(

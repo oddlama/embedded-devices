@@ -89,23 +89,16 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::{forward_register_fns, sensor};
-use embedded_interfaces::registers::i2c::codecs::crc8_codec::CrcError;
-use registers::{DataReady, DeviceReset, MeasuredValues, StartContinuousMeasurement, StopMeasurement};
-use uom::si::{
-    f64::{MassConcentration, Ratio, ThermodynamicTemperature},
-    mass_concentration::microgram_per_cubic_meter,
-    ratio::percent,
-    thermodynamic_temperature::degree_celsius,
-};
-
-use super::SensirionCommand;
+use self::commands::{DeviceReset, GetDataReady, ReadMeasuredValues, StartContinuousMeasurement, StopMeasurement};
+use embedded_devices_derive::{forward_command_fns, sensor};
+use uom::si::f64::{MassConcentration, Ratio, ThermodynamicTemperature};
 
 pub use super::sen6x::address;
-pub mod registers;
+use super::{commands::Crc8Error, sen6x::commands::DataReadyStatus};
+pub mod commands;
 
 /// Any CRC or Bus related error
-pub type TransportError<E> = embedded_interfaces::TransportError<CrcError, E>;
+pub type TransportError<E> = embedded_interfaces::TransportError<Crc8Error, E>;
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -153,20 +146,20 @@ pub struct Measurement {
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         I2cDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-pub struct SEN65<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> {
+pub struct SEN65<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> {
     /// The delay provider
     delay: D,
     /// The interface to communicate with the device
     interface: I,
 }
 
-pub trait SEN65Register {}
+pub trait SEN65Command {}
 
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), I2cDevice),
@@ -192,7 +185,7 @@ where
     }
 }
 
-#[forward_register_fns]
+#[forward_command_fns]
 #[sensor(
     Pm1Concentration,
     Pm2_5Concentration,
@@ -206,13 +199,13 @@ where
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ResettableDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> SEN65<D, I> {
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> SEN65<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, and resetting the device.
     pub async fn init(&mut self) -> Result<(), TransportError<I::BusError>> {
         use crate::device::ResettableDevice;
@@ -228,13 +221,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ResettableDevice
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::device::ResettableDevice
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::device::ResettableDevice
     for SEN65<D, I>
 {
     type Error = TransportError<I::BusError>;
@@ -242,12 +235,9 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     /// Resets the sensor by stopping any ongoing measurement, and resetting the device.
     async fn reset(&mut self) -> Result<(), Self::Error> {
         // Try to stop measurement if it is ongoing, otherwise ignore
-        if self.write_register(StopMeasurement::default()).await.is_ok() {
-            self.delay.delay_ms(StopMeasurement::EXECUTION_TIME_MS).await;
-        }
-
-        self.write_register(DeviceReset::default()).await?;
-        self.delay.delay_ms(DeviceReset::EXECUTION_TIME_MS).await;
+        let _ = self.execute::<StopMeasurement>(()).await;
+        // Reset
+        self.execute::<DeviceReset>(()).await?;
 
         Ok(())
     }
@@ -256,13 +246,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 #[maybe_async_cfg::maybe(
     idents(
         hal(sync = "embedded_hal", async = "embedded_hal_async"),
-        RegisterInterface,
+        CommandInterface,
         ContinuousSensor
     ),
     sync(feature = "sync"),
     async(feature = "async")
 )]
-impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterface> crate::sensor::ContinuousSensor
+impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::ContinuousSensor
     for SEN65<D, I>
 {
     type Error = TransportError<I::BusError>;
@@ -270,15 +260,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
     /// Starts continuous measurement.
     async fn start_measuring(&mut self) -> Result<(), Self::Error> {
-        self.write_register(StartContinuousMeasurement::default()).await?;
-        self.delay.delay_ms(StartContinuousMeasurement::EXECUTION_TIME_MS).await;
+        self.execute::<StartContinuousMeasurement>(()).await?;
         Ok(())
     }
 
     /// Stops continuous measurement.
     async fn stop_measuring(&mut self) -> Result<(), Self::Error> {
-        self.write_register(StopMeasurement::default()).await?;
-        self.delay.delay_ms(StopMeasurement::EXECUTION_TIME_MS).await;
+        self.execute::<StopMeasurement>(()).await?;
         Ok(())
     }
 
@@ -289,32 +277,27 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
 
     /// Returns the most recent measurement.
     async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
-        let measurement = self.read_register::<MeasuredValues>().await?.read_all();
+        let measurement = self.execute::<ReadMeasuredValues>(()).await?;
         Ok(Some(Measurement {
-            pm1_concentration: (measurement.mass_concentration_pm1 != u16::MAX).then(|| {
-                MassConcentration::new::<microgram_per_cubic_meter>(measurement.mass_concentration_pm1 as f64 / 10.0)
-            }),
-            pm2_5_concentration: (measurement.mass_concentration_pm2_5 != u16::MAX).then(|| {
-                MassConcentration::new::<microgram_per_cubic_meter>(measurement.mass_concentration_pm2_5 as f64 / 10.0)
-            }),
-            pm4_concentration: (measurement.mass_concentration_pm4 != u16::MAX).then(|| {
-                MassConcentration::new::<microgram_per_cubic_meter>(measurement.mass_concentration_pm4 as f64 / 10.0)
-            }),
-            pm10_concentration: (measurement.mass_concentration_pm10 != u16::MAX).then(|| {
-                MassConcentration::new::<microgram_per_cubic_meter>(measurement.mass_concentration_pm10 as f64 / 10.0)
-            }),
-            relative_humidity: (measurement.relative_humidity != i16::MAX)
-                .then(|| Ratio::new::<percent>(measurement.relative_humidity as f64 / 100.0)),
-            temperature: (measurement.temperature != i16::MAX)
-                .then(|| ThermodynamicTemperature::new::<degree_celsius>(measurement.temperature as f64 / 200.0)),
-            voc_index: (measurement.voc_index != i16::MAX).then_some(measurement.voc_index),
-            nox_index: (measurement.nox_index != i16::MAX).then_some(measurement.nox_index),
+            pm1_concentration: (measurement.read_raw_mass_concentration_pm1() != u16::MAX)
+                .then(|| measurement.read_mass_concentration_pm1()),
+            pm2_5_concentration: (measurement.read_raw_mass_concentration_pm2_5() != u16::MAX)
+                .then(|| measurement.read_mass_concentration_pm2_5()),
+            pm4_concentration: (measurement.read_raw_mass_concentration_pm4() != u16::MAX)
+                .then(|| measurement.read_mass_concentration_pm4()),
+            pm10_concentration: (measurement.read_raw_mass_concentration_pm10() != u16::MAX)
+                .then(|| measurement.read_mass_concentration_pm10()),
+            relative_humidity: (measurement.read_raw_relative_humidity() != i16::MAX)
+                .then(|| measurement.read_relative_humidity()),
+            temperature: (measurement.read_raw_temperature() != i16::MAX).then(|| measurement.read_temperature()),
+            voc_index: (measurement.read_voc_index() != i16::MAX).then_some(measurement.read_voc_index()),
+            nox_index: (measurement.read_nox_index() != i16::MAX).then_some(measurement.read_nox_index()),
         }))
     }
 
     /// Check if new measurements are available.
     async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.read_register::<DataReady>().await?.read_data_ready())
+        Ok(self.execute::<GetDataReady>(()).await?.read_data_ready() == DataReadyStatus::Ready)
     }
 
     /// Wait indefinitely until new measurements are available and return them. Checks whether data

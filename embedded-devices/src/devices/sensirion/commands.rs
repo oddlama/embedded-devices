@@ -76,7 +76,7 @@ impl<C: SensirionSendCommand> embedded_interfaces::commands::i2c::Executor for S
         A: hal::i2c::AddressMode + Copy,
     {
         let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
-        bound_bus.interface.write(bound_bus.address, &header).await?;
+        bound_bus.interface.write(bound_bus.address, header).await?;
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
         Ok(())
     }
@@ -145,7 +145,7 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
         const CHUNK_SIZE: usize = 2;
 
         let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
-        bound_bus.interface.write(bound_bus.address, &header).await?;
+        bound_bus.interface.write(bound_bus.address, header).await?;
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
 
         let mut array = Vec::<u8, 64>::new();
@@ -336,6 +336,7 @@ macro_rules! define_write_read_command {
 #[allow(unused)]
 pub(crate) use define_write_read_command;
 
+#[allow(unused)]
 macro_rules! define_sensirion_commands {
     // Main entry point - parse the marker section first
     (
