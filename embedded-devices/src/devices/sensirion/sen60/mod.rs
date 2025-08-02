@@ -1,5 +1,3 @@
-//! # SEN60
-//!
 //! The SEN60 is a particulate matter (PM) sensor from Sensition's SEN6x sensor module family.
 //!
 //! The SEN6x sensor module family is an air quality platform that combines critical parameters

@@ -1,5 +1,3 @@
-//! # SCD41
-//!
 //! The SCD41 is a photoacoustic NDIR CO2 sensor from Sensirion's SCD4x family which features
 //! improved accuracy, large measurement range of 400 - 5000 ppm, single shot operation feature and
 //! an inbuilt SHT4x temperature and humidity sensor for measurement compensation.

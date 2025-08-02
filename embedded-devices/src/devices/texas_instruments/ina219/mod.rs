@@ -1,5 +1,3 @@
-//! # INA219
-//!
 //! The INA219 is a current shunt and power monitor with an I2C- or SMBUS-compatible interface.
 //! The device monitors both shunt voltage drop and bus supply voltage, with programmable
 //! conversion times and filtering. A programmable calibration value, combined with

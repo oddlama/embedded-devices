@@ -1,5 +1,3 @@
-//! # SEN65
-//!
 //! The SEN65 is a particulate matter (PM), VOC, NOₓ, temperature and relative humidity sensor
 //! sensor from Sensition's SEN6x sensor module family.
 //!

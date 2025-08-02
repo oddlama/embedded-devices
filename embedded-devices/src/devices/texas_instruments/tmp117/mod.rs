@@ -1,5 +1,3 @@
-//! # TMP117
-//!
 //! The TMP117 is a high-precision digital temperature sensor. It is designed to meet ASTM E1112
 //! and ISO 80601 requirements for electronic patient thermometers. The TMP117 provides a 16-bit
 //! temperature result with a resolution of 0.0078 °C and an accuracy of up to ±0.1 °C across the

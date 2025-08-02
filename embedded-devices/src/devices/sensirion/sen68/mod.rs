@@ -1,5 +1,3 @@
-//! # SEN68
-//!
 //! The SEN68 is a particulate matter (PM), VOC, NOₓ, HCHO, temperature and relative humidity sensor
 //! sensor from Sensition's SEN6x sensor module family.
 //!

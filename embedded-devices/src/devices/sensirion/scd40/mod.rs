@@ -1,5 +1,3 @@
-//! # SCD40
-//!
 //! The SCD40 is a photoacoustic NDIR CO2 sensor from Sensirion's SCD4x family which features base
 //! accuracy, measurement range of 400 - 2000 ppm and an inbuilt SHT4x temperature and humidity
 //! sensor for measurement compensation.

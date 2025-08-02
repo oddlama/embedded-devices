@@ -1,5 +1,3 @@
-//! # INA226
-//!
 //! The INA226 is a current shunt and power monitor with an I2C- or SMBUS-compatible interface.
 //! The device monitors both a shunt voltage drop and bus supply voltage.
 //! Programmable calibration value, conversion times, and averaging,combined with an

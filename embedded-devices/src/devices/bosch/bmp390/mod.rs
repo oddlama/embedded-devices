@@ -1,5 +1,3 @@
-//! # BMP390
-//!
 //! The BMP390 is a digital sensor with pressure and temperature measurement based on proven sensing principles. The sensor
 //! module is housed in an extremely compact 10-pin metal-lid LGA package with a footprint of only 2.0 × 2.0 mm² and max 0.8
 //! mm package height. Its small dimensions and its low power consumption of 3.2 μA @1Hz allow the implementation in battery

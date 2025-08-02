@@ -1,5 +1,3 @@
-//! # INA228
-//!
 //! The INA228 is an ultra-precise digital power monitor with a 20-bit delta-sigma ADC specifically
 //! designed for current-sensing applications. The device can measure a full-scale differential
 //! input of ±163.84 mV or ±40.96 mV across a resistive shunt sense element with common-mode

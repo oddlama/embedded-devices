@@ -1,5 +1,3 @@
-//! # BME280
-//!
 //! The BME280 is a combined digital humidity, pressure and temperature sensor based on proven
 //! sensing principles. The sensor module is housed in an extremely compact metal-lid LGA package with
 //! a footprint of only 2.5 × 2.5 mm² with a height of 0.93 mm. Its small dimensions and its low power

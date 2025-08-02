@@ -1,5 +1,3 @@
-//! # TMP102
-//!
 //! The TMP102 device is a digital temperature sensor designed for NTC/PTC
 //! thermistor replacement where high accuracy is required. The device offers an
 //! accuracy of ±0.5°C without requiring calibration or external component

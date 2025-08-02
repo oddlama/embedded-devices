@@ -1,5 +1,3 @@
-//! # MCP3204
-//!
 //! The Microchip Technology Inc. MCP3204 device is a successive approximation 12-bit Analog-
 //! to-Digital (A/D) Converter with on-board sample and hold circuitry. The MCP3204 is programmable
 //! to provide two pseudo-differential input pairs or four single-ended inputs.

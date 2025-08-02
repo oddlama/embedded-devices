@@ -1,5 +1,3 @@
-//! # MCP3208
-//!
 //! The Microchip Technology Inc. MCP3208 device is a successive approximation 12-bit Analog-
 //! to-Digital (A/D) Converter with on-board sample and hold circuitry. The MCP3208 is programmable
 //! to provide four pseudo-differential input pairs or eight single-ended inputs.

@@ -1,5 +1,3 @@
-//! # MCP9808
-//!
 //! Microchip Technology Inc.'s MCP9808 digital temperature sensor converts temperatures between
 //! -20°C and +100°C to a digital word with ±0.25°C/±0.5°C (typical/maximum) accuracy.
 //!

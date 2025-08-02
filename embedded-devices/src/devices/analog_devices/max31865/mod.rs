@@ -1,5 +1,3 @@
-//! # MAX31865
-//!
 //! The MAX31865 is an easy-to-use resistance-to-digital converter optimized for platinum
 //! resistance temperature detectors (RTDs). An external resistor sets the sensitivity
 //! for the RTD being used and a precision delta-sigma ADC converts the ratio of the RTD

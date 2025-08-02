@@ -1,5 +1,3 @@
-//! # SEN63C
-//!
 //! The SEN63C is a particulate matter (PM), CO₂, temperature and relative humidity sensor sensor
 //! from Sensition's SEN6x sensor module family.
 //!

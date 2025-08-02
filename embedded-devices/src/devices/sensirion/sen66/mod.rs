@@ -1,5 +1,3 @@
-//! # SEN66
-//!
 //! The SEN66 is a particulate matter (PM), VOC, NOₓ, CO₂, temperature and relative humidity sensor
 //! sensor from Sensition's SEN6x sensor module family.
 //!
