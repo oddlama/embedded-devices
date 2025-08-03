@@ -5,7 +5,7 @@ use uom::si::f64::{
 };
 
 /// This trait is implemented for any sensor specific measurement struct.
-pub trait Measurement {}
+pub trait Measurement: core::fmt::Debug {}
 
 /// A sensor supporting one-shot measurements.
 ///

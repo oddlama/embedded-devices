@@ -160,7 +160,7 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
         for (i, x) in array.chunks(CHUNK_SIZE + 1).enumerate() {
             let value = &x[0..CHUNK_SIZE];
-            data[i..i + CHUNK_SIZE].copy_from_slice(value);
+            data[(i * CHUNK_SIZE)..((i + 1) * CHUNK_SIZE)].copy_from_slice(value);
 
             let calculated = crc.checksum(value);
             let expected = x[CHUNK_SIZE];
@@ -227,7 +227,7 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
         for (i, x) in array.chunks(CHUNK_SIZE + 1).enumerate() {
             let value = &x[0..CHUNK_SIZE];
-            data[i..i + CHUNK_SIZE].copy_from_slice(value);
+            data[(i * CHUNK_SIZE)..((i + 1) * CHUNK_SIZE)].copy_from_slice(value);
 
             let calculated = crc.checksum(value);
             let expected = x[CHUNK_SIZE];
