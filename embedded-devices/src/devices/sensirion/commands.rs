@@ -13,7 +13,7 @@ pub enum Crc8Error {
 /// Metadata associated to any sensirion specific command
 pub trait SensirionCommand {
     /// Length of the command id in bytes
-    const COMMAND_SIZE: usize;
+    const COMMAND_ID_LEN: usize;
     /// The command id.
     const COMMAND_ID: u64;
     /// This reflects the execution time for this command in milliseconds, if specified in the
@@ -75,7 +75,7 @@ impl<C: SensirionSendCommand> embedded_interfaces::commands::i2c::Executor for S
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
+        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         bound_bus.interface.write(bound_bus.address, header).await?;
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
         Ok(())
@@ -101,7 +101,7 @@ impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for 
     {
         const CHUNK_SIZE: usize = 2;
 
-        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
+        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         let mut array = Vec::<u8, 64>::new();
         array
             .extend_from_slice(header)
@@ -144,20 +144,20 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
         use bytemuck::Zeroable;
         const CHUNK_SIZE: usize = 2;
 
-        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
+        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         bound_bus.interface.write(bound_bus.address, header).await?;
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
 
         let mut array = Vec::<u8, 64>::new();
+        let mut out = C::Out::zeroed();
+        let data = bytemuck::bytes_of_mut(&mut out);
         array
-            .resize_default(C::COMMAND_SIZE + C::COMMAND_SIZE / CHUNK_SIZE)
+            .resize_default(data.len() + data.len() / CHUNK_SIZE)
             .map_err(|_| TransportError::Unexpected("command response data: too large for buffer"))?;
 
         bound_bus.interface.read(bound_bus.address, &mut array).await?;
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
-        let mut out = C::Out::zeroed();
-        let data = bytemuck::bytes_of_mut(&mut out);
         for (i, x) in array.chunks(CHUNK_SIZE + 1).enumerate() {
             let value = &x[0..CHUNK_SIZE];
             data[i..i + CHUNK_SIZE].copy_from_slice(value);
@@ -195,7 +195,7 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         use bytemuck::Zeroable;
         const CHUNK_SIZE: usize = 2;
 
-        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_SIZE..];
+        let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         let mut array = Vec::<u8, 64>::new();
         array
             .extend_from_slice(header)
@@ -216,15 +216,15 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
 
         let mut array = Vec::<u8, 64>::new();
+        let mut out = C::Out::zeroed();
+        let data = bytemuck::bytes_of_mut(&mut out);
         array
-            .resize_default(C::COMMAND_SIZE + C::COMMAND_SIZE / CHUNK_SIZE)
+            .resize_default(data.len() + data.len() / CHUNK_SIZE)
             .map_err(|_| TransportError::Unexpected("command response data: too large for buffer"))?;
 
         bound_bus.interface.read(bound_bus.address, &mut array).await?;
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
-        let mut out = C::Out::zeroed();
-        let data = bytemuck::bytes_of_mut(&mut out);
         for (i, x) in array.chunks(CHUNK_SIZE + 1).enumerate() {
             let value = &x[0..CHUNK_SIZE];
             data[i..i + CHUNK_SIZE].copy_from_slice(value);
@@ -254,7 +254,7 @@ macro_rules! define_send_command {
             type I2cExecutor = crate::devices::sensirion::commands::SensirionSendCommandExecutor<Self>;
         }
         impl crate::devices::sensirion::commands::SensirionCommand for $name {
-            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID_LEN: usize = $id_len;
             const COMMAND_ID: u64 = $id;
             const EXECUTION_TIME_MS: u32 = $time_ms;
         }
@@ -278,7 +278,7 @@ macro_rules! define_write_command {
             type I2cExecutor = crate::devices::sensirion::commands::SensirionWriteCommandExecutor<Self>;
         }
         impl crate::devices::sensirion::commands::SensirionCommand for $name {
-            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID_LEN: usize = $id_len;
             const COMMAND_ID: u64 = $id;
             const EXECUTION_TIME_MS: u32 = $time_ms;
         }
@@ -302,7 +302,7 @@ macro_rules! define_read_command {
             type I2cExecutor = crate::devices::sensirion::commands::SensirionReadCommandExecutor<Self>;
         }
         impl crate::devices::sensirion::commands::SensirionCommand for $name {
-            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID_LEN: usize = $id_len;
             const COMMAND_ID: u64 = $id;
             const EXECUTION_TIME_MS: u32 = $time_ms;
         }
@@ -326,7 +326,7 @@ macro_rules! define_write_read_command {
             type I2cExecutor = crate::devices::sensirion::commands::SensirionWriteReadCommandExecutor<Self>;
         }
         impl crate::devices::sensirion::commands::SensirionCommand for $name {
-            const COMMAND_SIZE: usize = $id_len;
+            const COMMAND_ID_LEN: usize = $id_len;
             const COMMAND_ID: u64 = $id;
             const EXECUTION_TIME_MS: u32 = $time_ms;
         }
