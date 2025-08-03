@@ -5,11 +5,11 @@ use crate::registers::{ReadableRegister, Register, RegisterCodec, WritableRegist
 
 /// A codec that represents absense of a codec. This is only used as a placeholder in register
 /// definitions to specify that the associated interface is not supported.
-pub struct UnsupportedCodec<E> {
+pub struct UnsupportedCodec<E: core::fmt::Debug> {
     _marker: PhantomData<E>,
 }
 
-impl<E> RegisterCodec for UnsupportedCodec<E> {
+impl<E: core::fmt::Debug> RegisterCodec for UnsupportedCodec<E> {
     type Error = E;
 }
 
@@ -19,7 +19,7 @@ impl<E> RegisterCodec for UnsupportedCodec<E> {
     async(feature = "async"),
     keep_self
 )]
-impl<E: 'static> crate::registers::spi::Codec for UnsupportedCodec<E> {
+impl<E: core::fmt::Debug> crate::registers::spi::Codec for UnsupportedCodec<E> {
     #[inline]
     async fn read_register<R, I>(_interface: &mut I) -> Result<R, TransportError<Self::Error, I::Error>>
     where

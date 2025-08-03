@@ -6,7 +6,7 @@ pub mod spi;
 /// A base trait for all register codecs
 pub trait RegisterCodec {
     /// An error type for codec specific errors
-    type Error;
+    type Error: core::fmt::Debug;
 }
 
 /// The basis trait for all registers. A register is a type that maps to a specific register on an
@@ -23,7 +23,7 @@ pub trait Register: Default + Clone + bytemuck::Pod {
     /// The associated unpacked type
     type Unpacked;
     /// A common error type which can represent all associated codec errors
-    type CodecError;
+    type CodecError: core::fmt::Debug;
     /// The SPI codec that should be used for this register. If the device doesn't support SPI
     /// communication, this can be ignored.
     #[cfg(all(feature = "sync", not(feature = "async")))]
@@ -54,7 +54,7 @@ pub trait WritableRegister: Register {}
 #[allow(async_fn_in_trait)]
 pub trait RegisterInterface {
     /// A type representing errors on the underlying bus
-    type BusError;
+    type BusError: core::fmt::Debug;
 
     /// Reads the given register through this interface
     async fn read_register<R>(&mut self) -> Result<R, TransportError<<R as Register>::CodecError, Self::BusError>>

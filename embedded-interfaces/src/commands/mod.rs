@@ -9,7 +9,7 @@ pub trait Executor {
     /// The command type used by this executor
     type Command: Command;
     /// An error type for executor specific errors
-    type Error;
+    type Error: core::fmt::Debug;
 }
 
 /// The basis trait for all commands. A command represents one or more transactions that belong
@@ -23,7 +23,7 @@ pub trait Command {
     type Out: bytemuck::Pod + bytemuck::Zeroable;
 
     /// A common error type which can represent all associated executor errors
-    type ExecutorError;
+    type ExecutorError: core::fmt::Debug;
     /// The SPI executor that should be used for this register. If the device doesn't support SPI
     /// communication, this can be ignored.
     #[cfg(all(feature = "sync", not(feature = "async")))]
@@ -54,7 +54,7 @@ pub trait Command {
 #[allow(async_fn_in_trait)]
 pub trait CommandInterface {
     /// A type representing errors on the underlying bus
-    type BusError;
+    type BusError: core::fmt::Debug;
 
     /// Executes the given command through this interface
     async fn execute<C, D>(

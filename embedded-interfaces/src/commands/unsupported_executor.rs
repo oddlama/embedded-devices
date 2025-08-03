@@ -4,11 +4,11 @@ use super::{Command, Executor, i2c, spi};
 
 /// This dummy executor accepts any command and does nothing when used. If this executor is used,
 /// it means that the associated interface is not supported.
-pub struct UnsupportedExecutor<E, C: Command + ?Sized> {
+pub struct UnsupportedExecutor<E: core::fmt::Debug, C: Command + ?Sized> {
     _marker: core::marker::PhantomData<(E, C)>,
 }
 
-impl<E, C: Command> Executor for UnsupportedExecutor<E, C> {
+impl<E: core::fmt::Debug, C: Command> Executor for UnsupportedExecutor<E, C> {
     type Error = E;
     type Command = C;
 }
@@ -19,7 +19,7 @@ impl<E, C: Command> Executor for UnsupportedExecutor<E, C> {
     async(feature = "async"),
     keep_self
 )]
-impl<E, C: Command> i2c::Executor for UnsupportedExecutor<E, C> {
+impl<E: core::fmt::Debug, C: Command> i2c::Executor for UnsupportedExecutor<E, C> {
     async fn execute<D, I, A>(
         _delay: &mut D,
         _bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,
@@ -40,7 +40,7 @@ impl<E, C: Command> i2c::Executor for UnsupportedExecutor<E, C> {
     async(feature = "async"),
     keep_self
 )]
-impl<E, C: Command> spi::Executor for UnsupportedExecutor<E, C> {
+impl<E: core::fmt::Debug, C: Command> spi::Executor for UnsupportedExecutor<E, C> {
     async fn execute<D, I>(
         _delay: &mut D,
         _interface: &mut I,

@@ -9,7 +9,7 @@ pub struct UnsupportedCodec<E> {
     _marker: PhantomData<E>,
 }
 
-impl<E> RegisterCodec for UnsupportedCodec<E> {
+impl<E: core::fmt::Debug> RegisterCodec for UnsupportedCodec<E> {
     type Error = E;
 }
 
@@ -19,7 +19,7 @@ impl<E> RegisterCodec for UnsupportedCodec<E> {
     async(feature = "async"),
     keep_self
 )]
-impl<E: 'static> crate::registers::i2c::Codec for UnsupportedCodec<E> {
+impl<E: core::fmt::Debug> crate::registers::i2c::Codec for UnsupportedCodec<E> {
     #[inline]
     async fn read_register<R, I, A>(
         _bound_bus: &mut crate::i2c::I2cBoundBus<I, A>,

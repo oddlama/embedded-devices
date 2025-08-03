@@ -17,7 +17,7 @@ pub trait Measurement: core::fmt::Debug {}
 #[allow(async_fn_in_trait)]
 pub trait OneshotSensor {
     /// The error type which may occur on associated functions
-    type Error;
+    type Error: core::fmt::Debug;
     /// A type holding the measurements obtained by this sensor
     type Measurement: self::Measurement;
 
@@ -38,7 +38,7 @@ pub trait OneshotSensor {
 #[allow(async_fn_in_trait)]
 pub trait ContinuousSensor {
     /// The error type which may occur on associated functions
-    type Error;
+    type Error: core::fmt::Debug;
     /// A type holding the measurements obtained by this sensor
     type Measurement: self::Measurement;
 

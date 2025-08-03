@@ -3,7 +3,7 @@
 #[allow(async_fn_in_trait)]
 pub trait ResettableDevice {
     /// The error type which may occur when resetting the device
-    type Error;
+    type Error: core::fmt::Debug;
 
     /// Performs a best-effort soft-reset of the device.
     async fn reset(&mut self) -> Result<(), Self::Error>;
