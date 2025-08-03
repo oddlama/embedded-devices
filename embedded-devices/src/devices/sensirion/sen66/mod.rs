@@ -36,8 +36,8 @@
 //! let pm10 = measurement.pm10_concentration.unwrap().get::<microgram_per_cubic_meter>();
 //! let humidity = measurement.relative_humidity.unwrap().get::<percent>();
 //! let temperature = measurement.temperature.unwrap().get::<degree_celsius>();
-//! let voc_index = measurement.voc_index.unwrap();
-//! let nox_index = measurement.nox_index.unwrap();
+//! let voc_index = measurement.voc_index.unwrap().get::<percent>();
+//! let nox_index = measurement.nox_index.unwrap().get::<percent>();
 //! let co2 = measurement.co2_concentration.unwrap().get::<part_per_million>();
 //! println!("Current measurement: {:?} µg/m³ PM1, {:?} µg/m³ PM2.5, {:?} µg/m³ PM4, {:?} µg/m³ PM10, {:?}%RH, {:?}°C, {:?} VOC, {:?} NOx, {:?}ppm CO₂",
 //!     pm1, pm2_5, pm4, pm10, humidity, temperature, voc_index, nox_index, co2
@@ -78,8 +78,8 @@
 //! let pm10 = measurement.pm10_concentration.unwrap().get::<microgram_per_cubic_meter>();
 //! let humidity = measurement.relative_humidity.unwrap().get::<percent>();
 //! let temperature = measurement.temperature.unwrap().get::<degree_celsius>();
-//! let voc_index = measurement.voc_index.unwrap();
-//! let nox_index = measurement.nox_index.unwrap();
+//! let voc_index = measurement.voc_index.unwrap().get::<percent>();
+//! let nox_index = measurement.nox_index.unwrap().get::<percent>();
 //! let co2 = measurement.co2_concentration.unwrap().get::<part_per_million>();
 //! println!("Current measurement: {:?} µg/m³ PM1, {:?} µg/m³ PM2.5, {:?} µg/m³ PM4, {:?} µg/m³ PM10, {:?}%RH, {:?}°C, {:?} VOC, {:?} NOx, {:?}ppm CO₂",
 //!     pm1, pm2_5, pm4, pm10, humidity, temperature, voc_index, nox_index, co2
@@ -134,7 +134,7 @@ pub struct Measurement {
     /// there are fewer VOCs compared to the average (e.g., induced by fresh air from an open
     /// window, using an air purifier, etc.).
     #[measurement(VocIndex)]
-    pub voc_index: Option<i16>,
+    pub voc_index: Option<Ratio>,
     /// Current NOx Index (1-500), moving average over past 24 hours. On the NOx Index scale, this
     /// offset is always mapped to the value of 1, making the readout as easy as possible: an NOx
     /// Index above 1 means that there are more NOx compounds compared to the average (e.g.,
@@ -142,7 +142,7 @@ pub struct Measurement {
     /// (nearly) no NOx gases present, which is the case most of the time (or induced by fresh air
     /// from an open window, using an air purifier, etc.).
     #[measurement(NoxIndex)]
-    pub nox_index: Option<i16>,
+    pub nox_index: Option<Ratio>,
     /// Current CO₂ concentration
     #[measurement(Co2Concentration)]
     pub co2_concentration: Option<Ratio>,
@@ -320,8 +320,10 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
             relative_humidity: (measurement.read_raw_relative_humidity() != i16::MAX)
                 .then(|| measurement.read_relative_humidity()),
             temperature: (measurement.read_raw_temperature() != i16::MAX).then(|| measurement.read_temperature()),
-            voc_index: (measurement.read_voc_index() != i16::MAX).then_some(measurement.read_voc_index()),
-            nox_index: (measurement.read_nox_index() != i16::MAX).then_some(measurement.read_nox_index()),
+            voc_index: (!matches!(measurement.read_raw_voc_index(), i16::MAX | 0))
+                .then_some(measurement.read_voc_index()),
+            nox_index: (!matches!(measurement.read_raw_nox_index(), i16::MAX | 0))
+                .then_some(measurement.read_nox_index()),
             co2_concentration: (measurement.read_raw_co2_concentration() != u16::MAX)
                 .then(|| measurement.read_co2_concentration()),
         }))

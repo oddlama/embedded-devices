@@ -55,10 +55,18 @@ interface_objects! {
             lsb: 1f64 / 200f64,
         },
         /// VOC index, LSB = 0.1
-        voc_index: i16 = i16::MAX,
+        raw_voc_index: i16 = i16::MAX => {
+            quantity: Ratio,
+            unit: percent,
+            lsb: 1f64 / 10f64,
+        },
         /// NOx index, LSB = 0.1
         /// Will be i16::MAX for the first 10-11 seconds after startup or reset.
-        nox_index: i16 = i16::MAX,
+        raw_nox_index: i16 = i16::MAX => {
+            quantity: Ratio,
+            unit: percent,
+            lsb: 1f64 / 10f64,
+        },
         /// CO2 concentration, LSB = 1 ppm
         /// Will be u16::MAX for the first 5-6 seconds after startup or reset.
         raw_co2_concentration: u16 = u16::MAX => {
