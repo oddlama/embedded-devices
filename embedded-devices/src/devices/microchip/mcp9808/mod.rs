@@ -70,8 +70,6 @@ use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
 use uom::si::f64::ThermodynamicTemperature;
 
-use crate::utils::from_bus_error;
-
 pub mod address;
 pub mod registers;
 
@@ -79,9 +77,9 @@ use self::registers::{AmbientTemperature, Configuration, DeviceIdRevision, Manuf
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// Invalid Device Id was encountered
     #[error("invalid device id")]
     InvalidDeviceId,
@@ -89,8 +87,6 @@ pub enum InitError<BusError> {
     #[error("invalid manufacturer id")]
     InvalidManufacturerId,
 }
-
-from_bus_error!(InitError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -259,6 +255,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         let interval = self.measurement_interval_us().await?;
         self.delay.delay_us(interval).await;
-        self.current_measurement().await.map(Option::unwrap)
+        self.current_measurement()
+            .await?
+            .ok_or_else(|| TransportError::Unexpected("measurement was not ready even though we expected it to be"))
     }
 }

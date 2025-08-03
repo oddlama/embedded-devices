@@ -92,7 +92,7 @@ pub type TransportError<E> = embedded_interfaces::TransportError<Crc8Error, E>;
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
-    /// Bus error
+    /// Transport error
     #[error("transport error")]
     Transport(#[from] TransportError<BusError>),
     /// Invalid sensor variant was encountered
@@ -287,7 +287,9 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         loop {
             if self.is_measurement_ready().await? {
-                return self.current_measurement().await.map(Option::unwrap);
+                return self.current_measurement().await?.ok_or_else(|| {
+                    TransportError::Unexpected("measurement was not ready even though we expected it to be")
+                });
             }
             self.delay.delay_ms(100).await;
         }

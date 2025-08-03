@@ -29,9 +29,7 @@ impl<E: 'static> crate::registers::i2c::Codec for UnsupportedCodec<E> {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        panic!(
-            "i2c::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
-        );
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 
     #[inline]
@@ -44,8 +42,6 @@ impl<E: 'static> crate::registers::i2c::Codec for UnsupportedCodec<E> {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        panic!(
-            "i2c::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
-        );
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 }

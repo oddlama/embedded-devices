@@ -7,37 +7,16 @@
 is in an experimental state. Until v1.0.0 is released there may be breaking
 changes at any time.**
 
-This project contains a collection of drivers for embedded devices, as well as a
-framework to make building drivers more streamlined and simple. As a user
-you get:
+This project contains a collection of drivers for embedded devices, as well as
+a framework to make building drivers easier and faster.
 
 - ✅ **Type-safe and ergonomic access** to all device registers and commands
 - 📚 **Thorough documentation** for each device based on the original datasheets
 - 🧵 **Supports both sync and async** usage for each driver - simultaneously if needed
-- 🧩 **Consistent interaction** with all devices following the same principles
 - 🧪 **Physical quantities** and units like °C/°F or Ω
   are associated to each value to prevent mix-ups and to allow automatic unit conversions
-
-Please refer to the list below for supported devices. For driver developers,
-this framework aims to make it a lot easier to write consistent and
-fully-featured drivers:
-
-- ✨ **Effortless, type-safe representation** of bit packed structs like registers or commands let's you capture exactly what has been specified in the datasheet
 - ⚡ **Zero-cost abstractions** for resource-efficient access to packed struct members
-- 🧰 **Unified framework** for building and extending drivers
-- 🔄 **Reusable codecs** to handle extended communication protocols (e.g. CRC checks over I2C/SPI)
-
-> This crate started as a proof-of-concept to show how sensor and device
-> drivers can benefit from a common framework, allowing new drivers to be added
-> with ease while being able to skip writing bus communication boilerplate over
-> and over again.
-
-This project contains of several crates:
-
-- [embedded-devices](./embedded-devices), contains the actual driver implementations for real hardware ICs
-- [embedded-devices-derive](./embedded-devices-derive), a proc-macro to reduce boilerplate for device definitions
-- [embedded-interfaces](./embedded-interfaces), provides the main abstractions for register- or command-based interfaces over I2C/SPI
-- [embedded-interfaces-codegen](./embedded-interfaces-codegen), a proc-macro to reduce boilerplate for interface definitions including bit-packed structs, enums and registers
+- 🚨 **Panic-free** in all situations and ready for use in high-reliability contexts
 
 ## Supported Devices
 
@@ -68,12 +47,20 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Sensirion | SEN66 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen66/index.html) |
 | Sensirion | SEN68 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, HCHO, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen68/index.html) |
 
-## Example usage
+## Quick start
 
-This example shows how to read temperature, pressure and humidity from the
-BME280 environmental sensor to give you an idea of how the drivers work. This
-example shows how to use it in an async context. The `BME280Sync` variant works
-analogous, just without calling `.await`:
+To use this driver crate, first add it to your dependencies and select the
+devices you need. You can also enable `all-devices`, but expect longer compile
+times in that case.
+
+```bash
+cargo add embedded-devices -F bosch-bme280
+```
+
+If you have not disabled the `sync` or `async` create features, you will now
+have access to the `BME280` device driver in either variant. Here's an example
+showing how to use the driver in an async context. The `BME280Sync` variant works
+exactly the same, just without calling `.await`:
 
 ```rust
 // Create a device on the given interface and address
@@ -91,23 +78,21 @@ bme280.configure(Configuration {
 }).await?;
 
 // Measure now
-let measurement = bme280.measure().await?;
+let measurement = bme280.measure().await.unwrap();
 
 // Retrieve the returned temperature as °C, pressure in Pa and humidity in %RH
 let temp = measurement.temperature.get::<degree_celsius>();
-let pres = measurement.pressure.unwrap().get::<pascal>();
-let hum = measurement.humidity.unwrap().get::<percent>();
-
-println!("Current temperature: {}°C", temp);
-println!("Current pressure: {}Pa", pres);
-println!("Current humidity: {}%RH", hum);
+let pressure = measurement.pressure.expect("should be enabled").get::<pascal>();
+let humidity = measurement.humidity.expect("should be enabled").get::<percent>();
+println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humidity);
 ```
 
-Note that every device is gated behind a crate feature, for example
-`bosch-bme280` for the device above. You can also disable all `sync` or `async`
-variants globally by disabling the respective feature.
+Generally, this crate never calls `.unwrap()` or other potentially panicking
+functions internally. All errors are propagated to the user, please make sure
+to handle them properly! So when using this driver in a real-world application,
+you can recover from errors at runtime or log what happened.
 
-## Architecture
+## Writing new device drivers
 
 Driver implementations are organized based on the manufacturer name and device
 name. Each driver exposes a struct with the name of the device, for example
@@ -116,7 +101,7 @@ name. Each driver exposes a struct with the name of the device, for example
 
 Usually the device owns an interface for communication. There are no further
 restrictions on the struct, so if it requires multiple interfaces or extra
-pins, then this is easily possible.
+pins, then this is of course possible.
 
 Most devices will expose a `new_i2c` and/or `new_spi` function to construct the
 appropriate object given an interface (and address if required).
@@ -151,8 +136,6 @@ may take input data and may produce output data.
 For each type of command, an executor needs to be defined that realizes the
 execution of the associated transaction sequence on the actual bus. For an
 example, have a look at any of the sensirion device drivers.
-
-[embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/) crate provides a simple way to
 
 ### Defining a register
 
@@ -409,6 +392,7 @@ please refer to the [embedded-interfaces](https://docs.rs/embedded-interfaces/la
 
 When writing new device drivers, please consider the following best-practices:
 
+- Never call any function that may `panic!`. Ever. Our drivers should not be able to crash userspace.
 - Expose all registers defined in the datasheet to allow accessing all device functions, only define functions for functionality
 - If the device is a sensor:
   - Create a `Measurement` struct (singular!) that holds all values measured
@@ -421,6 +405,13 @@ When writing new device drivers, please consider the following best-practices:
 
 Contributions are whole-heartedly welcome! Please feel free to suggest new features, implement device drivers,
 or generally suggest improvements.
+
+This project is split into several crates:
+
+- [embedded-devices](./embedded-devices), the main user-facing crate which contains the actual device driver implementations
+- [embedded-devices-derive](./embedded-devices-derive), a proc-macro for internal which simplifies some device definitions
+- [embedded-interfaces](./embedded-interfaces), traits and abstractions for register- and command-based device interfaces
+- [embedded-interfaces-codegen](./embedded-interfaces-codegen), a proc-macro which provides the interface definition DSL for bit-packed structs, enums and registers
 
 ## License
 

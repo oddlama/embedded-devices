@@ -26,9 +26,7 @@ impl<E: 'static> crate::registers::spi::Codec for UnsupportedCodec<E> {
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::spi::r#SpiDevice,
     {
-        panic!(
-            "spi::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
-        );
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 
     #[inline]
@@ -40,8 +38,6 @@ impl<E: 'static> crate::registers::spi::Codec for UnsupportedCodec<E> {
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice,
     {
-        panic!(
-            "spi::codecs::UnsupportedCodec cannot be used at runtime! Please specify a real codec to access this register."
-        );
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 }

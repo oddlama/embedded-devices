@@ -41,3 +41,4 @@ more general and brings its own bit-packing macro.
   until fixed point user types or auto conversion is supported.
 - Other `uom` base were disabled in order to speed up compilation by a large factor
 - Error types are now made with thiserror, and appropriate From<> impls were added to avoid excessive `.map_err()` calls
+- Removed all calls that can `panic!()`. From now on, all drivers in this crate are ready for usage in a high-reliability context.

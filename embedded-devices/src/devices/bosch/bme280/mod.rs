@@ -116,8 +116,6 @@ use uom::si::thermodynamic_temperature::degree_celsius;
 pub mod address;
 pub mod registers;
 
-use crate::utils::from_bus_error;
-
 use self::address::Address;
 use self::registers::{
     BurstMeasurementsPTH, Config, ControlHumidity, ControlMeasurement, IIRFilter, Id, Oversampling, SensorMode,
@@ -126,9 +124,9 @@ use self::registers::{
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum InitError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// Invalid chip id was encountered in `init`
     #[error("invalid chip id {0:#02x}")]
     InvalidChip(u8),
@@ -136,16 +134,13 @@ pub enum InitError<BusError> {
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum MeasurementError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// The calibration data was not yet read from the device, but a measurement was requested. Call `init` or `calibrate` first.
     #[error("not yet calibrated")]
     NotCalibrated,
 }
-
-from_bus_error!(InitError);
-from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -667,6 +662,10 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         let interval = self.measurement_interval_us().await?;
         self.delay.delay_us(interval).await;
-        self.current_measurement().await.map(Option::unwrap)
+        self.current_measurement().await?.ok_or_else(|| {
+            MeasurementError::Transport(TransportError::Unexpected(
+                "measurement was not ready even though we expected it to be",
+            ))
+        })
     }
 }

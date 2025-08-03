@@ -72,7 +72,7 @@ impl<const HEADER_SIZE: usize> crate::registers::i2c::Codec for StandardCodec<HE
         let mut buffer = Buffer::<{ HEADER_SIZE }, R> {
             header: R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..]
                 .try_into()
-                .expect("Unexpected compile-time header address size. This is a bug in the chosen Codec or embedded-registers."),
+                .map_err(|_| TransportError::Unexpected("wrong register address size - should not be able to occur"))?,
             register: *register.as_ref(),
         };
 

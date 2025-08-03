@@ -425,6 +425,7 @@ impl DataRate {
     /// Returns the interval of this data rate in microseconds.
     pub fn interval_us(&self) -> u32 {
         match self {
+            DataRate::Invalid(_) => 0,
             DataRate::F_200 => 5_000,
             DataRate::F_100 => 10_000,
             DataRate::F_50 => 20_000,
@@ -443,7 +444,6 @@ impl DataRate {
             DataRate::F_0_006 => 163_840_000,
             DataRate::F_0_003 => 327_680_000,
             DataRate::F_0_001_5 => 655_360_000,
-            DataRate::Invalid(_) => panic!("Cannot get interval of invalid DataRate"),
         }
     }
 }

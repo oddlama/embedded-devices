@@ -57,6 +57,7 @@
 
 use embedded_devices_derive::forward_register_fns;
 use embedded_devices_derive::sensor;
+use embedded_interfaces::TransportError;
 use registers::{
     Configuration, ConversionMode, FaultDetectionCycle, FaultThresholdHigh, FaultThresholdLow, FilterMode, WiringMode,
 };
@@ -64,15 +65,14 @@ use uom::si::f64::ThermodynamicTemperature;
 use uom::si::thermodynamic_temperature::degree_celsius;
 
 use crate::utils::callendar_van_dusen;
-use crate::utils::from_bus_error;
 
 pub mod registers;
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum FaultDetectionError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// Timeout (the detection never finished in the allocated time frame)
     #[error("fault detection timeout")]
     Timeout,
@@ -83,16 +83,13 @@ pub enum FaultDetectionError<BusError> {
 
 #[derive(Debug, defmt::Format, thiserror::Error)]
 pub enum MeasurementError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// A fault was detected. Read the FaultStatus register for details.
     #[error("fault detected")]
     FaultDetected,
 }
-
-from_bus_error!(FaultDetectionError);
-from_bus_error!(MeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -408,6 +405,10 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         let interval = self.measurement_interval_us().await?;
         self.delay.delay_us(interval).await;
-        self.current_measurement().await.map(Option::unwrap)
+        self.current_measurement().await?.ok_or_else(|| {
+            MeasurementError::Transport(TransportError::Unexpected(
+                "measurement was not ready even though we expected it to be",
+            ))
+        })
     }
 }

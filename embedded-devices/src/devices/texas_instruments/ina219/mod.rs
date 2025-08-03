@@ -86,8 +86,6 @@
 //! # }
 //! ```
 
-use crate::utils::from_bus_error;
-
 use self::address::Address;
 
 use embedded_devices_derive::{forward_register_fns, sensor};
@@ -101,9 +99,9 @@ pub mod registers;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// The conversion ready flag was not set within the expected time frame.
     #[error("conversion timeout")]
     Timeout,
@@ -115,17 +113,14 @@ pub enum MeasurementError<BusError> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ContinuousMeasurementError<BusError> {
-    /// Bus error
-    #[error("bus error")]
-    Bus(#[from] BusError),
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<(), BusError>),
     /// Measurement was ready, but an overflow occurred. The power and
     /// current measurement may be incorrect.
     #[error("overflow in measurement")]
     Overflow(Measurement),
 }
-
-from_bus_error!(MeasurementError);
-from_bus_error!(ContinuousMeasurementError);
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]

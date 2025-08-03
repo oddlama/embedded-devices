@@ -250,6 +250,8 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
         let interval = self.measurement_interval_us().await?;
         self.delay.delay_us(interval).await;
-        self.current_measurement().await.map(Option::unwrap)
+        self.current_measurement()
+            .await?
+            .ok_or_else(|| TransportError::Unexpected("measurement was not ready even though we expected it to be"))
     }
 }

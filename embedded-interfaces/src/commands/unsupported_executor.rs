@@ -2,8 +2,8 @@ use crate::TransportError;
 
 use super::{Command, Executor, i2c, spi};
 
-/// This dummy executor accepts and command and panics when used. If this is used, it means that
-/// the associated interface is not supported.
+/// This dummy executor accepts any command and does nothing when used. If this executor is used,
+/// it means that the associated interface is not supported.
 pub struct UnsupportedExecutor<E, C: Command + ?Sized> {
     _marker: core::marker::PhantomData<(E, C)>,
 }
@@ -30,7 +30,7 @@ impl<E, C: Command> i2c::Executor for UnsupportedExecutor<E, C> {
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
         A: hal::i2c::AddressMode + Copy,
     {
-        panic!("Unsupported interface!");
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 }
 
@@ -50,6 +50,6 @@ impl<E, C: Command> spi::Executor for UnsupportedExecutor<E, C> {
         D: hal::delay::DelayNs,
         I: hal::spi::r#SpiDevice,
     {
-        panic!("Unsupported interface!");
+        Err(TransportError::Unexpected("unsupported interface"))
     }
 }

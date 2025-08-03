@@ -105,17 +105,17 @@ impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for 
         let mut array = Vec::<u8, 64>::new();
         array
             .extend_from_slice(header)
-            .expect("Command id is too large for command buffer");
+            .map_err(|_| TransportError::Unexpected("command id: too large for command buffer"))?;
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
         let data = bytemuck::bytes_of(&input);
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
-                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
+                .map_err(|_| TransportError::Unexpected("command data: too large for buffer"))?;
             array
                 .push(crc.checksum(x))
-                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
+                .map_err(|_| TransportError::Unexpected("command data: too large for buffer"))?;
         }
 
         bound_bus.interface.write(bound_bus.address, &array).await?;
@@ -151,7 +151,7 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
         let mut array = Vec::<u8, 64>::new();
         array
             .resize_default(C::COMMAND_SIZE + C::COMMAND_SIZE / CHUNK_SIZE)
-            .expect("Command response data is too large for buffer");
+            .map_err(|_| TransportError::Unexpected("command response data: too large for buffer"))?;
 
         bound_bus.interface.read(bound_bus.address, &mut array).await?;
 
@@ -199,17 +199,17 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         let mut array = Vec::<u8, 64>::new();
         array
             .extend_from_slice(header)
-            .expect("Command id is too large for command buffer");
+            .map_err(|_| TransportError::Unexpected("command id: too large for command buffer"))?;
 
         let crc = crc::Crc::<u8>::new(&crc::CRC_8_NRSC_5);
         let data = bytemuck::bytes_of(&input);
         for x in data.chunks(CHUNK_SIZE) {
             array
                 .extend_from_slice(x)
-                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
+                .map_err(|_| TransportError::Unexpected("command data: too large for buffer"))?;
             array
                 .push(crc.checksum(x))
-                .expect("Command data too large for buffer. Raise an issue in embedded_interfaces.");
+                .map_err(|_| TransportError::Unexpected("command data: too large for buffer"))?;
         }
 
         bound_bus.interface.write(bound_bus.address, &array).await?;
@@ -218,7 +218,7 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
         let mut array = Vec::<u8, 64>::new();
         array
             .resize_default(C::COMMAND_SIZE + C::COMMAND_SIZE / CHUNK_SIZE)
-            .expect("Command response data is too large for buffer");
+            .map_err(|_| TransportError::Unexpected("command response data: too large for buffer"))?;
 
         bound_bus.interface.read(bound_bus.address, &mut array).await?;
 

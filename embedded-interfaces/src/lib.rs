@@ -19,9 +19,12 @@ pub mod spi;
 /// A combined error type for Codec or Bus errors
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError<CodecError, BusError> {
-    /// The codec failed to encore or decode this register
+    /// The codec failed to encode or decode something
     #[error("codec error")]
     Codec(CodecError),
+    /// An unexpected error
+    #[error("unexpected: {0}")]
+    Unexpected(&'static str),
     /// An error ocurred on the underlying interface
     #[error("bus error")]
     Bus(#[from] BusError),
