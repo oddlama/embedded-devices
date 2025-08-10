@@ -89,8 +89,9 @@ println!("Current measurement: {:?}°C, {:?} Pa, {:?}%RH", temp, pressure, humid
 
 Generally, this crate never calls `.unwrap()` or other potentially panicking
 functions internally. All errors are propagated to the user, please make sure
-to handle them properly! So when using this driver in a real-world application,
-you can recover from errors at runtime or log what happened.
+to handle them properly! When using this driver in a real-world application,
+you will be able to recover from errors at runtime or at least log what
+happened.
 
 ## Writing new device drivers
 
@@ -116,9 +117,10 @@ device requires a more complex codec.
 
 ### Register based devices
 
-The [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/) crate provides a simple way to
-define bit-packed registers, as well as an interface implementation to allow
-reading and writing those registers via I2C or SPI.
+The [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/)
+crate provides a simple way to define bit-packed registers, as well as an
+interface implementation to allow reading and writing those registers via I2C
+or SPI.
 
 A register usually refers to a specific memory address (or consecutive memory
 region) on the device by specifiying its start address. We also associate each
@@ -142,17 +144,19 @@ example, have a look at any of the sensirion device drivers.
 First, lets start with a very simple register definition. We will later create
 a device struct which we can use to read and write this register.
 
-To define our very simple register, we will use the special
-`interface_objects!` macro from
+To define our very simple register, we will use the special `interface_objects!` macro from
 [embedded-interfaces](https://docs.rs/embedded-interfaces/latest/embedded_interfaces/)
-which was creates specifically for this crate to make it simple and straight-forward to define bit-packed structs and registers.
+which was creates specifically for this crate to make it simple and
+straight-forward to define bit-packed structs and registers.
 
-Most devices support a burst-read/write operations, where you can begin reading from address `A` and will automatically receive
-values from the consecutive memory region until you stop reading. This means you can define registers with a `size > 1 byte`
-and will get the content you expect.
+Most devices support a burst-read/write operations, where you can begin reading
+from address `A` and will automatically receive values from the consecutive
+memory region until you stop reading. This means you can define registers with
+a `size > 1 byte` and will get the content you expect.
 
-Let's imagine our `MyDevice` had a 2-byte read-write register at device address `0x42(,0x43)`, which contains two `u8` values.
-We can define the corresponding register like so:
+Let's imagine our `MyDevice` had a 2-byte read-write register at device address
+`0x42(,0x43)`, which contains two `u8` values. We can define the corresponding
+register like so:
 
 ```rust
 use embedded_interfaces::codegen::interface_objects;
