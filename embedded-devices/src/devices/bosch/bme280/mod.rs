@@ -122,7 +122,8 @@ use self::registers::{
     TrimmingParameters1, TrimmingParameters2,
 };
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Transport error
     #[error("transport error")]
@@ -132,7 +133,8 @@ pub enum InitError<BusError> {
     InvalidChip(u8),
 }
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Transport error
     #[error("transport error")]

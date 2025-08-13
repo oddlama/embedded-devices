@@ -64,7 +64,8 @@
 use uom::si::{electric_potential::volt, f64::ElectricPotential};
 
 /// The ADC input channel
-#[derive(Copy, Clone, PartialEq, Eq, Debug, defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum InputChannel {
     /// Single channel 0
     Single0 = 0b1000,

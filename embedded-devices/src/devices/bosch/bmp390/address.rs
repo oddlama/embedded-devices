@@ -1,9 +1,8 @@
-use defmt::Format;
-
 const PRIMARY_ADDRESS: u8 = 0b1110110;
 const SECONDARY_ADDRESS: u8 = 0b1110111;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
     /// Primary device address 0b1110110 (SDO connected to GND).
     Primary,

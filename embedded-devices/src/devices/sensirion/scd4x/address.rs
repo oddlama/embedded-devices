@@ -1,6 +1,7 @@
 const ADDRESS: u8 = 0x62;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
     /// Default address
     Default,

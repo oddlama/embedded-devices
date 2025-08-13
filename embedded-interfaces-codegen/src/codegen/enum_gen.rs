@@ -74,11 +74,20 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
 
     // Generate the enum definition
     let enum_doc = format!("Enum width: {} bits", bit_size);
+    let derive_attrs = if cfg!(feature = "defmt") {
+        quote! {
+            #[derive(Copy, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
+        }
+    } else {
+        quote! {
+            #[derive(Copy, Clone, PartialEq, Eq, core::fmt::Debug)]
+        }
+    };
     let enum_def_code = quote! {
         #(#attributes)*
         #[doc = ""]
         #[doc = #enum_doc]
-        #[derive(Copy, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]
+        #derive_attrs
         pub enum #enum_name {
             #(#enum_variants,)*
         }

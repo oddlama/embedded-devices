@@ -4,7 +4,8 @@ use embedded_interfaces::{TransportError, commands::Command, define_executor};
 use heapless::Vec;
 
 /// An error representing CRC errors.
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum Crc8Error {
     #[error("the calculated crc checksum {calculated:#02x} did not match the expected value {expected:#02x}")]
     CrcMismatch { calculated: u8, expected: u8 },

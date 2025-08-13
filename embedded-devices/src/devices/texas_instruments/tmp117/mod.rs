@@ -78,7 +78,7 @@ pub mod registers;
 
 use self::registers::{AveragingMode, Configuration, ConversionMode, Temperature};
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Transport error
     #[error("transport error")]
@@ -88,7 +88,7 @@ pub enum InitError<BusError> {
     InvalidDeviceId(u16),
 }
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum EepromError<BusError> {
     /// Transport error
     #[error("transport error")]

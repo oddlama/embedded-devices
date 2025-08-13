@@ -90,7 +90,8 @@ pub mod commands;
 /// Any CRC or Bus related error
 pub type TransportError<E> = embedded_interfaces::TransportError<Crc8Error, E>;
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Transport error
     #[error("transport error")]

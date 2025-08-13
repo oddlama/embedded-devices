@@ -68,7 +68,8 @@ use crate::utils::callendar_van_dusen;
 
 pub mod registers;
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum FaultDetectionError<BusError> {
     /// Transport error
     #[error("transport error")]
@@ -81,7 +82,8 @@ pub enum FaultDetectionError<BusError> {
     FaultDetected,
 }
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum MeasurementError<BusError> {
     /// Transport error
     #[error("transport error")]

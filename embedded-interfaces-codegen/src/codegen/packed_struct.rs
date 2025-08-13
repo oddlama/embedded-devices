@@ -109,10 +109,19 @@ fn generate_unpacked_struct(
 
     // Generate the byte conversion method
     let pack_body = super::pack::generate_pack_body(interface_def, packed_name, processed_fields, size)?;
+    let derive_attrs = if cfg!(feature = "defmt") {
+        quote! {
+            #[derive(Copy, Clone, PartialEq, core::fmt::Debug, defmt::Format)]
+        }
+    } else {
+        quote! {
+            #[derive(Copy, Clone, PartialEq, core::fmt::Debug)]
+        }
+    };
 
     Ok(quote! {
         #(#doc_attrs)*
-        #[derive(Copy, Clone, PartialEq, core::fmt::Debug, defmt::Format)]
+        #derive_attrs
         pub struct #unpacked_name {
             #(#struct_fields,)*
         }

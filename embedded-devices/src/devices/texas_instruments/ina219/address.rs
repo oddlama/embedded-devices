@@ -1,5 +1,3 @@
-use defmt::Format;
-
 const ADDRESS_A0_GND_A1_GND: u8 = 0b1000000;
 const ADDRESS_A0_VCC_A1_GND: u8 = 0b1000001;
 const ADDRESS_A0_SDA_A1_GND: u8 = 0b1000010;
@@ -17,7 +15,8 @@ const ADDRESS_A0_VCC_A1_SCL: u8 = 0b1001101;
 const ADDRESS_A0_SDA_A1_SCL: u8 = 0b1001110;
 const ADDRESS_A0_SCL_A1_SCL: u8 = 0b1001111;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Pin {
     /// Address pin connected to GND
     Gnd,
@@ -29,7 +28,8 @@ pub enum Pin {
     Scl,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
     /// Address selection pins A0 and A1 tied to specific pins
     A0A1(Pin, Pin),

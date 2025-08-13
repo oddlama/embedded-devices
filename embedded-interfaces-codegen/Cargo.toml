@@ -19,3 +19,7 @@ prettyplease = "0.2.35"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
+
+[features]
+default = []
+defmt = []

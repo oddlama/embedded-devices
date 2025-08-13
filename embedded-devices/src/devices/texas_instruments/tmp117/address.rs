@@ -1,11 +1,10 @@
-use defmt::Format;
-
 const ADDRESS_GND: u8 = 0b1001000; // 0x48
 const ADDRESS_VCC: u8 = 0b1001001; // 0x49
 const ADDRESS_SDA: u8 = 0b1001010; // 0x4A
 const ADDRESS_SCL: u8 = 0b1001011; // 0x4B
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
     /// Address selection pin connected to GND
     Gnd,

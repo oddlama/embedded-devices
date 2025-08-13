@@ -110,7 +110,8 @@ use uom::si::f64::{ElectricCharge, ElectricCurrent, ElectricPotential, Electrica
 pub mod address;
 pub mod registers;
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Transport error
     #[error("transport error")]

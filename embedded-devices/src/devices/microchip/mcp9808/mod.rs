@@ -75,7 +75,8 @@ pub mod registers;
 
 use self::registers::{AmbientTemperature, Configuration, DeviceIdRevision, ManufacturerId, Resolution, ShutdownMode};
 
-#[derive(Debug, defmt::Format, thiserror::Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
 pub enum InitError<BusError> {
     /// Transport error
     #[error("transport error")]
