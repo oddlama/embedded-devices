@@ -17,8 +17,8 @@ bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 defmt = "1.0.1"
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-interfaces = { version = "0.9.13", path = "../embedded-interfaces", default-features = false }
-embedded-devices-derive = { version = "0.9.13", path = "../embedded-devices-derive" }
+embedded-interfaces = { version = "0.10.0", path = "../embedded-interfaces", default-features = false }
+embedded-devices-derive = { version = "0.10.0", path = "../embedded-devices-derive" }
 maybe-async-cfg = "0.2.5"
 paste = "1.0.15"
 # uom = { version = "0.36.0", features = ["f32", "f64", "si", "rational32", "rational64"], default-features = false }

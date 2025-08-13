@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-devices"
-version = "0.9.13"
+version = "0.10.0"
 dependencies = [
  "approx",
  "bytemuck",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-devices-derive"
-version = "0.9.13"
+version = "0.10.0"
 dependencies = [
  "convert_case",
  "darling",
@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-interfaces"
-version = "0.9.13"
+version = "0.10.0"
 dependencies = [
  "bitvec",
  "bytemuck",
@@ -255,7 +255,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-interfaces-codegen"
-version = "0.9.13"
+version = "0.10.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
