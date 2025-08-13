@@ -5,13 +5,13 @@ This release includes several breaking changes!
 The whole crate was reworked to allow non-register based interfaces (such as
 commands) and allow a more ergonomic definition of bit-packed structs. New
 traits have been added to unify how different devices are initialized, reset
-and used - especially sensors which now implement their measurements using a
+and used - especially sensors which now implement measurements using a
 common abstraction.
 
 ## Features / Improvements
 
 `embedded-registers` was retired in favor of `embedded-interfaces`, which is
-more general and brings its own bit-packing macro.
+more general and brings its own ergonomic bit-packing macro.
 
 #### Devices
 
@@ -29,16 +29,15 @@ more general and brings its own bit-packing macro.
 
 #### Codecs
 
-- Codecs can now return errors, so CRC errors no longer panic
-- Codecs were reworked to no longer operate on a specific interface type. Instead,
-  they are now only responsible for encoding and decoding registers to bytes.
+- Codecs can now return specific errors
 
 #### General
 
-- `uom` types always use `f64` to reduce compile times and make usage easier.
+- Removed all calls that can `panic!()`. From now on, all drivers in this crate are 100% panic-free
+  and thus ready to be used in a high-reliability contexts.
+- All `uom` types now always use `f64` to reduce compile times and make usage easier.
   While `rational32`/`rational64` do retain better precision, usage is awkward and
   rational reduction calculations are pretty slow. `f64` seemed like the best compromise
   until fixed point user types or auto conversion is supported.
-- Other `uom` base were disabled in order to speed up compilation by a large factor
-- Error types are now made with thiserror, and appropriate From<> impls were added to avoid excessive `.map_err()` calls
-- Removed all calls that can `panic!()`. From now on, all drivers in this crate are ready for usage in a high-reliability context.
+- Other `uom` bases were disabled in order to speed up compilation significantly
+- Error types are now made with `thiserror`, and appropriate `From<E>` impls were added to avoid excessive `.map_err()` calls
