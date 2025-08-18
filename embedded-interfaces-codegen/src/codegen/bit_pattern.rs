@@ -24,14 +24,12 @@ impl NormalizedRange {
     pub fn new(start: usize, end: usize) -> Result<Self, String> {
         if start == end {
             return Err(format!(
-                "Invalid empty bit pattern: {}..{} (must cover at least 1 bit)",
-                start, end
+                "Invalid empty bit pattern: {start}..{end} (must cover at least 1 bit)"
             ));
         }
         if start >= end {
             return Err(format!(
-                "Invalid bit range: {}..{} (start must be less than end)",
-                start, end
+                "Invalid bit range: {start}..{end} (start must be less than end)"
             ));
         }
         Ok(NormalizedRange { start, end })
@@ -239,7 +237,7 @@ fn process_single_field(
             match field.endianness {
                 Endianness::Little(span) => {
                     // split range every 8 bits and reverse
-                    if (end_bit - start_bit) % 8 != 0 {
+                    if !(end_bit - start_bit).is_multiple_of(8) {
                         return Err(syn::Error::new(
                             span,
                             "The little endian constraint can only be used on types which are a multiple of 8 bits in size",
@@ -270,7 +268,7 @@ fn process_single_field(
             match field.endianness {
                 Endianness::Little(span) => {
                     // split range every 8 bits and reverse
-                    if (end_bit - start_bit) % 8 != 0 {
+                    if !(end_bit - start_bit).is_multiple_of(8) {
                         return Err(syn::Error::new(
                             span,
                             "The little endian constraint can only be used on types which are a multiple of 8 bits in size",
@@ -326,8 +324,7 @@ fn validate_size_constraint(
                     return Err(syn::Error::new_spanned(
                         field_type,
                         format!(
-                            "Size constraint {} bits exceeds maximum size {} bits for type '{}'",
-                            size_constraint, max_size, type_name
+                            "Size constraint {size_constraint} bits exceeds maximum size {max_size} bits for type '{type_name}'"
                         ),
                     ));
                 }
@@ -354,8 +351,7 @@ fn validate_size_constraint(
                     return Err(syn::Error::new_spanned(
                         field_type,
                         format!(
-                            "Size constraint {} bits exceeds maximum size {} bits for array type",
-                            size_constraint, max_size
+                            "Size constraint {size_constraint} bits exceeds maximum size {max_size} bits for array type"
                         ),
                     ));
                 }
@@ -451,8 +447,7 @@ fn infer_field_size_bits(interface_def: &InterfaceObjectsDefinition, field_type:
                         _ => Err(syn::Error::new_spanned(
                             field_type,
                             format!(
-                                "Cannot infer bit size for type '{}'. Please specify an explicit bit pattern.",
-                                type_name
+                                "Cannot infer bit size for type '{type_name}'. Please specify an explicit bit pattern."
                             ),
                         )),
                     }
@@ -540,10 +535,7 @@ fn validate_bit_coverage(
         if total_size_bits != 0 {
             return Err(syn::Error::new_spanned(
                 parent,
-                format!(
-                    "Bit coverage does not match expected size. Expected {} bits, found 0 bits.",
-                    total_size_bits
-                ),
+                format!("Bit coverage does not match expected size. Expected {total_size_bits} bits, found 0 bits."),
             ));
         }
 

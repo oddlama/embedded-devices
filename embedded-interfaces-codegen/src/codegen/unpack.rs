@@ -111,7 +111,7 @@ pub fn generate_accessors(
                                         &sub_processed,
                                         &ranges,
                                         &field_doc,
-                                        &format!("{}{}_", prefix, field_name),
+                                        &format!("{prefix}{field_name}_"),
                                     )?);
                                 }
 
@@ -302,7 +302,7 @@ fn generate_unpack_expression(
                         "f32" | "f64" => generate_float_unpack(field_name, &type_name, ranges),
                         "usize" | "isize" | "char" => Err(syn::Error::new_spanned(
                             field_name,
-                            format!("Type '{}' is not supported for bit manipulation", type_name),
+                            format!("Type '{type_name}' is not supported for bit manipulation"),
                         )),
                         _ => generate_custom_type_unpack(field_name, field_type, ranges),
                     }
@@ -349,10 +349,7 @@ fn generate_unsigned_unpack(
     if total_bits > type_bits {
         return Err(syn::Error::new_spanned(
             field_name,
-            format!(
-                "Field requires {} bits but type {} can only hold {} bits",
-                total_bits, type_name, type_bits
-            ),
+            format!("Field requires {total_bits} bits but type {type_name} can only hold {type_bits} bits"),
         ));
     }
 
@@ -389,10 +386,7 @@ fn generate_signed_unpack(
     if total_bits > type_bits {
         return Err(syn::Error::new_spanned(
             field_name,
-            format!(
-                "Field requires {} bits but type {} can only hold {} bits",
-                total_bits, type_name, type_bits
-            ),
+            format!("Field requires {total_bits} bits but type {type_name} can only hold {type_bits} bits"),
         ));
     }
 
@@ -433,10 +427,7 @@ fn generate_float_unpack(field_name: &Ident, type_name: &str, ranges: &[Normaliz
     if total_bits != type_bits {
         return Err(syn::Error::new_spanned(
             field_name,
-            format!(
-                "Float type {} requires exactly {} bits, but {} bits were provided",
-                type_name, type_bits, total_bits
-            ),
+            format!("Float type {type_name} requires exactly {type_bits} bits, but {total_bits} bits were provided"),
         ));
     }
 
@@ -489,10 +480,7 @@ fn generate_array_unpack(
     if total_actual_bits != total_expected_bits {
         return Err(syn::Error::new_spanned(
             field_name,
-            format!(
-                "This array requires {} bits but {} bits were provided",
-                total_expected_bits, total_actual_bits
-            ),
+            format!("This array requires {total_expected_bits} bits but {total_actual_bits} bits were provided"),
         ));
     }
 
@@ -530,10 +518,7 @@ fn generate_struct_unpack(
     if total_bits != type_bits {
         return Err(syn::Error::new_spanned(
             field_name,
-            format!(
-                "Struct type {} requires exactly {} bits, but {} bits were provided",
-                packed_name, type_bits, total_bits
-            ),
+            format!("Struct type {packed_name} requires exactly {type_bits} bits, but {total_bits} bits were provided"),
         ));
     }
 
@@ -586,8 +571,7 @@ fn generate_custom_type_unpack(
             return Err(syn::Error::new_spanned(
                 field_name,
                 format!(
-                    "Custom types occupying {} bits are not supported. It needs to have at most 128 bits.",
-                    total_bits
+                    "Custom types occupying {total_bits} bits are not supported. It needs to have at most 128 bits."
                 ),
             ));
         }

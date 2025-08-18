@@ -411,7 +411,7 @@ impl EnumDefinition {
                 if let Some(overlap_value) = ranges_overlap(&all_captured_ranges, &captured_ranges) {
                     return Err(syn::Error::new_spanned(
                         &variant.name,
-                        format!("Value {} is captured by multiple variants", overlap_value),
+                        format!("Value {overlap_value} is captured by multiple variants"),
                     ));
                 }
 

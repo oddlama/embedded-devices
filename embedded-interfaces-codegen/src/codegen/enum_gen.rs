@@ -25,7 +25,7 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
 
         if let Some(cap_type) = &variant.capture_value {
             let pattern = generate_pattern(&variant.pattern);
-            let doc = format!("Value pattern: `{}`\n\nCaptures the specific value.", pattern);
+            let doc = format!("Value pattern: `{pattern}`\n\nCaptures the specific value.");
 
             // Variant captures the underlying value
             enum_variants.push(quote! {
@@ -73,7 +73,7 @@ pub fn generate_enum(enum_def: &EnumDefinition) -> syn::Result<TokenStream2> {
     }
 
     // Generate the enum definition
-    let enum_doc = format!("Enum width: {} bits", bit_size);
+    let enum_doc = format!("Enum width: {bit_size} bits");
     let derive_attrs = if cfg!(feature = "defmt") {
         quote! {
             #[derive(Copy, Clone, PartialEq, Eq, core::fmt::Debug, defmt::Format)]

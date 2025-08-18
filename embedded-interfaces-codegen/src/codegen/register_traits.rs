@@ -93,9 +93,6 @@ fn generate_mode_traits(register_name: &Ident, mode: &str) -> syn::Result<TokenS
             impl embedded_interfaces::registers::ReadableRegister for #register_name {}
             impl embedded_interfaces::registers::WritableRegister for #register_name {}
         }),
-        _ => Err(syn::Error::new_spanned(
-            register_name,
-            format!("Invalid mode: {}", mode),
-        )),
+        _ => Err(syn::Error::new_spanned(register_name, format!("Invalid mode: {mode}"))),
     }
 }

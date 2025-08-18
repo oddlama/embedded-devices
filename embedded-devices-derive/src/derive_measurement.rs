@@ -53,7 +53,7 @@ fn extract_measurement_impl(struct_name: &syn::Ident, field: &Field) -> Result<O
 
     let field_type = &field.ty;
 
-    let trait_name = format!("{}Measurement", measurement_type);
+    let trait_name = format!("{measurement_type}Measurement");
     let trait_ident = syn::Ident::new(&trait_name, measurement_type.span());
 
     let method_name = measurement_type.to_string().to_case(Case::Snake);
@@ -78,25 +78,22 @@ fn extract_measurement_impl(struct_name: &syn::Ident, field: &Field) -> Result<O
 }
 
 fn is_option_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == "Option";
-        }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == "Option";
     }
     false
 }
 
 fn extract_option_inner_type(ty: &syn::Type) -> proc_macro2::TokenStream {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if segment.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                        return quote! { #inner_ty };
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Option"
+        && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+    {
+        return quote! { #inner_ty };
     }
     quote! { #ty } // fallback
 }

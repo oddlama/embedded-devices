@@ -13,7 +13,7 @@ pub fn get_type_bits(type_name: &str) -> usize {
         "u32" | "i32" | "f32" => 32,
         "u64" | "i64" | "f64" => 64,
         "u128" | "i128" => 128,
-        _ => panic!("Unknown type: {}", type_name),
+        _ => panic!("Unknown type: {type_name}"),
     }
 }
 
