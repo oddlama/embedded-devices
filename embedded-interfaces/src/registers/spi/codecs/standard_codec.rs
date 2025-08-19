@@ -114,7 +114,18 @@ impl<
         data[HEADER_SIZE - 1 - (RW_BIT as usize) / 8] |= (RW_1_IS_READ as u8) << (RW_BIT % 8);
         Self::fill_addr_header::<R>(data);
         interface.transfer_in_place(data).await?;
-        Ok(buffer.register)
+
+        // Moving it into a variable ensures alignment.
+        let register = buffer.register;
+
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "SPI [32mread[m register_addr={:08x}:\n{}",
+            R::ADDRESS,
+            register.bitdump()
+        );
+
+        Ok(register)
     }
 
     #[inline]
@@ -126,6 +137,13 @@ impl<
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::spi::r#SpiDevice,
     {
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "SPI [32mwrite[m register_addr={:08x}:\n{}",
+            R::ADDRESS,
+            register.as_ref().bitdump()
+        );
+
         #[repr(C, packed(1))]
         #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]
         struct Buffer<const HEADER_SIZE: usize, R> {

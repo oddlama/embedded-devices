@@ -201,6 +201,7 @@ dependencies = [
  "embedded-hal-async",
  "embedded-interfaces",
  "heapless",
+ "log",
  "maybe-async-cfg",
  "paste",
  "thiserror",
@@ -247,6 +248,7 @@ dependencies = [
  "embedded-hal-async",
  "embedded-interfaces-codegen",
  "heapless",
+ "log",
  "maybe-async-cfg",
  "thiserror",
  "trybuild",
@@ -348,6 +350,12 @@ name = "konst_macro_rules"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
+
+[[package]]
+name = "log"
+version = "0.4.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "manyhow"

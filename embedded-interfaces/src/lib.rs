@@ -10,6 +10,7 @@ pub use bitvec;
 pub use bytemuck;
 pub use const_format;
 
+pub mod bitdump;
 pub mod commands;
 pub mod i2c;
 pub mod packable;
@@ -28,6 +29,14 @@ pub enum TransportError<CodecError, BusError> {
     /// An error ocurred on the underlying interface
     #[error("bus error")]
     Bus(#[from] BusError),
+}
+
+/// Objects that implement this trait can produce a pretty-printed bit-dump of it's internal
+/// structure.
+pub trait BitdumpFormattable {
+    #[cfg(feature = "std")]
+    /// Returns a bitdump formatter for the current object.
+    fn bitdump(&self) -> bitdump::BitdumpFormatter;
 }
 
 pub mod codegen {

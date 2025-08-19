@@ -27,6 +27,7 @@ uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1
 crc = "3.3.0"
 thiserror = { version = "2.0.12", default-features = false }
 heapless = "0.8.0"
+log = { version = "0.4", optional = true }
 
 [features]
 default = ["sync", "async"]
@@ -34,7 +35,12 @@ default = ["sync", "async"]
 sync = ["embedded-interfaces/sync"]
 async = ["dep:embedded-hal-async", "embedded-interfaces/async"]
 defmt = ["dep:defmt"]
-std = ["thiserror/std"]
+std = ["thiserror/std", "embedded-interfaces/std"]
+# Enables logging for this library
+log = ["dep:log"]
+# Trace-log all device communication. This is a feature intended for debugging only!
+# This has a heavy performance hit and no safety guarantees. Don't use this in production.
+trace-communication = ["std", "embedded-interfaces/trace-communication"]
 
 # Feature flags to enable all supported devices
 all-devices = [

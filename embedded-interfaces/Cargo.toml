@@ -21,6 +21,7 @@ embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-interfaces-codegen = { version = "0.10.0", path = "../embedded-interfaces-codegen" }
 heapless = "0.8.0"
+log = { version = "0.4", optional = true }
 maybe-async-cfg = "0.2.5"
 thiserror = { version = "2.0.12", default-features = false }
 
@@ -34,4 +35,9 @@ default = ["sync", "async"]
 sync = []
 async = ["dep:embedded-hal-async"]
 defmt = ["dep:defmt", "embedded-interfaces-codegen/defmt"]
-std = ["thiserror/std", "bitvec/std"]
+std = ["thiserror/std", "bitvec/std", "embedded-interfaces-codegen/std"]
+# Enables logging for this library
+log = ["dep:log"]
+# Trace-log all device communication. This is a feature intended for debugging only!
+# This has a heavy performance hit and no safety guarantees. Don't use this in production.
+trace-communication = ["log", "std"]

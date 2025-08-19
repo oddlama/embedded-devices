@@ -9,12 +9,30 @@ pub trait RegisterCodec {
     type Error: core::fmt::Debug;
 }
 
+#[cfg(feature = "std")]
+/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
+/// necessary feature "std" is enabled.
+pub trait MaybeBitdumpFormattable: crate::BitdumpFormattable {}
+
+#[cfg(feature = "std")]
+// Blanket impl
+impl<T: crate::BitdumpFormattable> MaybeBitdumpFormattable for T {}
+
+#[cfg(not(feature = "std"))]
+/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
+/// necessary feature "std" is enabled.
+pub trait MaybeBitdumpFormattable {}
+
+#[cfg(not(feature = "std"))]
+// Blanket impl
+impl<T> MaybeBitdumpFormattable for T {}
+
 /// The basis trait for all registers. A register is a type that maps to a specific register on an
 /// embedded device and should own the raw data required for this register.
 ///
 /// Additionally, a register knows the virtual address ossociated to the embedded device, and a
 /// bitfield representation of the data content.
-pub trait Register: Default + Clone + bytemuck::Pod {
+pub trait Register: Default + Clone + bytemuck::Pod + MaybeBitdumpFormattable {
     /// The size of the register in bytes
     const REGISTER_SIZE: usize;
     /// The virtual address of this register

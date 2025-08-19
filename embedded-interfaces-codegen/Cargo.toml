@@ -23,3 +23,4 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 [features]
 default = []
 defmt = []
+std = []

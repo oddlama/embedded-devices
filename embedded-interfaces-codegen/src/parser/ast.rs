@@ -129,9 +129,19 @@ pub struct BitPattern {
 /// Individual bit range
 #[derive(Debug, Clone)]
 pub enum BitRange {
-    Single(usize),                // [5]
-    Range(usize, usize),          // [5..8]
-    RangeInclusive(usize, usize), // [5..=8]
+    Single(usize),                // 5
+    Range(usize, usize),          // 5..8
+    RangeInclusive(usize, usize), // 5..=8
+}
+
+impl std::fmt::Display for BitRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BitRange::Single(s) => write!(f, "{s}"),
+            BitRange::Range(a, b) => write!(f, "{a}..{b}"),
+            BitRange::RangeInclusive(a, b) => write!(f, "{a}..={b}"),
+        }
+    }
 }
 
 /// Units block with quantity, unit, and scale information

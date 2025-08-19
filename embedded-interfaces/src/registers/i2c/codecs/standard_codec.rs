@@ -43,12 +43,21 @@ impl<const HEADER_SIZE: usize> crate::registers::i2c::Codec for StandardCodec<HE
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
         let header = &R::ADDRESS.to_be_bytes()[core::mem::size_of_val(&R::ADDRESS) - HEADER_SIZE..];
         let mut register = R::zeroed();
         let data = bytemuck::bytes_of_mut(&mut register);
         bound_bus.interface.write_read(bound_bus.address, header, data).await?;
+
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [32mread[m i2c_addr={:?} register_addr={:08x}:\n{}",
+            bound_bus.address,
+            R::ADDRESS,
+            register.bitdump()
+        );
+
         Ok(register)
     }
 
@@ -60,8 +69,16 @@ impl<const HEADER_SIZE: usize> crate::registers::i2c::Codec for StandardCodec<HE
     where
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [31mwrite[m i2c_addr={:?} register_addr={:08x}:\n{}",
+            bound_bus.address,
+            R::ADDRESS,
+            register.as_ref().bitdump()
+        );
+
         #[repr(C, packed(1))]
         #[derive(Copy, Clone, bytemuck::Pod, Zeroable)]
         struct Buffer<const HEADER_SIZE: usize, R> {

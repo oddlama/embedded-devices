@@ -21,7 +21,7 @@ pub trait Codec: RegisterCodec {
     where
         R: Register<CodecError = Self::Error> + ReadableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy;
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug;
 
     /// Write this register through the given I2C interface.
     async fn write_register<R, I, A>(
@@ -31,7 +31,7 @@ pub trait Codec: RegisterCodec {
     where
         R: Register<CodecError = Self::Error> + WritableRegister,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy;
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug;
 }
 
 #[maybe_async_cfg::maybe(
@@ -42,7 +42,7 @@ pub trait Codec: RegisterCodec {
 impl<I, A> crate::registers::RegisterInterface for crate::i2c::I2cDevice<I, A>
 where
     I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-    A: hal::i2c::AddressMode + Copy,
+    A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
 {
     type BusError = I::Error;
 
