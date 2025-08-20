@@ -1,4 +1,4 @@
-use crate::TransportError;
+use crate::{MaybeBitdumpFormattable, TransportError};
 
 pub mod i2c;
 pub mod spi;
@@ -18,9 +18,9 @@ pub trait Executor {
 /// Commands can both have input and output data.
 pub trait Command {
     /// The input data type
-    type In: bytemuck::Pod;
+    type In: bytemuck::Pod + MaybeBitdumpFormattable;
     /// The output data type
-    type Out: bytemuck::Pod + bytemuck::Zeroable;
+    type Out: bytemuck::Pod + bytemuck::Zeroable + MaybeBitdumpFormattable;
 
     /// A common error type which can represent all associated executor errors
     type ExecutorError: core::fmt::Debug;

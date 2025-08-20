@@ -1,4 +1,4 @@
-use crate::TransportError;
+use crate::{MaybeBitdumpFormattable, TransportError};
 
 pub mod i2c;
 pub mod spi;
@@ -8,24 +8,6 @@ pub trait RegisterCodec {
     /// An error type for codec specific errors
     type Error: core::fmt::Debug;
 }
-
-#[cfg(feature = "std")]
-/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
-/// necessary feature "std" is enabled.
-pub trait MaybeBitdumpFormattable: crate::BitdumpFormattable {}
-
-#[cfg(feature = "std")]
-// Blanket impl
-impl<T: crate::BitdumpFormattable> MaybeBitdumpFormattable for T {}
-
-#[cfg(not(feature = "std"))]
-/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
-/// necessary feature "std" is enabled.
-pub trait MaybeBitdumpFormattable {}
-
-#[cfg(not(feature = "std"))]
-// Blanket impl
-impl<T> MaybeBitdumpFormattable for T {}
 
 /// The basis trait for all registers. A register is a type that maps to a specific register on an
 /// embedded device and should own the raw data required for this register.

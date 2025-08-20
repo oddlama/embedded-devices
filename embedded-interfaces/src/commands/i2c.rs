@@ -17,7 +17,7 @@ pub trait Executor: crate::commands::r#Executor {
     where
         D: hal::delay::DelayNs,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy;
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug;
 }
 
 #[maybe_async_cfg::maybe(
@@ -28,7 +28,7 @@ pub trait Executor: crate::commands::r#Executor {
 impl<I, A> crate::commands::CommandInterface for crate::i2c::I2cDevice<I, A>
 where
     I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-    A: hal::i2c::AddressMode + Copy,
+    A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
 {
     type BusError = I::Error;
 

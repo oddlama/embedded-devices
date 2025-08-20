@@ -74,8 +74,16 @@ impl<C: SensirionSendCommand> embedded_interfaces::commands::i2c::Executor for S
     where
         D: hal::delay::DelayNs,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [32mwrite[m i2c_addr={:?} SensirionSendCommand(id={id:0w$x})",
+            bound_bus.address,
+            id = C::COMMAND_ID,
+            w = C::COMMAND_ID_LEN
+        );
+
         let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         bound_bus.interface.write(bound_bus.address, header).await?;
         delay.delay_ms(C::EXECUTION_TIME_MS).await;
@@ -98,9 +106,18 @@ impl<C: SensirionWriteCommand> embedded_interfaces::commands::i2c::Executor for 
     where
         D: hal::delay::DelayNs,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
         const CHUNK_SIZE: usize = 2;
+
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [32mwrite[m i2c_addr={:?} SensirionWriteCommand(id={id:0w$x}):\n{}",
+            bound_bus.address,
+            embedded_interfaces::BitdumpFormattable::bitdump(&input),
+            id = C::COMMAND_ID,
+            w = C::COMMAND_ID_LEN,
+        );
 
         let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         let mut array = Vec::<u8, 64>::new();
@@ -140,7 +157,7 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
     where
         D: hal::delay::DelayNs,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
         use bytemuck::Zeroable;
         const CHUNK_SIZE: usize = 2;
@@ -170,6 +187,15 @@ impl<C: SensirionReadCommand> embedded_interfaces::commands::i2c::Executor for S
             }
         }
 
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [31mread[m i2c_addr={:?} SensirionReadCommand(id={id:0w$x}):\n{}",
+            bound_bus.address,
+            embedded_interfaces::BitdumpFormattable::bitdump(&out),
+            id = C::COMMAND_ID,
+            w = C::COMMAND_ID_LEN,
+        );
+
         Ok(out)
     }
 }
@@ -191,10 +217,19 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
     where
         D: hal::delay::DelayNs,
         I: hal::i2c::I2c<A> + hal::i2c::ErrorType,
-        A: hal::i2c::AddressMode + Copy,
+        A: hal::i2c::AddressMode + Copy + core::fmt::Debug,
     {
         use bytemuck::Zeroable;
         const CHUNK_SIZE: usize = 2;
+
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [32mwrite[m i2c_addr={:?} SensirionWriteReadCommand(id={id:0w$x}):\n{}",
+            bound_bus.address,
+            embedded_interfaces::BitdumpFormattable::bitdump(&input),
+            id = C::COMMAND_ID,
+            w = C::COMMAND_ID_LEN,
+        );
 
         let header = &C::COMMAND_ID.to_be_bytes()[core::mem::size_of_val(&C::COMMAND_ID) - C::COMMAND_ID_LEN..];
         let mut array = Vec::<u8, 64>::new();
@@ -236,6 +271,15 @@ impl<C: SensirionWriteReadCommand> embedded_interfaces::commands::i2c::Executor
                 return Err(TransportError::Codec(Crc8Error::CrcMismatch { calculated, expected }));
             }
         }
+
+        #[cfg(feature = "trace-communication")]
+        log::trace!(
+            "I2C [31mread[m i2c_addr={:?} SensirionWriteReadCommand(id={id:0w$x}):\n{}",
+            bound_bus.address,
+            embedded_interfaces::BitdumpFormattable::bitdump(&out),
+            id = C::COMMAND_ID,
+            w = C::COMMAND_ID_LEN,
+        );
 
         Ok(out)
     }

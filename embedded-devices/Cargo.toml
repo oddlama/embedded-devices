@@ -40,7 +40,7 @@ std = ["thiserror/std", "embedded-interfaces/std"]
 log = ["dep:log"]
 # Trace-log all device communication. This is a feature intended for debugging only!
 # This has a heavy performance hit and no safety guarantees. Don't use this in production.
-trace-communication = ["std", "embedded-interfaces/trace-communication"]
+trace-communication = ["std", "log", "embedded-interfaces/trace-communication"]
 
 # Feature flags to enable all supported devices
 all-devices = [

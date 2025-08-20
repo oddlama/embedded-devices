@@ -33,11 +33,36 @@ pub enum TransportError<CodecError, BusError> {
 
 /// Objects that implement this trait can produce a pretty-printed bit-dump of it's internal
 /// structure.
+#[cfg(feature = "std")]
 pub trait BitdumpFormattable {
-    #[cfg(feature = "std")]
     /// Returns a bitdump formatter for the current object.
     fn bitdump(&self) -> bitdump::BitdumpFormatter;
 }
+
+#[cfg(feature = "std")]
+impl BitdumpFormattable for () {
+    fn bitdump(&self) -> bitdump::BitdumpFormatter {
+        bitdump::BitdumpFormatter::new("()".to_string(), vec![], vec![])
+    }
+}
+
+#[cfg(feature = "std")]
+/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
+/// necessary feature "std" is enabled.
+pub trait MaybeBitdumpFormattable: crate::BitdumpFormattable {}
+
+#[cfg(feature = "std")]
+// Blanket impl
+impl<T: crate::BitdumpFormattable> MaybeBitdumpFormattable for T {}
+
+#[cfg(not(feature = "std"))]
+/// A helper trait that conditionally binds to BitdumpFormattable depending on whether the
+/// necessary feature "std" is enabled.
+pub trait MaybeBitdumpFormattable {}
+
+#[cfg(not(feature = "std"))]
+// Blanket impl
+impl<T> MaybeBitdumpFormattable for T {}
 
 pub mod codegen {
     // re-export the derive stuff

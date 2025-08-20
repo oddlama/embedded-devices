@@ -40,6 +40,9 @@ registers. It automatically generates:
 - **Unpacked variants** for easier access and manipulation
 - **Accessor** methods that don't require full unpacking/packing
 - **Unit conversion functions** when physical units are specified
+- **Debug format** as in the image below to debug struct layout issues
+
+<img width="2285" height="1329" alt="image" src="https://github.com/user-attachments/assets/54d03aee-5dcb-4204-9ce4-ccd1bc6715d0" />
 
 ### Basic Struct Definition
 

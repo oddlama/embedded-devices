@@ -93,6 +93,12 @@ to handle them properly! When using this driver in a real-world application,
 you will be able to recover from errors at runtime or at least log what
 happened.
 
+If you are a driver developer you can also enable the `trace-communication`
+feature to have all device communication logged in a verbose format for
+debugging purposes:
+
+<img width="2285" height="1329" alt="image" src="https://github.com/user-attachments/assets/54d03aee-5dcb-4204-9ce4-ccd1bc6715d0" />
+
 ## Writing new device drivers
 
 Driver implementations are organized based on the manufacturer name and device
