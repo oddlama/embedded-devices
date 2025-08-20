@@ -191,18 +191,18 @@ interface_objects! {
 
     /// Device-internal calibration registers (section 1)
     register TrimmingParameters1(addr = 0x88, mode = r, size = 26) {
-        dig_t1: u16,
-        dig_t2: i16,
-        dig_t3: i16,
-        dig_p1: u16,
-        dig_p2: i16,
-        dig_p3: i16,
-        dig_p4: i16,
-        dig_p5: i16,
-        dig_p6: i16,
-        dig_p7: i16,
-        dig_p8: i16,
-        dig_p9: i16,
+        dig_t1: u16{le},
+        dig_t2: i16{le},
+        dig_t3: i16{le},
+        dig_p1: u16{le},
+        dig_p2: i16{le},
+        dig_p3: i16{le},
+        dig_p4: i16{le},
+        dig_p5: i16{le},
+        dig_p6: i16{le},
+        dig_p7: i16{le},
+        dig_p8: i16{le},
+        dig_p9: i16{le},
         /// Reserved byte
         _: u8,
         dig_h1: u8,
@@ -210,7 +210,7 @@ interface_objects! {
 
     /// Device-internal calibration registers (section 2)
     register TrimmingParameters2(addr = 0xe1, mode = r, size = 7) {
-        dig_h2: i16,
+        dig_h2: i16{le},
         dig_h3: u8,
         dig_h4_msb: i8,
         dig_h5_lsn_h4_lsn: i8,
