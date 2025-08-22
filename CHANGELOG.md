@@ -1,3 +1,11 @@
+# v0.10.1
+
+- Fixed wrong BME280 trimming parameter definition
+- Add BitdumpFormatter for `std` execution environments. This provides a
+  hexdump-like output format for all bit-packed structs
+- Enabling the `trace-communication` will log all registers that are being sent or received
+  for debugging purposes
+
 # v0.10.0
 
 This release includes several breaking changes!
