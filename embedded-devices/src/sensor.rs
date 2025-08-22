@@ -1,7 +1,7 @@
 use paste::paste;
 use uom::si::f64::{
-    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, Illuminance, MassConcentration, Power, Pressure, Ratio,
-    ThermodynamicTemperature, Velocity,
+    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, /*Illuminance,*/ MassConcentration, Power,
+    Pressure, Ratio, ThermodynamicTemperature, Velocity,
 };
 
 /// This trait is implemented for any sensor specific measurement struct.
@@ -104,7 +104,7 @@ define_sensor_measurement!(Co2Concentration, Ratio, "CO2 concentration");
 define_sensor_measurement!(Current, ElectricCurrent, "current");
 define_sensor_measurement!(Energy, Energy, "energy");
 define_sensor_measurement!(HchoConcentration, Ratio, "HCHO concentration");
-define_sensor_measurement!(Illuminance, Illuminance, "illuminance");
+// define_sensor_measurement!(Illuminance, Illuminance, "illuminance");
 define_sensor_measurement!(NoxIndex, Ratio, "NOx index");
 define_sensor_measurement!(Pm10Concentration, MassConcentration, "PM10 concentration");
 define_sensor_measurement!(Pm1Concentration, MassConcentration, "PM1 concentration");
