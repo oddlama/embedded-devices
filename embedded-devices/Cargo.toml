@@ -33,7 +33,7 @@ default = ["sync", "async"]
 
 sync = ["embedded-interfaces/sync"]
 async = ["dep:embedded-hal-async", "embedded-interfaces/async"]
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "embedded-interfaces/defmt"]
 std = ["thiserror/std", "embedded-interfaces/std"]
 # Enables logging for this library
 log = ["dep:log"]
