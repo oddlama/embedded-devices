@@ -1,7 +1,7 @@
 use paste::paste;
 use uom::si::f64::{
-    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, /*Illuminance,*/ MassConcentration, Power,
-    Pressure, Ratio, ThermodynamicTemperature, Velocity,
+    ElectricCharge, ElectricCurrent, ElectricPotential, Energy, Frequency, MassConcentration, Power, Pressure, Ratio,
+    ThermodynamicTemperature, Velocity,
 };
 
 /// This trait is implemented for any sensor specific measurement struct.
@@ -118,3 +118,4 @@ define_sensor_measurement!(Temperature, ThermodynamicTemperature, "temperature")
 define_sensor_measurement!(VocIndex, Ratio, "VOC index");
 define_sensor_measurement!(Voltage, ElectricPotential, "voltage");
 define_sensor_measurement!(WindSpeed, Velocity, "wind speed");
+define_sensor_measurement!(Frequency, Frequency, "frequency");

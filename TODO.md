@@ -2,6 +2,7 @@
 - make #[register(default = )] add a #[doc] annotation
 - move sensor and device traits into a new crate embedded-devices-hal
 - untangle bme and bmp
+- Configuration -> Config
 
 codegen:
 

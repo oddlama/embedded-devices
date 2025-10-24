@@ -12,20 +12,20 @@ categories.workspace = true
 license.workspace = true
 
 [dependencies]
-approx = { version = "0.5.1", default-features = false }
-bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
+approx = { version = "0.5", default-features = false }
+bytemuck = { version = "1.23", features = ["derive", "min_const_generics"] }
 defmt = { version = "1.0", optional = true }
-embedded-hal = "1.0.0"
-embedded-hal-async = { version = "1.0.0", optional = true }
+embedded-hal = "1.0"
+embedded-hal-async = { version = "1.0", optional = true }
 embedded-interfaces = { version = "0.10.1", path = "../embedded-interfaces", default-features = false }
 embedded-devices-derive = { version = "0.10.1", path = "../embedded-devices-derive" }
-maybe-async-cfg = "0.2.5"
-paste = "1.0.15"
+maybe-async-cfg = "0.2"
+paste = "1.0"
 uom = { version = "0.37.0", features = ["f64", "si"], default-features = false }
 # uom = { git = "https://github.com/iliekturtles/uom", rev = "b64af636bdff2119e5f1e0e5ad5206a326403e79", features = ["f64", "si"], default-features = false }
-crc = "3.3.0"
+crc = "3.3"
 thiserror = { version = "2.0.12", default-features = false }
-heapless = "0.8.0"
+heapless = "0.9"
 log = { version = "0.4", optional = true }
 
 [features]
@@ -44,6 +44,7 @@ trace-communication = ["std", "log", "embedded-interfaces/trace-communication"]
 # Feature flags to enable all supported devices
 all-devices = [
 	"analog_devices-max31865",
+	"belling-bl0942",
 	"bosch-bme280",
 	"bosch-bmp280",
 	"bosch-bmp390",
@@ -67,6 +68,9 @@ all-devices = [
 
 # Analog Devices
 analog_devices-max31865 = []
+
+# Belling
+belling-bl0942 = []
 
 # Bosch
 bosch-bme280 = []
