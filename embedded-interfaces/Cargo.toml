@@ -19,7 +19,7 @@ crc = "3.3.0"
 defmt = { version = "1.0", optional = true }
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-interfaces-codegen = { version = "0.10.1", path = "../embedded-interfaces-codegen" }
+embedded-interfaces-codegen = { version = "0.10.2", path = "../embedded-interfaces-codegen" }
 heapless = "0.8.0"
 log = { version = "0.4", optional = true }
 maybe-async-cfg = "0.2.5"
