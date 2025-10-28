@@ -4,6 +4,7 @@ edition = "2024"
 description = "Device driver implementations for many embedded sensors and devices"
 documentation = "https://docs.rs/embedded-devices"
 keywords = ["sensor", "embedded", "device", "driver", "peripheral"]
+rust-version = "1.89"
 version.workspace = true
 authors.workspace = true
 homepage.workspace = true
