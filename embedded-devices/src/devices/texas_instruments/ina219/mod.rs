@@ -304,7 +304,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the operating mode to
-    /// [`self::registers::OperatingMode::ShuntAndBusTriggered´] and enable all conversion outputs causing the
+    /// [`self::registers::OperatingMode::ShuntAndBusTriggered`] and enable all conversion outputs causing the
     /// device to perform a single conversion a return to sleep afterwards.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         let reg_conf = self.read_register::<self::registers::Configuration>().await?;
