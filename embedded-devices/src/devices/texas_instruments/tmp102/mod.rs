@@ -162,7 +162,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     type Error = TransportError<(), I::BusError>;
     type Measurement = Measurement;
 
-    /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration´].
+    /// Performs a one-shot measurement. This will set `shutdown` in [`self::registers::Configuration`].
     /// which will cause the device to perform a single conversion a return to sleep mode afterwards.
     ///
     /// This function will initialize the measurement, wait until the data is acquired and return

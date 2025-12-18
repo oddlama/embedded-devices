@@ -253,7 +253,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement. This will set the conversion mode to
-    /// [`self::registers::ConversionMode::Oneshot´] causing the device to perform a
+    /// [`self::registers::ConversionMode::Oneshot`] causing the device to perform a
     /// single conversion a return to sleep afterwards.
     async fn measure(&mut self) -> Result<Self::Measurement, Self::Error> {
         // Read current averaging mode to determine required measurement delay
