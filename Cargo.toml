@@ -3,8 +3,8 @@ resolver = "2"
 members = [
     "embedded-devices",
     "embedded-devices-derive",
-	"embedded-interfaces",
-	"embedded-interfaces-codegen",
+    "embedded-interfaces",
+    "embedded-interfaces-codegen",
 ]
 
 [workspace.package]

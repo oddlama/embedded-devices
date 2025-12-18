@@ -2703,3 +2703,50 @@ fn test_nested_struct_accessor_promotion() {
     assert_eq!(read_level2.mid_value, 100);
     assert_eq!(read_level2.level3.deep_value, 200);
 }
+
+#[test]
+fn test_bit_order_in_pattern() {
+    // Test for issue #19: bit patterns should respect ordering
+    // [1,0] should be different from [0,1] for MSB-first encoding
+    interface_objects! {
+        enum SomeMode: u8{2} {
+            0b00 A,
+            0b01 B,
+            0b10 C,
+            0b11 D,
+        }
+
+        struct Normal(size = 1) {
+            val: SomeMode[0,1] = SomeMode::A,
+            _: u8{6} = 0
+        }
+
+        struct Flipped(size = 1) {
+            val: SomeMode[1,0] = SomeMode::A,
+            _: u8{6} = 0
+        }
+    }
+
+    // Normal: bits [0,1] means bit 0 is MSB, bit 1 is LSB
+    // So SomeMode::B (0b01) should have bit 0=0, bit 1=1
+    // In byte: 0b01000000
+    let normal_b = NormalUnpacked { val: SomeMode::B }.pack();
+    assert_eq!(normal_b.0, [0b01000000]);
+
+    // Flipped: bits [1,0] means bit 1 is MSB, bit 0 is LSB
+    // So SomeMode::B (0b01) should have bit 1=0, bit 0=1
+    // In byte: 0b10000000
+    let flipped_b = FlippedUnpacked { val: SomeMode::B }.pack();
+    assert_eq!(flipped_b.0, [0b10000000]);
+
+    // Normal::val=SomeMode::B should match Flipped::val=SomeMode::C
+    // Because C=0b10, which flipped becomes the same bit pattern
+    let normal_b = NormalUnpacked { val: SomeMode::B }.pack();
+    let flipped_c = FlippedUnpacked { val: SomeMode::C }.pack();
+    assert_eq!(normal_b.0, flipped_c.0, "Normal::B should equal Flipped::C");
+
+    // And vice versa
+    let normal_c = NormalUnpacked { val: SomeMode::C }.pack();
+    let flipped_b = FlippedUnpacked { val: SomeMode::B }.pack();
+    assert_eq!(normal_c.0, flipped_b.0, "Normal::C should equal Flipped::B");
+}

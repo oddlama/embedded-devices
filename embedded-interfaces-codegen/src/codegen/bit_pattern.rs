@@ -47,8 +47,15 @@ impl NormalizedRange {
         self.end == other.start || other.end == self.start
     }
 
+    /// Check if this range is adjacent to another in increasing order
+    pub fn is_adjacent_increasing(&self, other: &NormalizedRange) -> bool {
+        self.end == other.start
+    }
+
     pub fn can_merge(&self, other: &NormalizedRange) -> bool {
-        self.overlaps(other) || self.is_adjacent(other)
+        // Only merge if overlapping OR adjacent in increasing order
+        // This preserves intentional bit ordering like [1,0] vs [0,1]
+        self.overlaps(other) || self.is_adjacent_increasing(other)
     }
 
     pub fn merge(&self, other: &NormalizedRange) -> NormalizedRange {
