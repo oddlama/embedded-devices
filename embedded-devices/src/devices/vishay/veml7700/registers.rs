@@ -57,29 +57,29 @@ interface_objects! {
         /// ALS interrupt enable
         interrupt_enable: bool[6] = false,
         /// Reserved bits
-        _: u8[5,4],
+        _: u8[4,5],
         /// ALS persistence protect number
-        interrupt_threshold_count: InterruptThresholdCount[3,2] = InterruptThresholdCount::One,
+        interrupt_threshold_count: InterruptThresholdCount[2,3] = InterruptThresholdCount::One,
         /// ALS integration time
-        integration_time: IntegrationTime[15,14,1,0] = IntegrationTime::T_100,
+        integration_time: IntegrationTime[14,15,0,1] = IntegrationTime::T_100,
         /// Reserved bit
         _: u8[13],
         /// ALS gain
-        gain: Gain[12,11] = Gain::X_1_8,
+        gain: Gain[11,12] = Gain::X_1_8,
         /// Reserved bits
-        _: u8[10,9,8],
+        _: u8[8,9,10],
     }
 
     // TODO: verify bit order
     register HighThresholdWindow(addr = 0x01, mode = rw, size = 2) {
         /// ALS high threshold window setting
-        als_high_threshold: u16,
+        als_high_threshold: u16{le},
     }
 
     // TODO: verify bit order
     register LowThresholdWindow(addr = 0x02, mode = rw, size = 2) {
         /// ALS low threshold window setting
-        als_low_threshold: u16,
+        als_low_threshold: u16{le},
     }
 
     enum PowerSavingMode: u8{2} {
@@ -97,27 +97,28 @@ interface_objects! {
         /// Power saving enable
         power_saving_enable: bool[7] = false,
         /// Power saving mode
-        power_saving_mode: PowerSavingMode[6,5] = PowerSavingMode::Mode1,
+        power_saving_mode: PowerSavingMode[5,6] = PowerSavingMode::Mode1,
         /// Reserved bits
         _: u16[0..5,8..16],
     }
 
     register ALSData(addr = 0x04, mode = r, size = 2) {
         /// ALS channel data
-        als_data: u16[8,9,10,11,12,13,14,15,0,1,2,3,4,5,6,7],
+        als_data: u16{le},
     }
 
     register WhiteData(addr = 0x05, mode = r, size = 2) {
         /// White channel data
-        white_data: u16[8,9,10,11,12,13,14,15,0,1,2,3,4,5,6,7],
+        white_data: u16{le},
     }
 
     register InterruptStatus(addr = 0x06, mode = r, size = 2) {
         /// Reserved bits
-        _: u16{14},
-
-        int_threshold_high: bool = false,
+        _: u8,
         int_threshold_low: bool = false,
+        int_threshold_high: bool = false,
+        /// Reserved bits
+        _: u8{6},
     }
 
     enum AddressOption: u8 {
