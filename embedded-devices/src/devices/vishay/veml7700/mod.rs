@@ -1,3 +1,69 @@
+//! The VEML7700 is a very high sensitivity, high accuracy ambient light sensor.
+//! It includes a highly sensitive photodiode, low-noise amplifier, 16-bit A/D converter,
+//! and supports an easy-to-use I2C bus communication interface and additional interrupt feature.
+//!
+//! The ambient light read-out is available as a digital value, and the built-in photodiode
+//! response is near that of the human eye. The 16-bit dynamic range for ambient light
+//! detection is 0 lx to ~140 klx, with resolution down to 0.0042 lx/ct.
+//!
+//! Besides 100 Hz and 120 Hz flicker noise rejection and a low temperature coefficient,
+//! the device consumes just 0.5 μA in shut down mode. In addition, another four Power saving
+//! modes are available that allow operating current to be reduced down to just 2 μA.
+//! The device operates within a temperature range of -25 °C to +85 °C.
+//!
+//! The VEML7700’s very high sensitivity of just 0.0042 lx allows the sensor to be placed
+//! behind very dark cover glasses that will dramatically reduce the total light reaching it.
+//! The sensor will also work behind clear cover glass, because even very high illumination
+//! (such as direct sunlight) will not saturate the device and read-outs up to 140 klx are possible.
+//!
+//! ## Usage (sync)
+//!
+//! ```rust
+//! # #[cfg(feature = "sync")] mod test {
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   D: embedded_hal::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::vishay::veml7700::{VEML7700Sync, address::Address};
+//! use embedded_devices::sensor::OneshotSensorSync;
+//!
+//! // Create and initialize the device
+//! let mut veml7700 = VEML7700Sync::new_i2c(delay, i2c, Address::Regular);
+//! veml7700.init().unwrap();
+//!
+//! // One-shot read the ambient light level in lux
+//! let measurement = veml7700.measure().unwrap();
+//! println!("Ambient light measurement: {:?} lux", measurement.lux);
+//! # Ok(())
+//! # }
+//! # }
+//! ```
+//!
+//! ## Usage (async)
+//!
+//! ```rust
+//! # #[cfg(feature = "async")] mod test {
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), I::Error>
+//! # where
+//! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   D: embedded_hal_async::delay::DelayNs
+//! # {
+//! use embedded_devices::devices::vishay::veml7700::{VEML7700Async, address::Address};
+//! use embedded_devices::sensor::OneshotSensorAsync;
+//!
+//! // Create and initialize the device
+//! let mut veml7700 = VEML7700Async::new_i2c(delay, i2c, Address::Regular);
+//! veml7700.init().await.unwrap();
+//!
+//! // One-shot read the ambient light level in lux
+//! let measurement = veml7700.measure().await.unwrap();
+//! println!("Ambient light measurement: {:?} lux", measurement.lux);
+//! # Ok(())
+//! # }
+//! # }
+//! ```
+
 use embedded_devices_derive::forward_register_fns;
 use embedded_interfaces::TransportError;
 
@@ -31,11 +97,17 @@ pub enum MeasurementError<BusError> {
     Transport(#[from] TransportError<(), BusError>),
 }
 
+/// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
     pub lux: f32, //uom::si::Illuminance,
 }
 
+/// The VEML7700 is a high accuracy digital ambient light sensor.
+/// It has a wide dynamic rangeof 0 lx to 140 klx with a resolution ranging from
+/// 0.0042 lx/ct to 2.1504 lx/ct depending on the used gain and integration time settings.
+///
+/// For a full description and usage examples, refer to the [module documentation](self).
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),

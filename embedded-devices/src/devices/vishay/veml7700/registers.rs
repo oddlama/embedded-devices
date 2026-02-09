@@ -12,6 +12,7 @@ interface_objects! {
 
     register_devices [ super::VEML7700 ]
 
+    /// Measurement gain
     #[allow(non_camel_case_types)]
     enum Gain: u8{2} {
         /// x1 gain
@@ -24,6 +25,7 @@ interface_objects! {
         0b11 X_1_4,
     }
 
+    /// Measurement integration time
     #[allow(non_camel_case_types)]
     enum IntegrationTime: u8{4} {
         /// 25 ms
@@ -41,8 +43,8 @@ interface_objects! {
         _ Invalid(u8),
     }
 
-    /// Number of consecutive measurements that must exceed
-    /// one of the thresholds to generate an interrupt
+    /// Number of consecutive out-of-threshold measurements
+    /// necessary to generate an interrupt
     #[allow(non_camel_case_types)]
     enum InterruptThresholdCount: u8{2} {
         0b00 One,
@@ -51,6 +53,7 @@ interface_objects! {
         0b11 Eight,
     }
 
+    /// Configuration register
     register Configuration(addr = 0x00, mode = rw, size = 2) {
         /// ALS shutdown
         shutdown: bool[7] = true,
@@ -70,18 +73,19 @@ interface_objects! {
         _: u8[8,9,10],
     }
 
-    // TODO: verify bit order
+    /// High threshold window register
     register HighThresholdWindow(addr = 0x01, mode = rw, size = 2) {
         /// ALS high threshold window setting
         als_high_threshold: u16{le},
     }
 
-    // TODO: verify bit order
+    /// Low threshold window register
     register LowThresholdWindow(addr = 0x02, mode = rw, size = 2) {
         /// ALS low threshold window setting
         als_low_threshold: u16{le},
     }
 
+    /// Power saving modes
     enum PowerSavingMode: u8{2} {
         /// 500 ms extra delay between measurements
         0b00 Mode1,
@@ -93,6 +97,7 @@ interface_objects! {
         0b11 Mode4,
     }
 
+    /// Power saving register
     register PowerSaving(addr = 0x03, mode = rw, size = 2) {
         /// Power saving enable
         power_saving_enable: bool[7] = false,
@@ -102,16 +107,19 @@ interface_objects! {
         _: u16[0..5,8..16],
     }
 
+    /// ALS channel measurement data
     register ALSData(addr = 0x04, mode = r, size = 2) {
         /// ALS channel data
         als_data: u16{le},
     }
 
+    /// White channel measurement data
     register WhiteData(addr = 0x05, mode = r, size = 2) {
         /// White channel data
         white_data: u16{le},
     }
 
+    /// Interrupt status register
     register InterruptStatus(addr = 0x06, mode = r, size = 2) {
         /// Reserved bits
         _: u8,
@@ -121,17 +129,20 @@ interface_objects! {
         _: u8{6},
     }
 
+    /// Known address options
     enum AddressOption: u8 {
         0xC4 AddressA,
         0xD4 AddressB,
         _ Invalid(u8),
     }
 
+    /// Known device ids
     enum DeviceIDCode: u8 {
         0x81 VEML7700,
         _ Invalid(u8),
     }
 
+    /// Device ID register
     register DeviceID(addr = 0x07, mode = r, size = 2) {
         device_id: DeviceIDCode = DeviceIDCode::Invalid(0),
         address_option_code: AddressOption = AddressOption::Invalid(0),
