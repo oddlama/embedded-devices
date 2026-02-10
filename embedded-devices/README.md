@@ -47,6 +47,7 @@ Below you will find a list of all currently supported devices. Please visit thei
 | Sensirion | SEN65 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen65/index.html) |
 | Sensirion | SEN66 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen66/index.html) |
 | Sensirion | SEN68 | I2C | Particulate matter (PM1, PM2.5, PM4, PM10), CO₂, VOC, NOₓ, HCHO, temperature and relative humidity sensor | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/sensirion/sen68/index.html) |
+| Vishay | VEML7700 | I2C | High accuracy ambient light sensor with dynamic range | [Docs](https://docs.rs/embedded-devices/latest/embedded_devices/devices/vishay/veml7700/index.html) |
 
 ## Quick start
 

@@ -3,6 +3,7 @@
 - move sensor and device traits into a new crate embedded-devices-hal
 - untangle bme and bmp
 - Configuration -> Config
+- update VEML7700 to use uom::si::illuminance::lux once uom 0.38 is out
 
 codegen:
 
