@@ -2,6 +2,7 @@
 //!
 #![cfg_attr(not(doctest), doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md")))]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 pub mod device;
 pub mod devices;
