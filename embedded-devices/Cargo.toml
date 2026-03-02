@@ -106,5 +106,8 @@ sensirion-stcc4 = []
 # Vishay
 vishay-veml7700 = []
 
+[dev-dependencies]
+anyhow = "1"
+
 [package.metadata.docs.rs]
 all-features = true

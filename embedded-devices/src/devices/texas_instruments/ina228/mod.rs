@@ -147,6 +147,12 @@ pub enum ContinuousMeasurementError<BusError> {
     /// current measurement may be incorrect.
     #[error("overflow in measurement")]
     Overflow(Measurement),
+    /// No new measurement was available when `next_measurement` was called.
+    ///
+    /// The caller is responsible for waiting at least `measurement_interval_us`
+    /// before calling `next_measurement`.
+    #[error("no measurement data available")]
+    DataNotReady,
 }
 
 /// Measurement data
@@ -501,39 +507,40 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         Ok(diag.read_conversion_ready())
     }
 
-    /// Wait indefinitely until new measurements are available and return them. Checks whether data
-    /// is ready in intervals of 100us.
+    /// Attempts to read the next measurement without polling or retrying.
+    ///
+    /// Returns [`ContinuousMeasurementError::DataNotReady`] if no new conversion is available.
+    /// The caller is responsible for timing — wait at least `measurement_interval_us`
+    /// since the last successful read before calling this.
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
-        loop {
-            let diag = self.read_register::<self::registers::DiagnosticsAndAlert>().await?;
-            if diag.read_conversion_ready() {
-                let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
-                let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
-                let temperature = self.read_register::<self::registers::Temperature>().await?;
-                let current = self.read_register::<self::registers::Current>().await?;
-                let energy = self.read_register::<self::registers::Energy>().await?;
-                let charge = self.read_register::<self::registers::Charge>().await?;
-                // Reading this register clears the conversion_ready flag
-                let power = self.read_register::<self::registers::Power>().await?;
+        let diag = self.read_register::<self::registers::DiagnosticsAndAlert>().await?;
+        if !diag.read_conversion_ready() {
+            return Err(ContinuousMeasurementError::DataNotReady);
+        }
 
-                let measurement = Measurement {
-                    shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
-                    bus_voltage: bus_voltage.read_value(),
-                    temperature: temperature.read_value(),
-                    current: current.read_current(self.current_lsb_na),
-                    power: power.read_power(self.current_lsb_na),
-                    energy: energy.read_energy(self.current_lsb_na),
-                    charge: charge.read_charge(self.current_lsb_na),
-                };
+        let bus_voltage = self.read_register::<self::registers::BusVoltage>().await?;
+        let shunt_voltage = self.read_register::<self::registers::ShuntVoltage>().await?;
+        let temperature = self.read_register::<self::registers::Temperature>().await?;
+        let current = self.read_register::<self::registers::Current>().await?;
+        let energy = self.read_register::<self::registers::Energy>().await?;
+        let charge = self.read_register::<self::registers::Charge>().await?;
+        // Reading this register clears the conversion_ready flag
+        let power = self.read_register::<self::registers::Power>().await?;
 
-                if diag.read_math_overflow() {
-                    return Err(ContinuousMeasurementError::Overflow(measurement));
-                } else {
-                    return Ok(measurement);
-                }
-            }
+        let measurement = Measurement {
+            shunt_voltage: shunt_voltage.read_voltage(self.adc_range),
+            bus_voltage: bus_voltage.read_value(),
+            temperature: temperature.read_value(),
+            current: current.read_current(self.current_lsb_na),
+            power: power.read_power(self.current_lsb_na),
+            energy: energy.read_energy(self.current_lsb_na),
+            charge: charge.read_charge(self.current_lsb_na),
+        };
 
-            self.delay.delay_us(100).await;
+        if diag.read_math_overflow() {
+            Err(ContinuousMeasurementError::Overflow(measurement))
+        } else {
+            Ok(measurement)
         }
     }
 }

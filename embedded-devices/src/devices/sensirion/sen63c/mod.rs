@@ -9,7 +9,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen63c::TransportError<I::Error>>
+//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen63c::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
 //! #   D: embedded_hal::delay::DelayNs
@@ -49,7 +49,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen63c::TransportError<I::Error>>
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::sen63c::MeasurementError<I::Error>>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
 //! #   D: embedded_hal_async::delay::DelayNs
@@ -101,6 +101,21 @@ pub mod commands;
 
 /// Any CRC or Bus related error
 pub type TransportError<E> = embedded_interfaces::TransportError<Crc8Error, E>;
+
+/// Errors that can occur while waiting for or reading a measurement
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<BusError>),
+    /// No new measurement was available when `next_measurement` was called.
+    ///
+    /// The caller is responsible for waiting at least `measurement_interval_us`
+    /// before calling `next_measurement`.
+    #[error("no measurement data available")]
+    DataNotReady,
+}
 
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
@@ -195,11 +210,16 @@ where
 )]
 impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> SEN63C<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, and resetting the device.
+    ///
+    /// # Power-on timing
+    ///
+    /// The datasheet requires at least 100 ms between VDD reaching the operating voltage and
+    /// the first I2C command. The caller must ensure this delay has elapsed before calling
+    /// `init`. Calling `init` immediately after `new_i2c` without an external delay may result
+    /// in a failed initialization.
     pub async fn init(&mut self) -> Result<(), TransportError<I::BusError>> {
         use crate::device::ResettableDevice;
 
-        // Datasheet specifies 100ms before I2C communication may be started
-        self.delay.delay_ms(100).await;
         self.reset().await?;
 
         Ok(())
@@ -262,7 +282,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
 impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::ContinuousSensor
     for SEN63C<D, I>
 {
-    type Error = TransportError<I::BusError>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Starts continuous measurement.
@@ -307,16 +327,15 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
         Ok(self.execute::<GetDataReady>(()).await?.read_data_ready() == DataReadyStatus::Ready)
     }
 
-    /// Wait indefinitely until new measurements are available and return them. Checks whether data
-    /// is ready in intervals of 100ms.
+    /// Attempts to read the next measurement without polling or retrying.
+    ///
+    /// Returns [`MeasurementError::DataNotReady`] if no new measurement is available.
+    /// The caller is responsible for timing — wait at least
+    /// `measurement_interval_us` since the last successful read before calling this.
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
-        loop {
-            if self.is_measurement_ready().await? {
-                return self.current_measurement().await?.ok_or_else(|| {
-                    TransportError::Unexpected("measurement was not ready even though we expected it to be")
-                });
-            }
-            self.delay.delay_ms(100).await;
+        if !self.is_measurement_ready().await? {
+            return Err(MeasurementError::DataNotReady);
         }
+        self.current_measurement().await?.ok_or(MeasurementError::DataNotReady)
     }
 }

@@ -9,10 +9,11 @@
 //! ## Usage (sync)
 //!
 //! ```rust
-//! # #[cfg(feature = "sync")] mod test {
-//! # fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::scd41::InitError<I::Error>>
+//! # #[cfg(all(feature = "sync", feature = "std"))] mod test {
+//! # fn test<I, D>(mut i2c: I, delay: D) -> anyhow::Result<()>
 //! # where
 //! #   I: embedded_hal::i2c::I2c + embedded_hal::i2c::ErrorType,
+//! #   I::Error: std::error::Error + Send + Sync + 'static,
 //! #   D: embedded_hal::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::sensirion::scd41::{SCD41Sync, address::Address};
@@ -42,10 +43,11 @@
 //! ## Usage (async)
 //!
 //! ```rust
-//! # #[cfg(feature = "async")] mod test {
-//! # async fn test<I, D>(mut i2c: I, delay: D) -> Result<(), embedded_devices::devices::sensirion::scd41::InitError<I::Error>>
+//! # #[cfg(all(feature = "async", feature = "std"))] mod test {
+//! # async fn test<I, D>(mut i2c: I, delay: D) -> anyhow::Result<()>
 //! # where
 //! #   I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType,
+//! #   I::Error: std::error::Error + Send + Sync + 'static,
 //! #   D: embedded_hal_async::delay::DelayNs
 //! # {
 //! use embedded_devices::devices::sensirion::scd41::{SCD41Async, address::Address};
@@ -99,6 +101,21 @@ pub enum InitError<BusError> {
     /// Invalid sensor variant was encountered
     #[error("invalid sensor variant {0:?}")]
     InvalidSensorVariant(SensorVariant),
+}
+
+/// Errors that can occur while waiting for or reading a measurement
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, thiserror::Error)]
+pub enum MeasurementError<BusError> {
+    /// Transport error
+    #[error("transport error")]
+    Transport(#[from] TransportError<BusError>),
+    /// No new measurement was available when `next_measurement` was called.
+    ///
+    /// The caller is responsible for waiting at least `measurement_interval_us`
+    /// before calling `next_measurement`.
+    #[error("no measurement data available")]
+    DataNotReady,
 }
 
 /// Measurement data
@@ -176,11 +193,16 @@ pub trait SCD41Command {}
 impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> SCD41<D, I> {
     /// Initializes the sensor by stopping any ongoing measurement, resetting the device and
     /// verifying the sensor variant.
+    ///
+    /// # Power-on timing
+    ///
+    /// The datasheet requires at least 30 ms between VDD reaching the operating voltage and
+    /// the first I2C command. The caller must ensure this delay has elapsed before calling
+    /// `init`. Calling `init` immediately after `new_i2c` without an external delay may result
+    /// in a failed initialization.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
         use crate::device::ResettableDevice;
 
-        // Datasheet specifies 30ms before sensor has reached idle state after power-up.
-        self.delay.delay_ms(30).await;
         self.reset().await?;
 
         // Verify sensor variant
@@ -250,7 +272,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
 impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::ContinuousSensor
     for SCD41<D, I>
 {
-    type Error = TransportError<I::BusError>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Starts continuous measurement.
@@ -285,17 +307,16 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
         Ok(self.execute::<GetDataReady>(()).await?.read_data_ready() == DataReadyStatus::Ready)
     }
 
-    /// Wait indefinitely until new measurements are available and return them. Checks whether data
-    /// is ready in intervals of 100ms.
+    /// Attempts to read the next measurement without polling or retrying.
+    ///
+    /// Returns [`MeasurementError::DataNotReady`] if no new measurement is available.
+    /// The caller is responsible for timing — wait at least
+    /// `measurement_interval_us` since the last successful read before calling this.
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
-        loop {
-            if self.is_measurement_ready().await? {
-                return self.current_measurement().await?.ok_or_else(|| {
-                    TransportError::Unexpected("measurement was not ready even though we expected it to be")
-                });
-            }
-            self.delay.delay_ms(100).await;
+        if !self.is_measurement_ready().await? {
+            return Err(MeasurementError::DataNotReady);
         }
+        self.current_measurement().await?.ok_or(MeasurementError::DataNotReady)
     }
 }
 
@@ -312,7 +333,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
 impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface> crate::sensor::OneshotSensor
     for SCD41<D, I>
 {
-    type Error = TransportError<I::BusError>;
+    type Error = MeasurementError<I::BusError>;
     type Measurement = Measurement;
 
     /// Performs a one-shot measurement.

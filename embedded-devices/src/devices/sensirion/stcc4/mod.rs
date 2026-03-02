@@ -170,11 +170,13 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
     /// Initializes the sensor by waking it up, stopping any ongoing measurement, and verifying
     /// the product ID.
     ///
-    /// The datasheet specifies a 10 ms power-up delay after VDD has reached the operating voltage.
+    /// # Power-on timing
+    ///
+    /// The datasheet requires at least 10 ms between VDD reaching the operating voltage and
+    /// the first I2C command. The caller must ensure this delay has elapsed before calling
+    /// `init`. Calling `init` immediately after `new_i2c` without an external delay may result
+    /// in a failed initialization.
     pub async fn init(&mut self) -> Result<(), InitError<I::BusError>> {
-        // Datasheet specifies 10ms power-up time after power-on.
-        // TODO do we want to do that here? maybe call reset and then this?
-        self.delay.delay_ms(10).await;
         // Wake up from sleep if needed (NACK is expected, ignore error)
         let _ = self.execute::<ExitSleepMode>(()).await;
         // Stop any ongoing measurement (ignore error if already idle)
@@ -290,15 +292,18 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
 
     /// The STCC4 does not support a GetDataReady command. This always returns `true`.
     ///
-    /// Use `next_measurement` which retries on NACK to reliably wait for data.
+    /// Since data availability cannot be checked without attempting a read, callers should
+    /// ensure that `measurement_interval_us` has elapsed since the last measurement
+    /// before calling `next_measurement` or `current_measurement`.
     async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error> {
         Ok(true)
     }
 
-    /// Returns the most recent measurement.
+    /// Attempts to read the most recent measurement.
     ///
-    /// The sensor responds with a NACK if no measurement data is available yet. In that case,
-    /// prefer `next_measurement` which automatically retries.
+    /// The STCC4 responds with a NACK if no measurement data is available yet, which surfaces
+    /// as a bus error. Callers should wait at least `measurement_interval_us` after
+    /// calling `start_measuring` before reading.
     async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
         let m = self.execute::<ReadMeasurement>(()).await?;
         Ok(Some(Measurement {
@@ -309,27 +314,19 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::commands::CommandInterface>
         }))
     }
 
-    /// Waits until measurement data is available and returns it.
+    /// Attempts to read the next measurement without polling or retrying.
     ///
-    /// The STCC4 has no GetDataReady command and responds with a NACK when no data is available.
-    /// This method retries with a 150 ms delay on any error until a read succeeds.
+    /// The STCC4 has no GetDataReady command and signals data unavailability via NACK, which
+    /// surfaces as a transport error. The caller is responsible for timing — wait at least
+    /// `measurement_interval_us` since the last successful read before calling this.
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error> {
-        // TODO no loop!
-        loop {
-            match self.execute::<ReadMeasurement>(()).await {
-                Ok(m) => {
-                    return Ok(Measurement {
-                        co2_concentration: m.read_co2_concentration(),
-                        temperature: m.read_temperature(),
-                        relative_humidity: m.read_relative_humidity(),
-                        status: m.read_status(),
-                    });
-                }
-                Err(_) => {
-                    self.delay.delay_ms(150).await;
-                }
-            }
-        }
+        let m = self.execute::<ReadMeasurement>(()).await?;
+        Ok(Measurement {
+            co2_concentration: m.read_co2_concentration(),
+            temperature: m.read_temperature(),
+            relative_humidity: m.read_relative_humidity(),
+            status: m.read_status(),
+        })
     }
 }
 

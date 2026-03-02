@@ -68,10 +68,14 @@ pub trait ContinuousSensor {
     /// should always return `true`.
     async fn is_measurement_ready(&mut self) -> Result<bool, Self::Error>;
 
-    /// Wait indefinitely until new measurements are available and return them. If the device does
-    /// not support checking for new measurements (e.g. via some form of data ready indicator),
-    /// this method should wait for [`Self::measurement_interval_us`] and read the measurement
-    /// opportunistically.
+    /// Attempt to read the next measurement without polling or retrying.
+    ///
+    /// Returns an error (typically a `DataNotReady` variant or a bus error) if no new measurement
+    /// is available. The caller is responsible for timing: wait at least
+    /// [`Self::measurement_interval_us`] since the last successful read before calling this.
+    ///
+    /// Implementations **must not** contain unbounded loops or unconditional delays. A single
+    /// non-blocking check followed by either a measurement or an error is the required pattern.
     async fn next_measurement(&mut self) -> Result<Self::Measurement, Self::Error>;
 }
 
