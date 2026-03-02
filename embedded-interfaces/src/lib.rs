@@ -20,6 +20,7 @@ pub mod registers;
 pub mod spi;
 
 /// A combined error type for Codec or Bus errors
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError<CodecError, BusError> {
     /// The codec failed to encode or decode something

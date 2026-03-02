@@ -66,6 +66,7 @@ all-devices = [
 	"sensirion-sen66",
 	"sensirion-sen68",
 	"vishay-veml7700",
+	"sensirion-stcc4",
 ]
 
 # Analog Devices
@@ -100,6 +101,7 @@ sensirion-sen63c = []
 sensirion-sen65 = []
 sensirion-sen66 = []
 sensirion-sen68 = []
+sensirion-stcc4 = []
 
 # Vishay
 vishay-veml7700 = []

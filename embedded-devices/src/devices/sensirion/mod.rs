@@ -32,3 +32,6 @@ pub mod sen65;
 pub mod sen66;
 #[cfg(feature = "sensirion-sen68")]
 pub mod sen68;
+
+#[cfg(feature = "sensirion-stcc4")]
+pub mod stcc4;
