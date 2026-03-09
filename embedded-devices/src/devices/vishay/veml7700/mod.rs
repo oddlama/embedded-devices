@@ -74,7 +74,8 @@ pub mod registers;
 
 use registers::{Configuration, PowerSaving};
 
-//use uom::si::illuminance::lux; // requires uom 0.38.0
+use uom::si::f64::Illuminance;
+use uom::si::illuminance::lux;
 
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, thiserror::Error)]
@@ -100,7 +101,7 @@ pub enum MeasurementError<BusError> {
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
-    pub lux: f32, //uom::si::Illuminance,
+    pub lux: Illuminance,
 }
 
 /// The VEML7700 is a high accuracy digital ambient light sensor.
@@ -183,7 +184,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         &mut self,
         config: &mut Configuration,
         ps_sleep: u32,
-    ) -> Result<f32, MeasurementError<I::BusError>> {
+    ) -> Result<f64, MeasurementError<I::BusError>> {
         const UP_THRESHOLD: u16 = 100;
         const DOWN_THRESHOLD: u16 = 10_000;
 
@@ -233,7 +234,7 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
             self.configure(config).await?;
         }
 
-        Ok(raw_lux as f32 * config.resolution())
+        Ok(raw_lux as f64 * config.resolution())
     }
 }
 
@@ -260,9 +261,10 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         self.write_register(config).await?;
 
         let raw_lux = self.measure_raw_lux_auto(&mut config, ps.ms()).await?;
+        let corrected_lux = lux_correction(raw_lux);
 
         Ok(Measurement {
-            lux: lux_correction(raw_lux),
+            lux: Illuminance::new::<lux>(corrected_lux),
         })
     }
 }
@@ -319,10 +321,11 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
     async fn current_measurement(&mut self) -> Result<Option<Self::Measurement>, Self::Error> {
         let config = self.read_register::<Configuration>().await?;
         let raw_data = self.read_register::<registers::ALSData>().await?;
-        let raw_lux = raw_data.read_als_data() as f32 * config.resolution();
+        let raw_lux = raw_data.read_als_data() as f64 * config.resolution();
+        let corrected_lux = lux_correction(raw_lux);
 
         Ok(Some(Measurement {
-            lux: lux_correction(raw_lux),
+            lux: Illuminance::new::<lux>(corrected_lux),
         }))
     }
 
@@ -339,13 +342,15 @@ impl<D: hal::delay::DelayNs, I: embedded_interfaces::registers::RegisterInterfac
         let ps = self.read_register::<PowerSaving>().await?;
 
         let raw_lux = self.measure_raw_lux_auto(&mut config, ps.ms()).await?;
+        let corrected_lux = lux_correction(raw_lux);
+
         Ok(Measurement {
-            lux: lux_correction(raw_lux),
+            lux: Illuminance::new::<lux>(corrected_lux),
         })
     }
 }
 
-fn lux_correction(raw_lux: f32) -> f32 {
+fn lux_correction(raw_lux: f64) -> f64 {
     if raw_lux <= 1000.0 {
         return raw_lux;
     }
@@ -357,10 +362,10 @@ fn lux_correction(raw_lux: f32) -> f32 {
     }
 
     // coefficients from datasheet
-    const A: f32 = 6.0135e-13;
-    const B: f32 = -9.3924e-9;
-    const C: f32 = 8.1488e-5;
-    const D: f32 = 1.0023;
+    const A: f64 = 6.0135e-13;
+    const B: f64 = -9.3924e-9;
+    const C: f64 = 8.1488e-5;
+    const D: f64 = 1.0023;
 
     let res_d = D * raw_lux;
 

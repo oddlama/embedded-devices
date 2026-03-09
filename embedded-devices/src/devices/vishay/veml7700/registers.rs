@@ -183,7 +183,7 @@ impl IntegrationTime {
         }
     }
 
-    pub(super) const fn k_hz(&self) -> f32 {
+    pub(super) const fn k_hz(&self) -> f64 {
         match self {
             IntegrationTime::T_25 => 0.04,
             IntegrationTime::T_50 => 0.02,
@@ -223,7 +223,7 @@ impl IntegrationTime {
 }
 
 impl Gain {
-    pub const fn factor(&self) -> f32 {
+    pub const fn factor(&self) -> f64 {
         match self {
             Gain::X_1 => 1.0,
             Gain::X_2 => 2.0,
@@ -232,7 +232,7 @@ impl Gain {
         }
     }
 
-    pub(super) const fn inv_factor(&self) -> f32 {
+    pub(super) const fn inv_factor(&self) -> f64 {
         match self {
             Gain::X_1_8 => 8.0,
             Gain::X_1_4 => 4.0,
@@ -267,8 +267,8 @@ impl Gain {
 impl Configuration {
     /// Calculate the lux/count resolution based on
     /// the current gain and integration time settings
-    pub fn resolution(&self) -> f32 {
-        const BASE_RES: f32 = 6.72;
+    pub fn resolution(&self) -> f64 {
+        const BASE_RES: f64 = 6.72;
 
         let gain = self.read_gain().inv_factor();
         let it = self.read_integration_time().k_hz();
