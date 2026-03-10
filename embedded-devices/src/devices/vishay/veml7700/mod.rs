@@ -64,8 +64,10 @@
 //! # }
 //! ```
 
-use embedded_devices_derive::forward_register_fns;
+use embedded_devices_derive::{forward_register_fns, sensor};
 use embedded_interfaces::TransportError;
+use uom::si::f64::Illuminance;
+use uom::si::illuminance::lux;
 
 use self::address::Address;
 
@@ -73,9 +75,6 @@ pub mod address;
 pub mod registers;
 
 use registers::{Configuration, PowerSaving};
-
-use uom::si::f64::Illuminance;
-use uom::si::illuminance::lux;
 
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, thiserror::Error)]
@@ -101,6 +100,7 @@ pub enum MeasurementError<BusError> {
 /// Measurement data
 #[derive(Debug, embedded_devices_derive::Measurement)]
 pub struct Measurement {
+    #[measurement(Illuminance)]
     pub lux: Illuminance,
 }
 
@@ -141,6 +141,7 @@ where
 }
 
 #[forward_register_fns]
+#[sensor(Illuminance)]
 #[maybe_async_cfg::maybe(
     idents(hal(sync = "embedded_hal", async = "embedded_hal_async"), RegisterInterface),
     sync(feature = "sync"),
