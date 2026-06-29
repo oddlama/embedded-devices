@@ -104,8 +104,8 @@ interface_objects! {
         /// Enables temperature compensation of an external shunt.
         /// Default: false.
         temperature_compensation: bool = false,
-        /// Enables temperature compensation of an external shunt.
-        /// Default: false.
+        /// Shunt full scale range selection across IN+ and IN– (0 = ±163.84 mV, 1 = ± 40.96 mV).
+        /// Default: 0 (±163.84 mV)
         adc_range: AdcRange = AdcRange::Div4,
         /// Reserved bits
         _: u8{4},
