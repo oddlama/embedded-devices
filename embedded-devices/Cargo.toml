@@ -43,6 +43,7 @@ trace-communication = ["std", "log", "embedded-interfaces/trace-communication"]
 
 # Feature flags to enable all supported devices
 all-devices = [
+	"texas_instruments-ads7830",
 	"analog_devices-max31865",
 	"belling-bl0942",
 	"bosch-bme280",
@@ -85,6 +86,7 @@ microchip-mcp3204 = []
 microchip-mcp3208 = []
 
 # Texas Instrument
+texas_instruments-ads7830 = []
 texas_instruments-ina219 = []
 texas_instruments-ina226 = []
 texas_instruments-ina228 = []
